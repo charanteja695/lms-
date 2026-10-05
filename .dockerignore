@@ -1,0 +1,14 @@
+# The build context is lms-backend/ for every service: keep local state, secrets and tests out of it.
+**/.venv
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.docker.example
+**/tests
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/*.egg-info
+**/var

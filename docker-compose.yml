@@ -1,0 +1,487 @@
+# Local development stack for the LMS backend: PostgreSQL (one database per service), Redis, MinIO (S3) and, for every
+# service, three containers built from one image: `<service>-migrate` (tools profile), `<service>` (the API) and
+# `<service>-worker` (outbox relay, event consumer, queues, housekeeping).
+#
+# Stack values come from lms-backend/.env (copy .env.example); each service reads its own <service>/.env.docker
+# (copy <service>/.env.docker.example). See README.md ("Local stack") for the commands. Build context is this
+# folder because every image installs ./shared.
+
+name: lms-backend
+
+x-migrate: &migrate
+  command: ["alembic", "upgrade", "head"]
+  depends_on:
+    postgres: { condition: service_healthy }
+    databases: { condition: service_completed_successfully }
+  profiles: ["tools"]
+
+x-api-deps: &api-deps
+  postgres: { condition: service_healthy }
+  redis: { condition: service_healthy }
+  databases: { condition: service_completed_successfully }
+
+x-api: &api
+  depends_on: *api-deps
+
+# Services that store files also wait for the development buckets.
+x-api-deps-s3: &api-deps-s3
+  <<: *api-deps
+  buckets: { condition: service_completed_successfully }
+
+x-api-s3: &api-s3
+  depends_on: *api-deps-s3
+
+x-worker: &worker
+  command: ["python", "-m", "app.worker"]
+
+services:
+  # ------------------------------------------------------------------ infrastructure
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports: ["${POSTGRES_PORT}:5432"]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+  # One-shot: creates every service's database if it does not exist yet (works on an existing volume too).
+  databases:
+    image: postgres:16-alpine
+    command: ["sh", "/scripts/create-databases.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes: ["./docker/create-databases.sh:/scripts/create-databases.sh:ro"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["${REDIS_PORT}:6379"]
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  # S3-compatible object storage for media, assessment answers, proctoring snapshots and certificates. The service
+  # env files point at it (S3_ENDPOINT_URL); leave that unset outside local development to use real AWS S3.
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-lms-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-lms-minio-secret}
+    ports: ["${MINIO_PORT:-9000}:9000", "${MINIO_CONSOLE_PORT:-9001}:9001"]
+    volumes: [minio-data:/data]
+
+  # One-shot: creates the development buckets (waits for MinIO to answer first).
+  buckets:
+    image: minio/mc:latest
+    entrypoint: ["sh", "/scripts/create-buckets.sh"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-lms-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-lms-minio-secret}
+    volumes: ["./docker/create-buckets.sh:/scripts/create-buckets.sh:ro"]
+    depends_on: [minio]
+    restart: "no"
+
+  # ------------------------------------------------------------------ user-management (8001)
+  user-management-migrate:
+    <<: *migrate
+    image: lms-user-management
+    build: { context: ., dockerfile: user-management/Dockerfile }
+    env_file: ./user-management/.env.docker
+
+  user-management:
+    <<: *api
+    image: lms-user-management
+    build: { context: ., dockerfile: user-management/Dockerfile }
+    env_file: ./user-management/.env.docker
+    ports: ["${USER_MANAGEMENT_PORT}:8000"]
+    volumes: [user-management-jobs:/app/var/jobs]
+
+  # Export jobs, event relay (Redis Stream lms:events) and housekeeping. Scale with --scale.
+  user-management-worker:
+    <<: [*api, *worker]
+    image: lms-user-management
+    build: { context: ., dockerfile: user-management/Dockerfile }
+    env_file: ./user-management/.env.docker
+    volumes: [user-management-jobs:/app/var/jobs]
+
+  # ------------------------------------------------------------------ catalog-service (8002)
+  catalog-service-migrate:
+    <<: *migrate
+    image: lms-catalog-service
+    build: { context: ., dockerfile: catalog-service/Dockerfile }
+    env_file: ./catalog-service/.env.docker
+
+  catalog-service:
+    <<: *api
+    image: lms-catalog-service
+    build: { context: ., dockerfile: catalog-service/Dockerfile }
+    env_file: ./catalog-service/.env.docker
+    ports: ["${CATALOG_PORT:-8002}:8000"]
+
+  catalog-service-worker:
+    <<: [*api, *worker]
+    image: lms-catalog-service
+    build: { context: ., dockerfile: catalog-service/Dockerfile }
+    env_file: ./catalog-service/.env.docker
+
+  # ------------------------------------------------------------------ media-service (8003)
+  media-service-migrate:
+    <<: *migrate
+    image: lms-media-service
+    build: { context: ., dockerfile: media-service/Dockerfile }
+    env_file: ./media-service/.env.docker
+
+  media-service:
+    <<: *api-s3
+    image: lms-media-service
+    build: { context: ., dockerfile: media-service/Dockerfile }
+    env_file: ./media-service/.env.docker
+    ports: ["${MEDIA_PORT:-8003}:8000"]
+
+  # Transcoding pipeline (ffmpeg is in the image), outbox relay, event consumer.
+  media-service-worker:
+    <<: [*api-s3, *worker]
+    image: lms-media-service
+    build: { context: ., dockerfile: media-service/Dockerfile }
+    env_file: ./media-service/.env.docker
+
+  # ------------------------------------------------------------------ subscription-service (8004)
+  subscription-service-migrate:
+    <<: *migrate
+    image: lms-subscription-service
+    build: { context: ., dockerfile: subscription-service/Dockerfile }
+    env_file: ./subscription-service/.env.docker
+
+  subscription-service:
+    <<: *api
+    image: lms-subscription-service
+    build: { context: ., dockerfile: subscription-service/Dockerfile }
+    env_file: ./subscription-service/.env.docker
+    ports: ["${SUBSCRIPTION_PORT:-8004}:8000"]
+
+  subscription-service-worker:
+    <<: [*api, *worker]
+    image: lms-subscription-service
+    build: { context: ., dockerfile: subscription-service/Dockerfile }
+    env_file: ./subscription-service/.env.docker
+
+  # ------------------------------------------------------------------ learning-service (8005)
+  learning-service-migrate:
+    <<: *migrate
+    image: lms-learning-service
+    build: { context: ., dockerfile: learning-service/Dockerfile }
+    env_file: ./learning-service/.env.docker
+
+  learning-service:
+    <<: *api
+    image: lms-learning-service
+    build: { context: ., dockerfile: learning-service/Dockerfile }
+    env_file: ./learning-service/.env.docker
+    ports: ["${LEARNING_PORT:-8005}:8000"]
+
+  learning-service-worker:
+    <<: [*api, *worker]
+    image: lms-learning-service
+    build: { context: ., dockerfile: learning-service/Dockerfile }
+    env_file: ./learning-service/.env.docker
+
+  # ------------------------------------------------------------------ code-execution-service (8006)
+  # Judging needs a Judge0 instance, which this stack does not run: JUDGE0_URL in the env file points at one on the host.
+  code-execution-service-migrate:
+    <<: *migrate
+    image: lms-code-execution-service
+    build: { context: ., dockerfile: code-execution-service/Dockerfile }
+    env_file: ./code-execution-service/.env.docker
+
+  code-execution-service:
+    <<: *api
+    image: lms-code-execution-service
+    build: { context: ., dockerfile: code-execution-service/Dockerfile }
+    env_file: ./code-execution-service/.env.docker
+    ports: ["${CODE_EXECUTION_PORT:-8006}:8000"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+
+  code-execution-service-worker:
+    <<: [*api, *worker]
+    image: lms-code-execution-service
+    build: { context: ., dockerfile: code-execution-service/Dockerfile }
+    env_file: ./code-execution-service/.env.docker
+    extra_hosts: ["host.docker.internal:host-gateway"]
+
+  # ------------------------------------------------------------------ assessment-service (8007)
+  assessment-service-migrate:
+    <<: *migrate
+    image: lms-assessment-service
+    build: { context: ., dockerfile: assessment-service/Dockerfile }
+    env_file: ./assessment-service/.env.docker
+
+  assessment-service:
+    <<: *api-s3
+    image: lms-assessment-service
+    build: { context: ., dockerfile: assessment-service/Dockerfile }
+    env_file: ./assessment-service/.env.docker
+    ports: ["${ASSESSMENT_PORT:-8007}:8000"]
+
+  assessment-service-worker:
+    <<: [*api-s3, *worker]
+    image: lms-assessment-service
+    build: { context: ., dockerfile: assessment-service/Dockerfile }
+    env_file: ./assessment-service/.env.docker
+
+  # ------------------------------------------------------------------ proctoring-service (8008)
+  proctoring-service-migrate:
+    <<: *migrate
+    image: lms-proctoring-service
+    build: { context: ., dockerfile: proctoring-service/Dockerfile }
+    env_file: ./proctoring-service/.env.docker
+
+  proctoring-service:
+    <<: *api-s3
+    image: lms-proctoring-service
+    build: { context: ., dockerfile: proctoring-service/Dockerfile }
+    env_file: ./proctoring-service/.env.docker
+    ports: ["${PROCTORING_PORT:-8008}:8000"]
+
+  proctoring-service-worker:
+    <<: [*api-s3, *worker]
+    image: lms-proctoring-service
+    build: { context: ., dockerfile: proctoring-service/Dockerfile }
+    env_file: ./proctoring-service/.env.docker
+
+  # ------------------------------------------------------------------ certificate-service (8009)
+  certificate-service-migrate:
+    <<: *migrate
+    image: lms-certificate-service
+    build: { context: ., dockerfile: certificate-service/Dockerfile }
+    env_file: ./certificate-service/.env.docker
+
+  certificate-service:
+    <<: *api-s3
+    image: lms-certificate-service
+    build: { context: ., dockerfile: certificate-service/Dockerfile }
+    env_file: ./certificate-service/.env.docker
+    ports: ["${CERTIFICATE_PORT:-8009}:8000"]
+
+  certificate-service-worker:
+    <<: [*api-s3, *worker]
+    image: lms-certificate-service
+    build: { context: ., dockerfile: certificate-service/Dockerfile }
+    env_file: ./certificate-service/.env.docker
+
+  # ------------------------------------------------------------------ notification-service (8016)
+  notification-service-migrate:
+    <<: *migrate
+    image: lms-notification-service
+    build: { context: ., dockerfile: notification-service/Dockerfile }
+    env_file: ./notification-service/.env.docker
+
+  notification-service:
+    <<: *api
+    image: lms-notification-service
+    build: { context: ., dockerfile: notification-service/Dockerfile }
+    env_file: ./notification-service/.env.docker
+    ports: ["${NOTIFICATION_PORT:-8016}:8000"]
+
+  notification-service-worker:
+    <<: [*api, *worker]
+    image: lms-notification-service
+    build: { context: ., dockerfile: notification-service/Dockerfile }
+    env_file: ./notification-service/.env.docker
+
+  # ------------------------------------------------------------------ ai-gateway (8010)
+  # Talks to real LLM/embedding providers: set ANTHROPIC_API_KEY / VOYAGE_API_KEY in its .env.docker, or every
+  # completion/embedding call answers 503 PROVIDER_NOT_CONFIGURED (see ai-gateway/README.md "Not exercised").
+  ai-gateway-migrate:
+    <<: *migrate
+    image: lms-ai-gateway
+    build: { context: ., dockerfile: ai-gateway/Dockerfile }
+    env_file: ./ai-gateway/.env.docker
+
+  ai-gateway:
+    <<: *api
+    image: lms-ai-gateway
+    build: { context: ., dockerfile: ai-gateway/Dockerfile }
+    env_file: ./ai-gateway/.env.docker
+    ports: ["${AI_GATEWAY_PORT:-8010}:8000"]
+
+  ai-gateway-worker:
+    <<: [*api, *worker]
+    image: lms-ai-gateway
+    build: { context: ., dockerfile: ai-gateway/Dockerfile }
+    env_file: ./ai-gateway/.env.docker
+
+  # ------------------------------------------------------------------ ai-tutor-service (8011)
+  # Calls ai-gateway and support-service; without a provider key in ai-gateway every model call answers 503.
+  ai-tutor-service-migrate:
+    <<: *migrate
+    image: lms-ai-tutor-service
+    build: { context: ., dockerfile: ai-tutor-service/Dockerfile }
+    env_file: ./ai-tutor-service/.env.docker
+
+  ai-tutor-service:
+    <<: *api
+    image: lms-ai-tutor-service
+    build: { context: ., dockerfile: ai-tutor-service/Dockerfile }
+    env_file: ./ai-tutor-service/.env.docker
+    ports: ["${AI_TUTOR_PORT:-8011}:8000"]
+
+  ai-tutor-service-worker:
+    <<: [*api, *worker]
+    image: lms-ai-tutor-service
+    build: { context: ., dockerfile: ai-tutor-service/Dockerfile }
+    env_file: ./ai-tutor-service/.env.docker
+
+  # ------------------------------------------------------------------ support-service (8012)
+  # Receives hand-offs from ai-tutor-service.
+  support-service-migrate:
+    <<: *migrate
+    image: lms-support-service
+    build: { context: ., dockerfile: support-service/Dockerfile }
+    env_file: ./support-service/.env.docker
+
+  support-service:
+    <<: *api
+    image: lms-support-service
+    build: { context: ., dockerfile: support-service/Dockerfile }
+    env_file: ./support-service/.env.docker
+    ports: ["${SUPPORT_PORT:-8012}:8000"]
+
+  support-service-worker:
+    <<: [*api, *worker]
+    image: lms-support-service
+    build: { context: ., dockerfile: support-service/Dockerfile }
+    env_file: ./support-service/.env.docker
+
+  # ------------------------------------------------------------------ career-service (8013)
+  # Calls ai-gateway for AI suggestions; without a provider key there every AI call answers 503 (the rest of the resume builder works).
+  career-service-migrate:
+    <<: *migrate
+    image: lms-career-service
+    build: { context: ., dockerfile: career-service/Dockerfile }
+    env_file: ./career-service/.env.docker
+
+  career-service:
+    <<: *api
+    image: lms-career-service
+    build: { context: ., dockerfile: career-service/Dockerfile }
+    env_file: ./career-service/.env.docker
+    ports: ["${CAREER_PORT:-8013}:8000"]
+
+  career-service-worker:
+    <<: [*api, *worker]
+    image: lms-career-service
+    build: { context: ., dockerfile: career-service/Dockerfile }
+    env_file: ./career-service/.env.docker
+
+  # ------------------------------------------------------------------ job-portal-service (8014)
+  # Calls ai-gateway (screening, embeddings), assessment-service (hiring-test invitations) and career-service (resume snapshots).
+  job-portal-service-migrate:
+    <<: *migrate
+    image: lms-job-portal-service
+    build: { context: ., dockerfile: job-portal-service/Dockerfile }
+    env_file: ./job-portal-service/.env.docker
+
+  job-portal-service:
+    <<: *api
+    image: lms-job-portal-service
+    build: { context: ., dockerfile: job-portal-service/Dockerfile }
+    env_file: ./job-portal-service/.env.docker
+    ports: ["${JOB_PORTAL_PORT:-8014}:8000"]
+
+  job-portal-service-worker:
+    <<: [*api, *worker]
+    image: lms-job-portal-service
+    build: { context: ., dockerfile: job-portal-service/Dockerfile }
+    env_file: ./job-portal-service/.env.docker
+
+  # ------------------------------------------------------------------ ai-interview-service (8015)
+  # Calls ai-gateway (interview conduct/evaluation/feedback completions, speech) and code-execution-service (the coding round's runs).
+  ai-interview-service-migrate:
+    <<: *migrate
+    image: lms-ai-interview-service
+    build: { context: ., dockerfile: ai-interview-service/Dockerfile }
+    env_file: ./ai-interview-service/.env.docker
+
+  ai-interview-service:
+    <<: *api
+    image: lms-ai-interview-service
+    build: { context: ., dockerfile: ai-interview-service/Dockerfile }
+    env_file: ./ai-interview-service/.env.docker
+    ports: ["${INTERVIEW_PORT:-8015}:8000"]
+
+  ai-interview-service-worker:
+    <<: [*api, *worker]
+    image: lms-ai-interview-service
+    build: { context: ., dockerfile: ai-interview-service/Dockerfile }
+    env_file: ./ai-interview-service/.env.docker
+
+  # ------------------------------------------------------------------ analytics-service (8017)
+  # Consumes events from every other service; calls none of them synchronously.
+  analytics-service-migrate:
+    <<: *migrate
+    image: lms-analytics-service
+    build: { context: ., dockerfile: analytics-service/Dockerfile }
+    env_file: ./analytics-service/.env.docker
+
+  analytics-service:
+    <<: *api
+    image: lms-analytics-service
+    build: { context: ., dockerfile: analytics-service/Dockerfile }
+    env_file: ./analytics-service/.env.docker
+    ports: ["${ANALYTICS_PORT:-8017}:8000"]
+
+  analytics-service-worker:
+    <<: [*api, *worker]
+    image: lms-analytics-service
+    build: { context: ., dockerfile: analytics-service/Dockerfile }
+    env_file: ./analytics-service/.env.docker
+
+  # ------------------------------------------------------------------ billing-service (8018)
+  # Consumes subscription.activated and org events; the payment gateway is a contract only (PAYMENT_GATEWAY_URL empty = manual payments only).
+  billing-service-migrate:
+    <<: *migrate
+    image: lms-billing-service
+    build: { context: ., dockerfile: billing-service/Dockerfile }
+    env_file: ./billing-service/.env.docker
+
+  billing-service:
+    <<: *api
+    image: lms-billing-service
+    build: { context: ., dockerfile: billing-service/Dockerfile }
+    env_file: ./billing-service/.env.docker
+    ports: ["${BILLING_PORT:-8018}:8000"]
+
+  billing-service-worker:
+    <<: [*api, *worker]
+    image: lms-billing-service
+    build: { context: ., dockerfile: billing-service/Dockerfile }
+    env_file: ./billing-service/.env.docker
+
+  # ------------------------------------------------------------------ api-gateway (8000)
+  # The single public entry point (phase 0.5): routes to every other service by its generated config/routes.json. No database, no worker.
+  api-gateway:
+    image: lms-api-gateway
+    build: { context: ., dockerfile: api-gateway/Dockerfile }
+    env_file: ./api-gateway/.env.docker
+    depends_on:
+      redis: { condition: service_healthy }
+    ports: ["${API_GATEWAY_PORT:-8000}:8000"]
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  user-management-jobs:
