@@ -38,6 +38,11 @@ class PromptService:
     async def list_prompts(self, *, page: int, per_page: int) -> tuple[list[Prompt], int, bool]:
         return await paginate(self.db, select(Prompt).order_by(Prompt.created_at.desc(), Prompt.id), page, per_page)
 
+    async def list_versions(self, prompt: Prompt) -> list[PromptVersion]:
+        """Every version of a prompt, newest first (drafts, the active one, retired ones)."""
+        stmt = select(PromptVersion).where(PromptVersion.prompt_id == prompt.id).order_by(PromptVersion.version.desc())
+        return list((await self.db.execute(stmt)).scalars())
+
     async def active_version(self, prompt: Prompt) -> PromptVersion:
         version = (
             await self.db.execute(select(PromptVersion).where(PromptVersion.prompt_id == prompt.id, PromptVersion.status == PromptStatus.ACTIVE))
@@ -79,10 +84,13 @@ class PromptService:
         await self.db.commit()
         return version
 
-    async def activate_version(self, prompt: Prompt, version: PromptVersion, *, activated_by: int) -> PromptVersion:
+    async def activate_version(
+        self, prompt: Prompt, version: PromptVersion, *, activated_by: int, self_approval: bool = False
+    ) -> PromptVersion:
+        """Someone other than the author activates a version; the super admin, who runs AI alone, may activate their own."""
         if version.status != PromptStatus.DRAFT:
             raise ConflictError(f"Version {version.version} is {version.status}, not draft.", code="NOT_DRAFT")
-        if version.created_by == activated_by:
+        if version.created_by == activated_by and not self_approval:
             raise PermissionDeniedError("A prompt version must be activated by someone other than its author.", code="SAME_AUTHOR")
         previous = (
             await self.db.execute(select(PromptVersion).where(PromptVersion.prompt_id == prompt.id, PromptVersion.status == PromptStatus.ACTIVE))

@@ -5,13 +5,15 @@ from datetime import UTC, datetime
 from typing import Any
 
 import fakeredis.aioredis
+import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
 from lms_common.auth import AccessTokenClaims
 from lms_common.events import Event
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
-from app.api.deps import _authenticate
+from app.api.deps import _authenticate, get_people_client
+from app.clients.user_management import UserManagementClient
 from app.core.config import Settings, get_settings
 from app.db.session import build_engine, build_sessionmaker
 from app.events.consumers.router import dispatch
@@ -40,12 +42,19 @@ def _settings(**overrides: Any) -> Settings:
     return Settings(**values)
 
 
-def make_claims(*, user_id: int, role: str, organization_id: int | None, scopes: tuple[str, ...]) -> AccessTokenClaims:
+# What user-management puts in a token by default (its permission catalog), for the permissions this service checks.
+ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {"student": ("support.ask",), "staff": ("support.agent",), "institution_head": ("support.agent", "support.assign")}
+
+
+def make_claims(*, user_id: int, role: str, organization_id: int | None, scopes: tuple[str, ...], defaults: bool = True) -> AccessTokenClaims:
+    scopes = (*ROLE_PERMISSIONS.get(role, ()), *scopes) if defaults else scopes  # "defaults": the role's own
     now = datetime.now(UTC)
     return AccessTokenClaims(
         user_id=user_id, session_id=1755000000030002, role=role, organization_id=organization_id,
         organization_type="institution" if organization_id else None, scopes=scopes, token_version=0,
         token_id="test-token", issued_at=int(now.timestamp()), expires_at=now,
+        # the test admin looks after both test institutions (support.manage reaches only those for an admin)
+        admin_organization_ids=(ORG_A, ORG_B) if role == "admin" else (),
     )
 
 
@@ -75,11 +84,36 @@ async def redis():
     await client.aclose()
 
 
+class PeopleStub:
+    """Stands in for user-management's ``/internal/permission-holders``: everyone holds what their role gives them,
+    except the (user, permission) pairs a test removes. ``calls`` records what was asked."""
+
+    def __init__(self) -> None:
+        self.removed: set[tuple[int, str]] = set()
+        self.calls: list[dict[str, Any]] = []
+        self.down = False
+
+    def respond(self, request: httpx.Request) -> httpx.Response:
+        if self.down:
+            return httpx.Response(503)
+        assert request.headers["X-Internal-Service-Token"] == INTERNAL_TOKEN
+        body = json.loads(request.content)
+        self.calls.append(body)
+        held = [u for u in body["user_ids"] if (int(u), body["permission"]) not in self.removed]
+        return httpx.Response(200, json={"status": "success", "message": "", "user_ids": held})
+
+
 @pytest.fixture
-async def app(db_engine, sessionmaker, settings, redis):
+def people() -> PeopleStub:
+    return PeopleStub()
+
+
+@pytest.fixture
+async def app(db_engine, sessionmaker, settings, redis, people):
     fastapi_app = create_app(settings)
     fastapi_app.state.engine, fastapi_app.state.sessionmaker, fastapi_app.state.redis = db_engine, sessionmaker, redis
     fastapi_app.dependency_overrides[get_settings] = lambda: settings
+    fastapi_app.dependency_overrides[get_people_client] = lambda: UserManagementClient(settings, transport=httpx.MockTransport(people.respond))
     yield fastapi_app
 
 
@@ -96,8 +130,8 @@ def internal_headers() -> dict[str, str]:
 
 @pytest.fixture
 def act_as(app) -> Callable[..., AccessTokenClaims]:
-    def _set(user_id: int, *, role: str = "student", organization_id: int | None = ORG_A, scopes: tuple[str, ...] = ()) -> AccessTokenClaims:
-        claims = make_claims(user_id=user_id, role=role, organization_id=organization_id, scopes=scopes)
+    def _set(user_id: int, *, role: str = "student", organization_id: int | None = ORG_A, scopes: tuple[str, ...] = (), defaults: bool = True) -> AccessTokenClaims:
+        claims = make_claims(user_id=user_id, role=role, organization_id=organization_id, scopes=scopes, defaults=defaults)
         app.dependency_overrides[_authenticate] = lambda: claims
         return claims
 

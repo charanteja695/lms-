@@ -12,9 +12,9 @@ from app.api.deps import (
     RequireInstitutionHead,
     SettingsDep,
     ensure_organization_visible,
+    institutions_listed,
 )
 from app.api.responses import errors
-from app.permissions.scopes import Scope
 from app.schemas.common import ListQuery
 from app.schemas.course_request import (
     ApproveRequest,
@@ -59,9 +59,9 @@ async def submit_course_request(
 async def list_course_requests(
     query: Annotated[ListQuery, Query()], auth: CurrentAuth, db: DbSession, settings: SettingsDep, redis: RedisDep
 ) -> CourseRequestListResponse:
-    organization_id = None if auth.has_scope(Scope.ACCOUNTS_MANAGE.value) else auth.organization_id
+    organization_ids = institutions_listed(auth)
     requests, total, is_exact = await CourseRequestService(db, settings, redis).list_requests(
-        query, organization_id=organization_id
+        query, organization_ids=organization_ids
     )
     return CourseRequestListResponse(
         message="Course requests retrieved successfully.",
@@ -106,6 +106,7 @@ async def approve_course_request(
 ) -> SubscriptionResponse:
     service = CourseRequestService(db, settings, redis)
     request = await service.get(course_request_id)
+    ensure_organization_visible(auth, request.organization_id)
     subscription = await service.approve(auth.user_id, request, data)
     return SubscriptionResponse(
         message="Course request approved; subscription activated.", subscription=SubscriptionOut.model_validate(subscription)
@@ -128,5 +129,6 @@ async def reject_course_request(
 ) -> CourseRequestResponse:
     service = CourseRequestService(db, settings, redis)
     request = await service.get(course_request_id)
+    ensure_organization_visible(auth, request.organization_id)
     request = await service.reject(auth.user_id, request, data.reason)
     return CourseRequestResponse(message="Course request rejected.", course_request=CourseRequestOut.model_validate(request))

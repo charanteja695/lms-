@@ -8,7 +8,7 @@ async def _completed_call(client, who, fake_chat) -> None:
     created = await client.post("/api/v1/prompts/tutor.explain/versions", json={"template": "Explain {{topic}}.", "variables": ["topic"]})
     who.other_ai_manager()
     await client.post(f"/api/v1/prompts/tutor.explain/versions/{created.json()['version']['version']}/activate")
-    fake_chat.queue_result(ChatResult(content="Recursion is self-reference.", model="claude-sonnet-5", prompt_tokens=5, completion_tokens=5, stop_reason="end_turn"))
+    fake_chat.queue_result(ChatResult(content="Recursion is self-reference.", model="claude-sonnet-5-5", prompt_tokens=5, completion_tokens=5, stop_reason="end_turn"))
     body = {"organization_id": str(ORG_A), "service": "ai-tutor-service", "user_id": str(USER), "prompt_key": "tutor.explain", "variables": {"topic": "recursion"}, "messages": [{"role": "user", "content": "email me at a@b.com"}]}
     response = await client.post("/api/v1/internal/completions", json=body, headers={"X-Internal-Service-Token": "test-internal-service-token-0123456789"})
     assert response.status_code == 200
@@ -101,17 +101,17 @@ async def test_get_and_set_model_routes(client, who, settings):
     routes = (await client.get("/api/v1/models")).json()["models"]
     assert routes["chat"][0]["provider"] == "anthropic" and routes["chat"][0]["model"] == settings.ANTHROPIC_DEFAULT_MODEL
 
-    updated = await client.patch("/api/v1/models/chat", json={"providers": [{"provider": "anthropic", "model": "claude-opus-5"}]})
+    updated = await client.patch("/api/v1/models/chat", json={"providers": [{"provider": "anthropic", "model": "claude-opus-5-5"}]})
     assert updated.status_code == 200
-    assert updated.json()["providers"] == [{"provider": "anthropic", "model": "claude-opus-5"}]
+    assert updated.json()["providers"] == [{"provider": "anthropic", "model": "claude-opus-5-5"}]
 
     fetched = (await client.get("/api/v1/models")).json()["models"]
-    assert fetched["chat"] == [{"provider": "anthropic", "model": "claude-opus-5"}]
+    assert fetched["chat"] == [{"provider": "anthropic", "model": "claude-opus-5-5"}]
 
 
 async def test_setting_an_unknown_provider_for_a_capability_is_rejected(client, who):
     who.ai_manager()
-    response = await client.patch("/api/v1/models/embedding", json={"providers": [{"provider": "anthropic", "model": "claude-sonnet-5"}]})
+    response = await client.patch("/api/v1/models/embedding", json={"providers": [{"provider": "anthropic", "model": "claude-sonnet-5-5"}]})
     assert response.status_code == 422
     assert response.json()["code"] == "UNKNOWN_PROVIDER"
 
@@ -120,3 +120,11 @@ async def test_setting_an_empty_route_is_rejected(client, who):
     who.ai_manager()
     response = await client.patch("/api/v1/models/chat", json={"providers": []})
     assert response.status_code == 422
+
+
+async def test_own_usage_follows_the_persons_permission(client, act_as):
+    """A super admin can let one student see their institution's AI spend, or take it away from a staff member."""
+    act_as(USER, role="student", organization_id=ORG_A, scopes=("ai.usage.own",))
+    assert (await client.get(f"/api/v1/orgs/{ORG_A}/usage")).status_code == 200
+    act_as(STAFF_A, role="staff", organization_id=ORG_A, defaults=False)
+    assert (await client.get(f"/api/v1/orgs/{ORG_A}/usage")).status_code == 403

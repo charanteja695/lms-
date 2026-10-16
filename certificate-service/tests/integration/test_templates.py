@@ -22,11 +22,11 @@ async def first_certificate(client, who) -> dict:
     return (await client.get("/api/v1/certificates")).json()["certificates"][0]
 
 
-async def test_a_template_starts_as_a_draft_with_sensible_defaults(client, who):
+async def test_a_template_starts_as_a_draft_with_sensible_defaults(client, who, settings):
     template = await create(client, who)
     assert template["status"] == "draft" and template["title_text"] == "Certificate of Completion"
     assert [b["label"] for b in template["grade_bands"]] == ["Distinction", "Merit", "Pass"]
-    assert "{student_name}" in template["body_text"] and template["accent_color"] == "#1F4E79"
+    assert "{student_name}" in template["body_text"] and template["accent_color"] == settings.CERTIFICATE_DEFAULT_ACCENT_COLOR == "#00663C"
 
 
 async def test_placeholders_colours_and_bands_are_validated(client, who):

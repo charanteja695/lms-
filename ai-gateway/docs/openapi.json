@@ -293,7 +293,7 @@
         "tags": [
           "Prompts"
         ],
-        "summary": "Get a prompt",
+        "summary": "Get a prompt with all its versions",
         "operationId": "get_prompt_api_v1_prompts__key__get",
         "security": [
           {
@@ -317,7 +317,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PromptResponse"
+                  "$ref": "#/components/schemas/PromptDetailResponse"
                 }
               }
             }
@@ -3155,6 +3155,47 @@
           "owner_service"
         ],
         "title": "PromptCreateIn"
+      },
+      "PromptDetailResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "prompt": {
+            "$ref": "#/components/schemas/PromptOut"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/PromptVersionOut"
+            },
+            "type": "array",
+            "title": "Versions",
+            "description": "Every version, newest first"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "prompt",
+          "versions"
+        ],
+        "title": "PromptDetailResponse"
       },
       "PromptListResponse": {
         "properties": {

@@ -15,6 +15,8 @@ from app.api.deps import (
     CannedIdParam,
     DbSession,
     IdempotencyKeyHeader,
+    MessageIdParam,
+    PeopleClientDep,
     RequireAgent,
     RequireInternalCaller,
     RequireManager,
@@ -36,6 +38,8 @@ from app.schemas.support import (
     AssigneeOut,
     AssigneesResponse,
     AssignRequest,
+    AttachmentLink,
+    AttachmentLinkResponse,
     CannedCreate,
     CannedListResponse,
     CannedOut,
@@ -63,6 +67,7 @@ from app.schemas.support import (
     TranscriptOut,
     TranscriptResponse,
 )
+from app.services.attachment_service import AttachmentService
 from app.services.config_service import ConfigService
 from app.services.ticket_service import TicketService
 
@@ -154,12 +159,12 @@ async def ticket_transcript(ticket_id: TicketIdParam, auth: RequireAgent, db: Db
     "queue): the active people of the ticket's queue — the same rule `POST .../assign` enforces.",
     responses=errors(*AUTHENTICATED, 404),
 )
-async def ticket_assignees(ticket_id: TicketIdParam, auth: RequireAgent, db: DbSession, settings: SettingsDep) -> AssigneesResponse:
+async def ticket_assignees(ticket_id: TicketIdParam, auth: RequireAgent, db: DbSession, settings: SettingsDep, people_client: PeopleClientDep) -> AssigneesResponse:
     service = TicketService(db, settings)
     ticket = await load_visible(service, auth, ticket_id)
     if not policy.can_handle(auth, ticket):
         raise NotFoundError("Ticket not found.", code="TICKET_NOT_FOUND")
-    people = await service.assignees(ticket, auth)
+    people = await service.assignees(ticket, auth, people_client)
     return AssigneesResponse(
         message="",
         assignees=[AssigneeOut(user_id=str(p.user_id), name=f"{p.first_name} {p.last_name}".strip() or str(p.user_id), role=p.role) for p in people],
@@ -193,10 +198,25 @@ async def reply(ticket_id: TicketIdParam, body: AgentReplyCreate, auth: RequireA
     ticket = await _handled(service, auth, ticket_id)
     if body.then not in (None, TicketStatus.WAITING_ON_STUDENT, TicketStatus.RESOLVED):
         raise ValidationFailedError(details=[{"field": "then", "code": "INVALID_STATUS", "message": "Use waiting_on_student or resolved"}])
+    attachments = await AttachmentService(settings).verify(auth.user_id, body.attachments)
     ticket, message = await service.reply_as_agent(
-        ticket, auth, body=body.body, internal=body.internal, then=body.then.value if body.then else None, canned_reply_id=body.canned_reply_id
+        ticket, auth, body=body.body, internal=body.internal, then=body.then.value if body.then else None, canned_reply_id=body.canned_reply_id,
+        attachments=attachments,
     )
     return MessageResponse(message="Note added." if body.internal else "Reply sent.", ticket=TicketOut.model_validate(ticket), reply=MessageOut.model_validate(message))
+
+
+@router.get(
+    "/tickets/{ticket_id}/messages/{message_id}/attachments/{index}", response_model=AttachmentLinkResponse,
+    summary="Download an attachment on a ticket I handle (internal notes included)", responses=errors(*AUTHENTICATED, 404),
+)
+async def attachment(ticket_id: TicketIdParam, message_id: MessageIdParam, index: int, auth: RequireAgent, db: DbSession, settings: SettingsDep) -> AttachmentLinkResponse:
+    service = TicketService(db, settings)
+    ticket = await load_visible(service, auth, ticket_id)
+    if not policy.can_handle(auth, ticket):
+        raise NotFoundError("Ticket not found.", code="TICKET_NOT_FOUND")
+    message = await service.message(ticket, message_id, include_internal=True)
+    return AttachmentLinkResponse(message="", attachment=AttachmentLink.model_validate(await AttachmentService(settings).download_url(message, index)))
 
 
 @router.post("/tickets/{ticket_id}/claim", response_model=TicketResponse, summary="Take a ticket", responses=errors(*AUTHENTICATED, 404, 409))
@@ -210,9 +230,9 @@ async def claim(ticket_id: TicketIdParam, auth: RequireAgent, db: DbSession, set
     description="A support manager anywhere; an institution head within their own institution's queue. The assignee must be able to handle the queue.",
     responses=errors(*AUTHENTICATED, 404, 409),
 )
-async def assign(ticket_id: TicketIdParam, body: AssignRequest, auth: RequireAgent, db: DbSession, settings: SettingsDep) -> TicketResponse:
+async def assign(ticket_id: TicketIdParam, body: AssignRequest, auth: RequireAgent, db: DbSession, settings: SettingsDep, people: PeopleClientDep) -> TicketResponse:
     service = TicketService(db, settings)
-    ticket = await service.assign(await _handled(service, auth, ticket_id), auth, body.assignee_user_id)
+    ticket = await service.assign(await _handled(service, auth, ticket_id), auth, body.assignee_user_id, people)
     return TicketResponse(message="Ticket assigned.", ticket=TicketOut.model_validate(ticket))
 
 

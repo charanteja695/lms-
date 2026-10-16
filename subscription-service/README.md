@@ -66,7 +66,7 @@ pytest
 
 ## Tests
 
-22 tests (`tests/unit`, `tests/integration`) cover: authorization (missing token, wrong role,
+23 tests (`tests/unit`, `tests/integration`) cover: authorization (missing token, wrong role,
 institution head without an organisation, seat endpoints rejecting calls with neither a valid
 internal token nor an accounts.manage session), the full course-request lifecycle (unknown
 course, duplicate pending request, cross-institution visibility, approve creating an active

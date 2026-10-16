@@ -43,6 +43,10 @@ from app.schemas.attempt import (
     FileUploadUrlIn,
     ReasonIn,
     ResultResponse,
+    ResultsRowOut,
+    ResultsSummaryRequest,
+    ResultsSummaryResponse,
+    ResultsTestOut,
     SavedAnswerOut,
     SavedAnswersResponse,
 )
@@ -282,6 +286,23 @@ async def list_attempts(query: Annotated[AttemptQuery, Query()], auth: CurrentAu
             page=query.page, per_page=query.per_page, total=total, is_exact=is_exact,
             sort_column="created_time", sort_order=SortOrder(query.sort_order),
         ),
+    )
+
+
+@router.post(
+    "/results/summary",
+    response_model=ResultsSummaryResponse,
+    summary="Marks and results for a group of students",
+    description="Per student and test: attempts, best score and whether they passed. Institution staff and heads see their own students "
+    "(platform tests); exam managers see anyone. Send a section's roster as `user_ids`.",
+    responses=errors(*AUTHENTICATED, 422),
+)
+async def results_summary(body: ResultsSummaryRequest, auth: CurrentAuth, db: DbSession) -> ResultsSummaryResponse:
+    tests, rows = await ReportService(db).results_summary(auth, body.user_ids, body.test_id)
+    return ResultsSummaryResponse(
+        message="Results retrieved successfully.",
+        tests=[ResultsTestOut(test_id=t.public_id, title=t.title, kind=t.kind, pass_mark_percent=t.pass_mark_percent) for t in tests],
+        rows=[ResultsRowOut.model_validate(r) for r in rows],
     )
 
 

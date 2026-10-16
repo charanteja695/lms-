@@ -15,6 +15,7 @@ from app.core.security import AccessTokenClaims
 from app.core.time import utcnow
 from app.domain.enums import PriceKind, QuoteStatus
 from app.models.billing import BillingProfile, Quote
+from app.models.refs import OrgRef
 from app.permissions.policy import can_manage_billing, owns
 from app.services.outbox import write_event
 from app.services.price_service import PriceService
@@ -62,6 +63,10 @@ class QuoteService:
     async def create(self, auth: AccessTokenClaims, org_id: int, requested: list[dict[str, int]]) -> Quote:
         if not owns(auth, org_id):
             raise NotFoundError("Organisation not found.", code="ORGANIZATION_NOT_FOUND")
+        ref = await self.db.get(OrgRef, org_id)
+        if ref is not None and ref.org_type == "employer":
+            # course seats are subscribed by institutions only (subscription-service); an employer buys plans instead
+            raise ConflictError("Course seats are for institutions; a company buys an employer plan.", code="NOT_AN_INSTITUTION")
         if not requested or len(requested) > self.settings.MAX_QUOTE_LINES:
             raise ValidationFailedError(details=[{"field": "lines", "code": "OUT_OF_RANGE", "message": f"Ask about 1-{self.settings.MAX_QUOTE_LINES} courses"}])
         prices = PriceService(self.db)

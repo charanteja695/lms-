@@ -24,6 +24,9 @@ class Scope(StrEnum):
     BILLING_MANAGE = "billing.manage"
 
 
+OWN = "analytics.own"  # their own organisation's dashboards and reports
+
+
 def is_super_admin(auth: AccessTokenClaims) -> bool:
     return auth.role == Role.SUPER_ADMIN
 
@@ -31,14 +34,18 @@ def is_super_admin(auth: AccessTokenClaims) -> bool:
 def can_view_platform(auth: AccessTokenClaims, *domain_scopes: Scope) -> bool:
     """A platform admin sees a platform-wide dashboard if they hold the scope that manages that domain, or the
     catch-all `analytics.view`. A super admin always can."""
-    if is_super_admin(auth):
-        return True
-    return auth.has_scope(Scope.ANALYTICS_VIEW.value) or any(auth.has_scope(s.value) for s in domain_scopes)
+    return auth.can(Scope.ANALYTICS_VIEW.value) or any(auth.has_scope(s.value) for s in domain_scopes)
+
+
+def _own(auth: AccessTokenClaims, kind: str) -> bool:
+    return auth.organization_id is not None and auth.organization_type == kind and auth.has_scope(OWN)
 
 
 def is_institution_member(auth: AccessTokenClaims) -> bool:
-    return auth.role in {Role.INSTITUTION_HEAD, Role.STAFF} and auth.organization_id is not None
+    """Sees their own institution's dashboards (``analytics.own``; by default its staff and head)."""
+    return _own(auth, "institution")
 
 
 def is_employer_member(auth: AccessTokenClaims) -> bool:
-    return auth.role in {Role.EMPLOYER_ADMIN, Role.RECRUITER} and auth.organization_id is not None
+    """Sees their own company's hiring dashboard (``analytics.own``; by default its admin and recruiters)."""
+    return _own(auth, "employer")

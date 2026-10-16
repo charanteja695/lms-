@@ -17,6 +17,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.tutor import TutorClient
+from app.clients.user_management import UserManagementClient
 from app.core.config import Settings, get_settings
 from app.core.context import RequestContext
 from app.core.exceptions import AuthenticationError, NotFoundError, PermissionDeniedError, ValidationFailedError
@@ -77,7 +78,7 @@ async def _authenticate(request: Request, settings: SettingsDep, credentials: An
     identity = TokenIdentity(
         session_id=str(claims.session_id), user_id=str(claims.user_id),
         organization_id=str(claims.organization_id) if claims.organization_id else None,
-        token_version=claims.token_version, issued_at=claims.issued_at,
+        token_version=claims.token_version, issued_at=claims.issued_at, role=claims.role,
     )
     if await is_token_revoked(request.app.state.redis, identity, key_prefix=settings.ACCESS_STATE_KEY_PREFIX):
         raise AuthenticationError("Your access has been revoked. Please log in again.", code="TOKEN_REVOKED")
@@ -110,6 +111,16 @@ RequireAgent = Annotated[AccessTokenClaims, Depends(require_agent)]
 RequireManager = Annotated[AccessTokenClaims, Depends(require_manager)]
 
 
+def require_participant(auth: CurrentAuth) -> AccessTokenClaims:
+    """Writes messages: someone who opens tickets, or answers them."""
+    if not (is_student(auth) or is_agent(auth)):
+        raise PermissionDeniedError()
+    return auth
+
+
+RequireParticipant = Annotated[AccessTokenClaims, Depends(require_participant)]
+
+
 def require_internal_caller(settings: SettingsDep, token: Annotated[str | None, Header(alias="X-Internal-Service-Token")] = None) -> None:
     """Other backend services call ``/internal`` with the shared secret — same scheme as the other services."""
     expected = settings.INTERNAL_SERVICE_TOKEN.get_secret_value()
@@ -134,7 +145,15 @@ async def canned_id_path(canned_id: Annotated[str, Path()]) -> int:
     return number
 
 
+async def message_id_path(message_id: Annotated[str, Path()]) -> int:
+    number = parse_public_id(message_id)
+    if number is None:
+        raise NotFoundError("Message not found.", code="MESSAGE_NOT_FOUND")
+    return number
+
+
 TicketIdParam = Annotated[int, Depends(ticket_id_path)]
+MessageIdParam = Annotated[int, Depends(message_id_path)]
 CannedIdParam = Annotated[int, Depends(canned_id_path)]
 
 
@@ -147,6 +166,7 @@ def rate_limit_user(scope: str, limit_setting: str, window_seconds: int) -> Call
 
 TicketRateLimit = Depends(rate_limit_user("ticket-create", "TICKET_RATE_LIMIT_PER_USER_PER_HOUR", 3600))
 ReplyRateLimit = Depends(rate_limit_user("ticket-reply", "REPLY_RATE_LIMIT_PER_USER_PER_MINUTE", 60))
+AttachmentRateLimit = Depends(rate_limit_user("attachment-url", "ATTACHMENT_URL_RATE_LIMIT_PER_USER_PER_MINUTE", 60))
 AgentRateLimit = Depends(rate_limit_user("ticket-agent", "AGENT_RATE_LIMIT_PER_HOUR", 3600))
 
 _IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9_.:-]{8,80}$")
@@ -168,3 +188,10 @@ def get_tutor_client(settings: SettingsDep) -> TutorClient:
 
 
 TutorClientDep = Annotated[TutorClient, Depends(get_tutor_client)]
+
+
+def get_people_client(settings: SettingsDep) -> UserManagementClient:
+    return UserManagementClient(settings)
+
+
+PeopleClientDep = Annotated[UserManagementClient, Depends(get_people_client)]

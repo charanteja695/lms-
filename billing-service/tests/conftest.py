@@ -38,8 +38,17 @@ def _settings(**overrides: Any) -> Settings:
     return Settings(**values)
 
 
-def make_claims(*, user_id: int, role: str, organization_id: int | None, scopes: tuple[str, ...] = ()) -> AccessTokenClaims:
+# What user-management puts in a token by default (its permission catalog), for the permissions this service checks.
+ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
+    "institution_head": ("billing.contact",),
+    "employer_admin": ("billing.contact", "billing.plans.buy"),
+}
+
+
+def make_claims(*, user_id: int, role: str, organization_id: int | None, scopes: tuple[str, ...] = (), defaults: bool = True) -> AccessTokenClaims:
+    """``scopes`` are extra permissions (an admin's scopes, or a person's grants); ``defaults`` adds the role's."""
     now = datetime.now(UTC)
+    scopes = (*ROLE_PERMISSIONS.get(role, ()), *scopes) if defaults else scopes
     return AccessTokenClaims(
         user_id=user_id, session_id=1755000000210900, role=role, organization_id=organization_id, organization_type=None, scopes=scopes, token_version=0, token_id="test-token",
         issued_at=int(now.timestamp()), expires_at=now,
@@ -109,8 +118,8 @@ async def client(app) -> AsyncIterator[AsyncClient]:
 
 @pytest.fixture
 def act_as(app) -> Callable[..., AccessTokenClaims]:
-    def _set(user_id: int, *, role: str, organization_id: int | None, scopes: tuple[str, ...] = ()) -> AccessTokenClaims:
-        claims = make_claims(user_id=user_id, role=role, organization_id=organization_id, scopes=scopes)
+    def _set(user_id: int, *, role: str, organization_id: int | None, scopes: tuple[str, ...] = (), defaults: bool = True) -> AccessTokenClaims:
+        claims = make_claims(user_id=user_id, role=role, organization_id=organization_id, scopes=scopes, defaults=defaults)
         app.dependency_overrides[_authenticate] = lambda: claims
         return claims
 
@@ -125,8 +134,14 @@ class Identities:
     def head(self, user_id: int = HEAD, organization_id: int = INSTITUTION):
         return self._act_as(user_id, role="institution_head", organization_id=organization_id)
 
-    def staff(self):
-        return self._act_as(STAFF, role="staff", organization_id=INSTITUTION)
+    def staff(self, granted: tuple[str, ...] = ()):
+        """``granted``: permissions a super admin gave this person on top of their role."""
+        return self._act_as(STAFF, role="staff", organization_id=INSTITUTION, scopes=granted)
+
+    def head_without(self, *removed: str, organization_id: int = INSTITUTION):
+        """An institution head a super admin removed permissions from."""
+        kept = tuple(p for p in ROLE_PERMISSIONS["institution_head"] if p not in removed)
+        return self._act_as(HEAD, role="institution_head", organization_id=organization_id, scopes=kept, defaults=False)
 
     def employer_admin(self, organization_id: int = EMPLOYER):
         return self._act_as(EMP_ADMIN, role="employer_admin", organization_id=organization_id)

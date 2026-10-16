@@ -167,7 +167,7 @@ async def test_notes_are_private_to_the_recruiting_team(client, who, send_event,
     assert (await client.get(f"{API}/employer/applications/{application['application_id']}")).status_code == 403
 
 
-async def test_another_company_and_a_manager_cannot_act_on_someone_elses_applicants(client, who, send_event, work, career):
+async def test_another_company_cannot_act_on_someone_elses_applicants_but_the_careers_manager_can(client, who, send_event, work, career):
     from tests.conftest import EMP_B, RECRUITER_B
 
     job_id = await hiring_world(client, who, send_event, work)
@@ -178,7 +178,6 @@ async def test_another_company_and_a_manager_cannot_act_on_someone_elses_applica
         assert (await client.get(f"{API}{path}")).status_code == 404, path
     assert (await client.post(f"{API}/employer/applications/{aid}/advance")).status_code == 404
     assert (await client.post(f"{API}/employer/jobs/{job_id}/applications/shortlist", json={"application_ids": [aid]})).status_code == 404
-    who.manager()  # a careers manager may look at hiring, never decide it
+    who.manager()  # the super admin runs hiring for every company: they see it and decide it
     assert (await client.get(f"{API}/employer/jobs/{job_id}/applications")).status_code == 200 and (await client.get(f"{API}/employer/applications/{aid}")).status_code == 200
-    assert (await client.post(f"{API}/employer/applications/{aid}/advance")).status_code == 403
-    assert (await client.post(f"{API}/employer/jobs/{job_id}/applications/reject", json={"application_ids": [aid], "reason": "x", "confirm": True})).status_code == 403
+    assert (await client.post(f"{API}/employer/applications/{aid}/advance")).status_code == 200

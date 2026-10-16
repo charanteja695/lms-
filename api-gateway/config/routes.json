@@ -45,6 +45,10 @@
       "service": "job-portal-service"
     },
     {
+      "path": "/api/v1/attachments",
+      "service": "support-service"
+    },
+    {
       "path": "/api/v1/attempts",
       "service": "assessment-service"
     },
@@ -109,6 +113,18 @@
       "service": "notification-service"
     },
     {
+      "path": "/api/v1/directory/companies",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/directory/institutions",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/directory/organizations",
+      "service": "user-management"
+    },
+    {
       "path": "/api/v1/drives",
       "service": "job-portal-service"
     },
@@ -167,6 +183,10 @@
     {
       "path": "/api/v1/grading",
       "service": "assessment-service"
+    },
+    {
+      "path": "/api/v1/hierarchy",
+      "service": "user-management"
     },
     {
       "path": "/api/v1/index",
@@ -253,6 +273,10 @@
       "service": "ai-gateway"
     },
     {
+      "path": "/api/v1/permissions",
+      "service": "user-management"
+    },
+    {
       "path": "/api/v1/playback",
       "service": "media-service"
     },
@@ -295,6 +319,10 @@
     {
       "path": "/api/v1/reports",
       "service": "analytics-service"
+    },
+    {
+      "path": "/api/v1/results",
+      "service": "assessment-service"
     },
     {
       "path": "/api/v1/resume-templates",

@@ -49,7 +49,7 @@ async def optional_claims(request: Request, settings: Settings, redis: Redis) ->
         raise AuthenticationError("Your access token is invalid or has expired.", code="INVALID_TOKEN") from exc
     identity = TokenIdentity(
         session_id=str(claims.session_id), user_id=str(claims.user_id), organization_id=str(claims.organization_id) if claims.organization_id else None,
-        token_version=claims.token_version, issued_at=claims.issued_at,
+        token_version=claims.token_version, issued_at=claims.issued_at, role=claims.role,
     )
     if await is_token_revoked(redis, identity, key_prefix=settings.ACCESS_STATE_KEY_PREFIX):
         raise AuthenticationError("Your access has been revoked. Please log in again.", code="TOKEN_REVOKED")

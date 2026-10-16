@@ -192,6 +192,8 @@ class InstitutionService:
             if data.admin_user_id not in (None, actor.public_id):
                 raise PermissionDeniedError(f"Admins can only create {self.label}s they own.")
             admin = actor
+        elif self.org_type == OrganizationType.EMPLOYER:
+            admin = actor  # companies belong to the super admin, who runs hiring (there are no company logins)
         else:
             if data.admin_user_id is None:
                 raise ValidationFailedError(

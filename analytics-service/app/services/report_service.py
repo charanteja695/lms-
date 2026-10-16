@@ -18,7 +18,7 @@ from app.core.security import AccessTokenClaims
 from app.core.time import utcnow
 from app.domain.enums import Dashboard, ReportFormat, ReportFrequency, ReportStatus
 from app.models.report import ReportDefinition, ReportRun
-from app.permissions.policy import Scope, can_view_platform, is_super_admin
+from app.permissions.policy import Scope, can_view_platform, is_employer_member, is_institution_member, is_super_admin
 from app.services import dashboard_service
 from app.services.outbox import write_event
 
@@ -79,13 +79,17 @@ def check_dashboard_access(auth: AccessTokenClaims, dashboard: str, *, organizat
     if is_super_admin(auth):
         return
     if dashboard == Dashboard.INSTITUTION:
-        if organization_id == auth.organization_id and auth.role in {"institution_head", "staff"}:
+        if organization_id == auth.organization_id and is_institution_member(auth):
             return
         if can_view_platform(auth):
             return
         raise PermissionDeniedError("You may only see your own institution's dashboard.", code="NOT_YOUR_ORGANIZATION")
     if dashboard == Dashboard.HIRING and employer_id is not None:
-        if employer_id == auth.organization_id and auth.role in {"employer_admin", "recruiter"}:
+        if employer_id == auth.organization_id and is_employer_member(auth):
+            return
+    if dashboard == Dashboard.HIRING and employer_id is None and organization_id is not None:
+        # an institution's own students' hiring outcomes, for that institution's own head and staff
+        if organization_id == auth.organization_id and is_institution_member(auth):
             return
     if not can_view_platform(auth, *_DASHBOARD_SCOPE.get(Dashboard(dashboard), ())):
         raise PermissionDeniedError("You do not have permission to view this dashboard.", code="PERMISSION_DENIED")

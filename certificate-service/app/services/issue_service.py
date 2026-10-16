@@ -85,7 +85,7 @@ class IssueService:
         course = await self.db.get(CourseRef, course_id)
         organization_id = int(payload["organization_id"]) if payload.get("organization_id") else None
         institution = await self.db.get(InstitutionRef, organization_id) if organization_id else None
-        template_id, snapshot = await TemplateService(self.db).resolve(course_id)
+        template_id, snapshot = await TemplateService(self.db).resolve(course_id, self.settings.CERTIFICATE_DEFAULT_ACCENT_COLOR)
         percent = float(payload.get("percent") or 0.0)
         passed_at = payload.get("passed_at")
         completion = datetime.strptime(passed_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC) if passed_at else utcnow()

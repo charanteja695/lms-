@@ -48,8 +48,10 @@ class LearningPathService:
             raise NotFoundError("Learning path not found.", code="LEARNING_PATH_NOT_FOUND")
         return path
 
-    async def list_learning_paths(self, query: ListQuery) -> tuple[list[LearningPath], int, bool]:
+    async def list_learning_paths(self, query: ListQuery, *, published_only: bool = False) -> tuple[list[LearningPath], int, bool]:
         stmt = select(LearningPath)
+        if published_only:
+            stmt = stmt.where(LearningPath.status == ContentStatus.PUBLISHED)
         if query.search_text:
             stmt = stmt.where(LearningPath.title.ilike(contains_pattern(query.search_text)))
         stmt = stmt.order_by(

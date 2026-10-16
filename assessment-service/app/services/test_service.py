@@ -63,6 +63,7 @@ _RULE_FIELDS = (
     "result_visibility",
     "review_policy",
     "proctoring_level",
+    "proctoring_screen_share",
     "requires_schedule",
 )
 
@@ -81,6 +82,7 @@ def definition_event_payload(test: Test) -> dict[str, Any]:
         "time_mode": test.time_mode,
         "duration_minutes": test.duration_minutes,
         "proctoring_level": test.proctoring_level,
+        "proctoring_screen_share": test.proctoring_level == "strict" and test.proctoring_screen_share,
         "total_marks": test.total_marks,
         "question_count": test.question_count,
     }

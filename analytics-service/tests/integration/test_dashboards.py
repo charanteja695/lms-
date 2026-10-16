@@ -1,7 +1,7 @@
 """The seven dashboards, end to end: an event ingested, rolled up, and read back through the API — and who
 may see what (docs/PRODUCT.md §5.9)."""
 
-from tests.conftest import API, EMPLOYER, EMPLOYER_2, INSTITUTION, INSTITUTION_2
+from tests.conftest import API, EMPLOYER, EMPLOYER_2, HEAD, INSTITUTION, INSTITUTION_2, STAFF
 
 APPLICATION_JOB = 1755000000130011
 
@@ -82,6 +82,19 @@ async def test_a_recruiter_cannot_read_another_employers_hiring_funnel(client, w
     assert response.status_code == 403
 
 
+async def test_an_institution_sees_its_own_students_hiring_outcomes_but_no_one_elses(client, who, send_event, rollup):
+    await send_event("application.stage_changed", {"application_id": "1", "job_id": "1", "employer_id": str(EMPLOYER), "user_id": "1", "organization_id": str(INSTITUTION), "from": "applied", "to": "shortlisted", "actor": "recruiter"})
+    await send_event("application.stage_changed", {"application_id": "2", "job_id": "1", "employer_id": str(EMPLOYER), "user_id": "2", "organization_id": str(INSTITUTION_2), "from": "applied", "to": "shortlisted", "actor": "recruiter"})
+    await rollup()
+
+    who.head()  # INSTITUTION
+    response = await client.get(f"{API}/dashboards/hiring", params={"organization_id": str(INSTITUTION)})
+    assert response.status_code == 200, response.text
+    assert response.json()["dashboard"]["applications_by_stage"] == {"shortlisted": 1}
+    assert (await client.get(f"{API}/dashboards/hiring", params={"organization_id": str(INSTITUTION_2)})).status_code == 403
+    assert (await client.get(f"{API}/dashboards/hiring")).status_code == 403  # platform-wide still needs careers.manage
+
+
 async def test_the_billing_dashboard_is_wired_but_empty_until_billing_service_exists(client, who, rollup):
     await rollup()
     who.billing_admin()
@@ -103,3 +116,11 @@ async def test_the_billing_dashboard_totals_billing_services_real_events(client,
     assert (body["credit_notes"], body["credit_amount"], body["plans_activated"]) == (1, 1180.0, 1)
     scoped = (await client.get(f"{API}/dashboards/billing", params={"organization_id": org})).json()["dashboard"]
     assert scoped["invoices_issued"] == 2 and scoped["plans_activated"] == 0  # the plan belongs to the employer, not this institution
+
+
+async def test_own_dashboards_follow_the_persons_permission(client, act_as):
+    """A super admin can take a head's own dashboards away, or not; a student never had them."""
+    act_as(HEAD, role="institution_head", organization_id=INSTITUTION, defaults=False)
+    assert (await client.get(f"{API}/dashboards/institution")).status_code == 403
+    act_as(STAFF, role="staff", organization_id=INSTITUTION)
+    assert (await client.get(f"{API}/dashboards/institution")).status_code == 200

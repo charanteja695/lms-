@@ -100,6 +100,7 @@ services:
     image: lms-user-management
     build: { context: ., dockerfile: user-management/Dockerfile }
     env_file: ./user-management/.env.docker
+    volumes: ["./user-management/keys:/app/keys:ro"]
 
   user-management:
     <<: *api
@@ -107,7 +108,9 @@ services:
     build: { context: ., dockerfile: user-management/Dockerfile }
     env_file: ./user-management/.env.docker
     ports: ["${USER_MANAGEMENT_PORT}:8000"]
-    volumes: [user-management-jobs:/app/var/jobs]
+    # RS256 signing key (python scripts/generate_jwt_keys.py user-management/keys); the other services only read the
+    # public key from /.well-known/jwks.json
+    volumes: [user-management-jobs:/app/var/jobs, "./user-management/keys:/app/keys:ro"]
 
   # Export jobs, event relay (Redis Stream lms:events) and housekeeping. Scale with --scale.
   user-management-worker:
@@ -115,7 +118,7 @@ services:
     image: lms-user-management
     build: { context: ., dockerfile: user-management/Dockerfile }
     env_file: ./user-management/.env.docker
-    volumes: [user-management-jobs:/app/var/jobs]
+    volumes: [user-management-jobs:/app/var/jobs, "./user-management/keys:/app/keys:ro"]
 
   # ------------------------------------------------------------------ catalog-service (8002)
   catalog-service-migrate:
@@ -353,7 +356,7 @@ services:
     env_file: ./support-service/.env.docker
 
   support-service:
-    <<: *api
+    <<: *api-s3
     image: lms-support-service
     build: { context: ., dockerfile: support-service/Dockerfile }
     env_file: ./support-service/.env.docker
@@ -478,7 +481,23 @@ services:
     env_file: ./api-gateway/.env.docker
     depends_on:
       redis: { condition: service_healthy }
-    ports: ["${API_GATEWAY_PORT:-8000}:8000"]
+    # Published on this machine only: browsers come in through `web`, and the gateway trusts the X-Forwarded-For it sets.
+    ports: ["127.0.0.1:${API_GATEWAY_PORT:-8000}:8000"]
+
+  # ------------------------------------------------------------------ web (3000)
+  # The React app, served by nginx, which forwards /api to the gateway on the same origin. VITE_* values are baked in at build.
+  web:
+    image: lms-web
+    build:
+      context: ../lms-frontend
+      args:
+        VITE_APP_NAME: ${WEB_APP_NAME:-LMS}
+    environment:
+      API_UPSTREAM: http://api-gateway:8000
+      STORAGE_ORIGIN: ${WEB_STORAGE_ORIGIN:-http://minio:9000}
+    depends_on:
+      api-gateway: { condition: service_started }
+    ports: ["${WEB_PORT:-3000}:80"]
 
 volumes:
   postgres-data:

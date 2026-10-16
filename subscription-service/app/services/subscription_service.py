@@ -36,10 +36,10 @@ class SubscriptionService:
             raise NotFoundError("Subscription not found.", code="SUBSCRIPTION_NOT_FOUND")
         return subscription
 
-    async def list_subscriptions(self, query: ListQuery, *, organization_id: int | None) -> tuple[list[Subscription], int, bool]:
+    async def list_subscriptions(self, query: ListQuery, *, organization_ids: tuple[int, ...] | None) -> tuple[list[Subscription], int, bool]:
         stmt = select(Subscription)
-        if organization_id is not None:
-            stmt = stmt.where(Subscription.organization_id == organization_id)
+        if organization_ids is not None:  # None: every institution
+            stmt = stmt.where(Subscription.organization_id.in_(organization_ids))
         if query.status:
             stmt = stmt.where(Subscription.status == query.status)
         stmt = stmt.order_by(

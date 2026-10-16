@@ -14,6 +14,7 @@ from enum import StrEnum
 from app.models.institution import Institution
 from app.models.user import User
 from app.permissions.roles import (
+    ADMIN_SCOPES,
     ORGANIZATION_SCOPED_ROLES,
     ROLE_LEVELS,
     SCOPE_FOR_ORGANIZATION,
@@ -44,6 +45,8 @@ USER_PERMISSIONS: dict[Role, dict[Action, frozenset[Role]]] = {
         **_all_actions(
             Role.ADMIN, Role.INSTITUTION_HEAD, Role.STAFF, Role.STUDENT, Role.EMPLOYER_ADMIN, Role.RECRUITER
         ),
+        # No new company logins: older ones can still be seen, edited, suspended or removed.
+        Action.CREATE: frozenset({Role.ADMIN, Role.INSTITUTION_HEAD, Role.STAFF, Role.STUDENT}),
         Action.VIEW: frozenset(
             {
                 Role.SUPER_ADMIN,
@@ -57,7 +60,7 @@ USER_PERMISSIONS: dict[Role, dict[Action, frozenset[Role]]] = {
         ),
     },
     # Admins reach only members of organisations they own (see is_user_in_scope).
-    Role.ADMIN: _all_actions(Role.INSTITUTION_HEAD, Role.STAFF, Role.STUDENT, Role.EMPLOYER_ADMIN, Role.RECRUITER),
+    Role.ADMIN: _all_actions(Role.INSTITUTION_HEAD, Role.STAFF, Role.STUDENT),
     Role.INSTITUTION_HEAD: _all_actions(Role.STAFF, Role.STUDENT),
     Role.STAFF: {
         Action.VIEW: frozenset({Role.STUDENT}),
@@ -65,7 +68,7 @@ USER_PERMISSIONS: dict[Role, dict[Action, frozenset[Role]]] = {
         Action.UPDATE: frozenset({Role.STUDENT}),
     },
     Role.STUDENT: {},
-    Role.EMPLOYER_ADMIN: _all_actions(Role.RECRUITER),
+    Role.EMPLOYER_ADMIN: {},
     Role.RECRUITER: {},
 }
 
@@ -108,14 +111,14 @@ def is_valid_manager(manager_role: str, subordinate_role: str) -> bool:
 def has_scope(actor: User, scope: AdminScope) -> bool:
     if actor.role == Role.SUPER_ADMIN:
         return True
-    return actor.role == Role.ADMIN and scope in actor.scope_list
+    return actor.role == Role.ADMIN and scope in ADMIN_SCOPES and scope in actor.scope_list
 
 
 def token_scopes(user: User) -> list[str]:
     """Scopes carried in the access token: every scope for super admins, assigned scopes for admins."""
     if user.role == Role.SUPER_ADMIN:
         return [scope.value for scope in AdminScope]
-    return list(user.scope_list) if user.role == Role.ADMIN else []
+    return [scope for scope in user.scope_list if scope in ADMIN_SCOPES] if user.role == Role.ADMIN else []
 
 
 # ------------------------------------------------------------------ resource scope

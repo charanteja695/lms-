@@ -1,6 +1,6 @@
 """Which provider(s) serve a capability, in fallback order (docs/PRODUCT.md §6: "provider routing").
 
-One row per capability. ``providers`` is an ordered list of ``{"provider": "anthropic", "model": "claude-sonnet-5"}``;
+One row per capability. ``providers`` is an ordered list of ``{"provider": "anthropic", "model": "claude-sonnet-5-5"}``;
 the router (app/providers/router.py) tries them in order, falling back to the next on a transient failure. Seeded by
 the initial migration from the same defaults ``Settings`` would otherwise fall back to, so ``GET /models`` always has
 something to show; an admin can reorder or add providers with ``PATCH /models/{capability}``.

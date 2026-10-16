@@ -59,7 +59,7 @@ pytest -m postgres                        # 3 tests on a real embedded PostgreSQ
 
 ## Verification (2026-09-21)
 
-**32 tests** — 8 unit (layout rules, deterministic PDF), 21 integration on SQLite, 3 on a **real PostgreSQL**
+**34 tests** — 8 unit (layout rules, deterministic PDF), 21 integration on SQLite, 3 on a **real PostgreSQL**
 (migration up → down → up with `alembic check` finding no drift; concurrent deliveries of one pass issue one
 certificate; concurrent PDF workers never claim the same certificate). ruff and `mypy --strict` clean.
 

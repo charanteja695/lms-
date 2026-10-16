@@ -1,7 +1,9 @@
-"""Who may do what with a ticket. One place, so the rules read the same everywhere they are applied.
+"""Who may do what with a ticket, as permissions from the access token (user-management's catalog; a super admin can
+grant or remove any of them per person). One place, so the rules read the same everywhere they are applied.
 
-  student                  their own tickets: open, read (never internal notes), reply, close, reopen, rate
-  institution staff/head   the batch-staff queue of their own institution (a head may also assign within it)
+  support.ask              their own tickets: open, read (never internal notes), reply, close, reopen, rate (a student)
+  support.agent            the batch-staff queue of their own institution (staff, head)
+  support.assign           assign within that queue (a head)
   exams.manage             the exam-team (integrity) queue
   support.manage           every queue; assignment anywhere, SLA policies, platform canned replies, reports
   super admin              everything
@@ -13,21 +15,38 @@ from app.models.ticket import Ticket
 from app.permissions.roles import Role
 from app.permissions.scopes import Scope
 
+# What a person needs to handle (and so be assigned) a ticket of each queue; mirrors ``can_handle``.
+HANDLER_PERMISSIONS: dict[Queue, tuple[str, ...]] = {
+    Queue.BATCH_STAFF: ("support.agent",),
+    Queue.EXAM_TEAM: (Scope.EXAMS_MANAGE.value, Scope.SUPPORT_MANAGE.value),
+    Queue.PLATFORM_SUPPORT: (Scope.SUPPORT_MANAGE.value,),
+}
+
 
 def is_super_admin(auth: AccessTokenClaims) -> bool:
     return auth.role == Role.SUPER_ADMIN
 
 
 def is_student(auth: AccessTokenClaims) -> bool:
-    return auth.role == Role.STUDENT
+    """Opens tickets of their own."""
+    return auth.has_scope("support.ask")
 
 
 def is_institution_staff(auth: AccessTokenClaims) -> bool:
-    return auth.role in {Role.STAFF, Role.INSTITUTION_HEAD} and auth.organization_id is not None
+    """Answers their own institution's batch-staff queue."""
+    return auth.organization_id is not None and auth.has_scope("support.agent")
 
 
 def is_manager(auth: AccessTokenClaims) -> bool:
-    return is_super_admin(auth) or bool(auth.has_scope(Scope.SUPPORT_MANAGE.value))
+    return auth.can(Scope.SUPPORT_MANAGE.value)
+
+
+def manages_ticket(auth: AccessTokenClaims, ticket: Ticket) -> bool:
+    """A support manager: the super admin for every ticket, an admin for tickets from the institutions they look after."""
+    if not is_manager(auth):
+        return False
+    care = auth.organizations_in_care()
+    return care is None or ticket.organization_id in care
 
 
 def is_exam_team(auth: AccessTokenClaims) -> bool:
@@ -36,7 +55,7 @@ def is_exam_team(auth: AccessTokenClaims) -> bool:
 
 def can_handle(auth: AccessTokenClaims, ticket: Ticket) -> bool:
     """May act on ``ticket`` as an agent (read it with its internal notes, reply, change it)."""
-    if is_manager(auth):
+    if manages_ticket(auth, ticket):
         return True
     if ticket.queue == Queue.EXAM_TEAM:
         return is_exam_team(auth)
@@ -50,9 +69,9 @@ def can_view(auth: AccessTokenClaims, ticket: Ticket) -> bool:
 
 
 def can_assign_others(auth: AccessTokenClaims, ticket: Ticket) -> bool:
-    if is_manager(auth):
+    if manages_ticket(auth, ticket):
         return True
-    return auth.role == Role.INSTITUTION_HEAD and ticket.queue == Queue.BATCH_STAFF and auth.organization_id == ticket.organization_id
+    return auth.has_scope("support.assign") and ticket.queue == Queue.BATCH_STAFF and auth.organization_id == ticket.organization_id
 
 
 def is_agent(auth: AccessTokenClaims) -> bool:

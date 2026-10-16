@@ -3,5 +3,6 @@ pytest>=8,<10
 pytest-asyncio>=0.24,<2
 aiosqlite>=0.20,<1
 fakeredis>=2.23,<3
+moto[s3]>=5,<6
 ruff>=0.6
 mypy>=1.11

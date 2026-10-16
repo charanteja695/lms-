@@ -66,6 +66,15 @@ async def test_the_author_cannot_activate_their_own_version(client, who):
     assert response.json()["code"] == "SAME_AUTHOR"
 
 
+async def test_the_super_admin_who_runs_ai_alone_may_activate_their_own_version(client, who):
+    who.super_admin()
+    await client.post("/api/v1/prompts", json={"key": "tutor.ownerself", "owner_service": "ai-tutor-service"})
+    version = (await client.post("/api/v1/prompts/tutor.ownerself/versions", json={"template": "v1"})).json()["version"]["version"]
+    response = await client.post(f"/api/v1/prompts/tutor.ownerself/versions/{version}/activate")
+    assert response.status_code == 200, response.text
+    assert response.json()["version"]["status"] == "active"
+
+
 async def test_a_different_manager_can_activate_and_it_replaces_the_previous_active_version(client, who):
     who.ai_manager()
     await client.post("/api/v1/prompts", json={"key": "tutor.rotate", "owner_service": "ai-tutor-service"})
@@ -101,3 +110,13 @@ async def test_retire_a_version(client, who):
     v1 = (await client.post("/api/v1/prompts/tutor.retire/versions", json={"template": "v1"})).json()["version"]["version"]
     response = await client.post(f"/api/v1/prompts/tutor.retire/versions/{v1}/retire")
     assert response.status_code == 200 and response.json()["version"]["status"] == "retired"
+
+
+async def test_a_prompt_comes_with_all_its_versions_newest_first(client, who):
+    who.ai_manager()
+    await client.post("/api/v1/prompts", json={"key": "tutor.quiz_me", "owner_service": "ai-tutor-service"})
+    for text in ("Quiz {{topic}} briefly.", "Quiz {{topic}} in three questions."):
+        assert (await client.post("/api/v1/prompts/tutor.quiz_me/versions", json={"template": text, "variables": ["topic"]})).status_code == 201
+    body = (await client.get("/api/v1/prompts/tutor.quiz_me")).json()
+    assert [v["version"] for v in body["versions"]] == [2, 1]
+    assert {v["status"] for v in body["versions"]} == {"draft"} and body["prompt"]["key"] == "tutor.quiz_me"

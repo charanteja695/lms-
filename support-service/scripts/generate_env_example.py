@@ -33,8 +33,11 @@ DOCKER_OVERRIDES = {
     "DATABASE_URL": "postgresql+asyncpg://lms:lms@postgres:5432/lms_support",
     "REDIS_URL": "redis://redis:6379/0",
     "USER_MANAGEMENT_JWKS_URL": "http://user-management:8000/.well-known/jwks.json",
-    
-    
+    "USER_MANAGEMENT_URL": "http://user-management:8000",
+    "AI_TUTOR_SERVICE_URL": "http://ai-tutor-service:8000",
+    "S3_ENDPOINT_URL": "http://minio:9000",  # the compose MinIO; unset it to talk to real AWS S3
+    "AWS_ACCESS_KEY_ID": "lms-minio",
+    "AWS_SECRET_ACCESS_KEY": "lms-minio-secret",
 }
 
 

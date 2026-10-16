@@ -44,7 +44,7 @@ async def test_an_analyzer_that_finds_nothing_is_recorded_as_looked_and_clean(cl
     await upload(client, s3_bucket, settings, session_id, "periodic")
     await work.analyze()
     async with sessionmaker() as db:
-        rows = (await db.execute(select(Snapshot))).scalars().all()
+        rows = (await db.execute(select(Snapshot).where(Snapshot.kind != "liveness"))).scalars().all()  # liveness frames are kept for a person
         assert {r.analysis_status for r in rows} == {"done"} and all(r.findings == [] and not r.flagged for r in rows)
 
 
@@ -85,7 +85,7 @@ async def test_under_heavy_load_only_some_periodic_snapshots_are_analysed(client
     assert statuses[2] == "pending" and statuses[5] == "pending"
     assert "skipped" in statuses[3:5]
     async with sessionmaker() as db:
-        skipped = (await db.execute(select(Snapshot.skip_reason).where(Snapshot.analysis_status == "skipped"))).scalars().all()
+        skipped = (await db.execute(select(Snapshot.skip_reason).where(Snapshot.analysis_status == "skipped", Snapshot.kind != "liveness"))).scalars().all()
     assert set(skipped) == {"sampled out under load"}
 
 

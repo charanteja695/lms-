@@ -10,6 +10,7 @@ from app.api.deps import (
     CurrentAuth,
     DbSession,
     IdempotencyKeyHeader,
+    MessageIdParam,
     ReplyRateLimit,
     RequireStudent,
     SettingsDep,
@@ -24,6 +25,8 @@ from app.models.config import UserRef
 from app.models.ticket import Ticket
 from app.permissions import policy
 from app.schemas.support import (
+    AttachmentLink,
+    AttachmentLinkResponse,
     CsatRequest,
     MessageOut,
     MessageResponse,
@@ -34,6 +37,7 @@ from app.schemas.support import (
     TicketPageResponse,
     TicketResponse,
 )
+from app.services.attachment_service import AttachmentService
 from app.services.ticket_service import TicketService
 
 router = APIRouter(prefix="/tickets", tags=["Tickets (student)"])
@@ -74,9 +78,11 @@ async def load_own(service: TicketService, auth: AccessTokenClaims, ticket_id: i
     responses=errors(*AUTHENTICATED), dependencies=[TicketRateLimit],
 )
 async def create_ticket(body: TicketCreate, auth: RequireStudent, db: DbSession, settings: SettingsDep, key: IdempotencyKeyHeader = None) -> TicketResponse:
+    attachments = await AttachmentService(settings).verify(auth.user_id, body.attachments)
     ticket, created = await TicketService(db, settings).create(
         requester_user_id=auth.user_id, organization_id=auth.organization_id, subject=body.subject, description=body.description,
         category=body.category, source=Source.PORTAL, course_id=body.course_id, idempotency_key=f"portal:{auth.user_id}:{key}" if key else None,
+        attachments=attachments,
     )
     await db.commit()
     return TicketResponse(message="Ticket opened." if created else "Ticket already opened.", ticket=TicketOut.model_validate(ticket))
@@ -106,8 +112,20 @@ async def get_ticket(ticket_id: TicketIdParam, auth: CurrentAuth, db: DbSession,
 )
 async def reply(ticket_id: TicketIdParam, body: ReplyCreate, auth: RequireStudent, db: DbSession, settings: SettingsDep) -> MessageResponse:
     service = TicketService(db, settings)
-    ticket, message = await service.reply_as_requester(await load_own(service, auth, ticket_id), auth.user_id, body.body)
+    attachments = await AttachmentService(settings).verify(auth.user_id, body.attachments)
+    ticket, message = await service.reply_as_requester(await load_own(service, auth, ticket_id), auth.user_id, body.body, attachments)
     return MessageResponse(message="Reply sent.", ticket=TicketOut.model_validate(ticket), reply=MessageOut.model_validate(message))
+
+
+@router.get(
+    "/{ticket_id}/messages/{message_id}/attachments/{index}", response_model=AttachmentLinkResponse, summary="Download an attachment on my ticket",
+    description="A short-lived link (`S3_DOWNLOAD_URL_EXPIRES_SECONDS`) to the file; `index` is its position in the message's `attachments`.",
+    responses=errors(*AUTHENTICATED, 404),
+)
+async def attachment(ticket_id: TicketIdParam, message_id: MessageIdParam, index: int, auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> AttachmentLinkResponse:
+    service = TicketService(db, settings)
+    message = await service.message(await load_own(service, auth, ticket_id), message_id, include_internal=False)
+    return AttachmentLinkResponse(message="", attachment=AttachmentLink.model_validate(await AttachmentService(settings).download_url(message, index)))
 
 
 @router.post("/{ticket_id}/close", response_model=TicketResponse, summary="Close my ticket", responses=errors(*AUTHENTICATED, 404))

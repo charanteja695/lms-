@@ -144,7 +144,7 @@ async def _authenticate(
         user_id=str(claims.user_id),
         organization_id=str(claims.organization_id) if claims.organization_id else None,
         token_version=claims.token_version,
-        issued_at=claims.issued_at,
+        issued_at=claims.issued_at, role=claims.role,
     )
     if await is_token_revoked(request.app.state.redis, identity, key_prefix=settings.ACCESS_STATE_KEY_PREFIX):
         raise AuthenticationError("Your access has been revoked. Please log in again.", code="TOKEN_REVOKED")
@@ -156,7 +156,7 @@ CurrentAuth = Annotated[AccessTokenClaims, Depends(_authenticate)]
 
 def require_scope(scope: Scope) -> Callable[[AccessTokenClaims], AccessTokenClaims]:
     def dependency(auth: CurrentAuth) -> AccessTokenClaims:
-        if not auth.has_scope(scope.value):
+        if not auth.can(scope.value):  # a permission from the token; a super admin holds them all
             raise PermissionDeniedError()
         return auth
 
@@ -164,4 +164,35 @@ def require_scope(scope: Scope) -> Callable[[AccessTokenClaims], AccessTokenClai
 
 
 RequireAuthor = Annotated[AccessTokenClaims, Depends(require_scope(Scope.CONTENT_AUTHOR))]
+
+
+# Reading. Course and learning-path listings (titles, status) need only a sign-in: every role names courses somewhere
+# (requests, prices, job eligibility). A course's content needs a reader permission; an unpublished version or path is
+# for its authors and reviewers only. Permissions from the token (user-management's catalog; per-person editable):
+#   catalog.read (students, staff, heads)   catalog.browse (staff, heads)   content.author / content.review   platform staff
+_PLATFORM_ROLES = frozenset({"admin", "super_admin"})
+
+
+def sees_drafts(auth: AccessTokenClaims) -> bool:
+    return auth.can(Scope.CONTENT_AUTHOR.value) or auth.can(Scope.CONTENT_REVIEW.value)
+
+
+def can_read_content(auth: AccessTokenClaims) -> bool:
+    return sees_drafts(auth) or auth.role in _PLATFORM_ROLES or auth.has_scope("catalog.read") or auth.has_scope("catalog.browse")
+
+
+def require_reader(auth: CurrentAuth) -> AccessTokenClaims:
+    if not can_read_content(auth):
+        raise PermissionDeniedError("You don't have access to course content.", code="CONTENT_NOT_ALLOWED")
+    return auth
+
+
+def require_drafts(auth: CurrentAuth) -> AccessTokenClaims:
+    if not sees_drafts(auth):
+        raise PermissionDeniedError()
+    return auth
+
+
+RequireReader = Annotated[AccessTokenClaims, Depends(require_reader)]
+RequireDraftReader = Annotated[AccessTokenClaims, Depends(require_drafts)]
 RequireReviewer = Annotated[AccessTokenClaims, Depends(require_scope(Scope.CONTENT_REVIEW))]

@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import get_settings
 from app.core.exceptions import BadRequestError
 from app.core.time import utcnow
 from app.domain.enums import ContentStatus, ReviewAction
@@ -213,3 +214,19 @@ class ReviewService:
         ).scalar_one_or_none()
         if empty_topic is not None:
             raise BadRequestError("Every topic needs at least one item.", code="EMPTY_TOPIC")
+
+        if get_settings().REQUIRE_TOPIC_TESTS:
+            untested = (
+                await self.db.execute(
+                    select(Topic.title)
+                    .join(Module, Module.id == Topic.module_id)
+                    .where(Module.course_version_id == version.id, Topic.topic_test_id.is_(None))
+                    .order_by(Module.position, Topic.position)
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+            if untested is not None:
+                raise BadRequestError(
+                    f'"{untested}" has no topic test yet. Every topic ends with a published topic test.',
+                    code="TOPIC_TEST_MISSING",
+                )

@@ -55,3 +55,8 @@ class PromptVersionOut(ResponseSchema):
 
 class PromptVersionResponse(SuccessResponse):
     version: PromptVersionOut
+
+
+class PromptDetailResponse(SuccessResponse):
+    prompt: PromptOut
+    versions: list[PromptVersionOut] = Field(description="Every version, newest first")

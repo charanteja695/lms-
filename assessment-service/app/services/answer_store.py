@@ -19,6 +19,10 @@ class AnswerStore:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
+    async def lock(self, attempt_id: uuid.UUID) -> None:
+        """Every writer of an attempt's answers takes this row lock first, so writers take turns (no deadlocks)."""
+        await self.db.execute(select(Attempt.id).where(Attempt.id == attempt_id).with_for_update())
+
     async def load(self, attempt_id: uuid.UUID) -> dict[int, AttemptAnswer]:
         rows = (await self.db.execute(select(AttemptAnswer).where(AttemptAnswer.attempt_id == attempt_id))).scalars()
         return {row.question_public_id: row for row in rows}
@@ -58,7 +62,11 @@ class AnswerStore:
 
     async def flush(self, attempt: Attempt, buffer: AnswerBuffer) -> int:
         """Move the attempt's buffered answers into the database and commit. Returns how many were written. On a
-        failure the attempt is marked dirty again, so the buffered copy is never lost."""
+        failure the attempt is marked dirty again, so the buffered copy is never lost.
+
+        The attempt's row is locked first, so two writers of the same attempt (the background flush and a submit) take
+        turns instead of inserting the same answers at once and deadlocking each other."""
+        await self.lock(attempt.id)
         records = await buffer.read_all(attempt.public_id)
         if not records:
             return 0

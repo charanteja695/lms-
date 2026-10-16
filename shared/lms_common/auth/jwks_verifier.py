@@ -106,6 +106,7 @@ class JWKSVerifier:
                 token_id=str(payload["jti"]),
                 issued_at=int(payload["iat"]),
                 expires_at=payload["exp"],
+                admin_organization_ids=tuple(int(i) for i in payload.get("admin_orgs") or ()),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise TokenError("Malformed token claims") from exc

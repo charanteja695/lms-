@@ -1,9 +1,12 @@
-"""Who may do what.
+"""Who may do what, as permissions from the access token (user-management's catalog; a super admin can grant or remove
+any of them per person):
 
-  student            their own interviews: consent, take them, read their report (a screening report once it is released), appeal, retake
-  recruiter/admin    their company's screening plans and interviews: read transcripts and evaluations, review the AI's recommendation, decide appeals
-  careers.manage     the platform's mock plans; read any interview; calibration and fairness audits
-  super admin        everything
+  interviews.practice  their own interviews: consent, take them, read their report (a screening report once it is released),
+                       appeal, retake (by default a student)
+  interviews.screen    their own company's screening plans and interviews: transcripts, evaluations, reviews, appeals
+                       (by default an employer admin or recruiter)
+  careers.manage       the platform's mock plans; read any interview; calibration and fairness audits
+  super admin          every management action (taking an interview is a person's own, so it is never implied)
 """
 
 from enum import StrEnum
@@ -16,20 +19,26 @@ class Scope(StrEnum):
     CAREERS_MANAGE = "careers.manage"  # values mirror user-management's AdminScope
 
 
+PRACTICE = "interviews.practice"
+SCREEN = "interviews.screen"
+
+
 def is_super_admin(auth: AccessTokenClaims) -> bool:
     return auth.role == Role.SUPER_ADMIN
 
 
 def is_student(auth: AccessTokenClaims) -> bool:
-    return auth.role == Role.STUDENT
+    """Takes interviews as a candidate (held, not implied by being a super admin)."""
+    return auth.has_scope(PRACTICE)
 
 
 def is_employer_member(auth: AccessTokenClaims) -> bool:
-    return auth.role in {Role.EMPLOYER_ADMIN, Role.RECRUITER} and auth.organization_id is not None
+    """Screens candidates for their own company."""
+    return auth.organization_id is not None and auth.has_scope(SCREEN)
 
 
 def can_manage_careers(auth: AccessTokenClaims) -> bool:
-    return is_super_admin(auth) or bool(auth.has_scope(Scope.CAREERS_MANAGE.value))
+    return auth.can(Scope.CAREERS_MANAGE.value)
 
 
 def owns_employer(auth: AccessTokenClaims, employer_org_id: int | None) -> bool:

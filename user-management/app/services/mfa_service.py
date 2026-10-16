@@ -240,10 +240,13 @@ class MfaService:
 
     # ------------------------------------------------------------------ helpers
 
-    @staticmethod
-    def _matching_step(secret: str, code: str, last_used_step: int | None) -> int | None:
-        """Accept the current code and one step either side (clock drift); never a step already used."""
+    def _matching_step(self, secret: str, code: str, last_used_step: int | None) -> int | None:
+        """Accept the current code and one step either side (clock drift); never a step already used. On a test server
+        with MFA_TEST_CODE set (refused in staging/production), that fixed code is also accepted, any number of times."""
         code = code.strip()
+        test_code = self.settings.MFA_TEST_CODE
+        if test_code and not self.settings.is_production_like and hmac.compare_digest(code, test_code):
+            return max(int(time.time() // _TOTP_PERIOD), (last_used_step or 0))
         if not secret or len(code) != 6 or not code.isdigit():
             return None
         totp = pyotp.TOTP(secret)

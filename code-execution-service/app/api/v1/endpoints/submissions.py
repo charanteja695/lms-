@@ -10,6 +10,8 @@ from app.api.deps import (
     IdempotencyKeyHeader,
     ProblemIdParam,
     RateLimiterDep,
+    RequireOwnSubmissions,
+    RequirePractice,
     SettingsDep,
     SubmissionIdParam,
 )
@@ -42,7 +44,7 @@ router = APIRouter(tags=["Submissions"])
 async def submit(
     problem_id: ProblemIdParam,
     data: SubmissionCreate,
-    auth: CurrentAuth,
+    auth: RequirePractice,
     db: DbSession,
     settings: SettingsDep,
     cipher: CipherDep,
@@ -64,7 +66,7 @@ async def submit(
 
 @router.get("/submissions", response_model=SubmissionListResponse, summary="List my submissions", responses=errors(*AUTHENTICATED))
 async def list_my_submissions(
-    query: Annotated[SubmissionQuery, Query()], auth: CurrentAuth, db: DbSession, settings: SettingsDep
+    query: Annotated[SubmissionQuery, Query()], auth: RequireOwnSubmissions, db: DbSession, settings: SettingsDep
 ) -> SubmissionListResponse:
     submissions, total, is_exact = await SubmissionService(db, settings).list_submissions(query, user_id=auth.user_id)
     return SubmissionListResponse(

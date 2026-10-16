@@ -32,7 +32,7 @@ async def test_reactivating_an_org_restores_access(client, who, send_event, fake
     await send_event("institution.suspended", {"organization_id": str(ORG_A)})
     await send_event("institution.activated", {"organization_id": str(ORG_A)})
 
-    fake_chat.queue_result(ChatResult(content="ok", model="claude-sonnet-5", prompt_tokens=1, completion_tokens=1, stop_reason="end_turn"))
+    fake_chat.queue_result(ChatResult(content="ok", model="claude-sonnet-5-5", prompt_tokens=1, completion_tokens=1, stop_reason="end_turn"))
     response = await client.post("/api/v1/internal/completions", json=_body(), headers=internal_headers)
     assert response.status_code == 200
 
@@ -41,7 +41,7 @@ async def test_suspension_is_scoped_to_the_org_it_names(client, who, send_event,
     await _make_prompt(client, who)
     await send_event("institution.suspended", {"organization_id": str(ORG_B)})
 
-    fake_chat.queue_result(ChatResult(content="ok", model="claude-sonnet-5", prompt_tokens=1, completion_tokens=1, stop_reason="end_turn"))
+    fake_chat.queue_result(ChatResult(content="ok", model="claude-sonnet-5-5", prompt_tokens=1, completion_tokens=1, stop_reason="end_turn"))
     response = await client.post("/api/v1/internal/completions", json=_body(), headers=internal_headers)  # ORG_A, unaffected
     assert response.status_code == 200
 

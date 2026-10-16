@@ -1226,6 +1226,24 @@
             }
           },
           {
+            "name": "organization_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Billing managers: one organisation's quotes",
+              "title": "Organization Id"
+            },
+            "description": "Billing managers: one organisation's quotes"
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,

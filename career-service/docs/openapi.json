@@ -3391,7 +3391,7 @@
           "Resumes: AI and export"
         ],
         "summary": "Download as PDF",
-        "description": "Server-rendered with the resume's template, from the current draft or from a saved `version_no`. The PDF uses standard fonts: characters outside Latin-1 (for example Devanagari) print as `?`, and `X-Unrenderable-Characters` says how many.",
+        "description": "Server-rendered with the resume's template, from the current draft or from a saved `version_no`. `template_key` renders it with another template instead, to preview that template with the student's own data (nothing is saved); `inline=true` asks the browser to show it rather than download it. The PDF uses standard fonts: characters outside Latin-1 (for example Devanagari) print as `?`, and `X-Unrenderable-Characters` says how many.",
         "operationId": "export_pdf_api_v1_resumes__resume_id__export_pdf_get",
         "security": [
           {
@@ -3422,6 +3422,35 @@
                 }
               ],
               "title": "Version No"
+            }
+          },
+          {
+            "name": "template_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Preview with this template instead of the resume's own",
+              "title": "Template Key"
+            },
+            "description": "Preview with this template instead of the resume's own"
+          },
+          {
+            "name": "inline",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Inline"
             }
           }
         ],

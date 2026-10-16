@@ -7,7 +7,9 @@ from tests.conftest import (
     CERT_2,
     COURSE,
     COURSE_2,
+    ORG_A,
     ORG_B,
+    STAFF_A,
     STAFF_B,
     STUDENT,
     STUDENT_2,
@@ -232,3 +234,14 @@ async def test_internal_snapshot_freezes_the_resume_that_was_sent(client, who, s
     assert (await client.post(f"{API}/internal/resumes/nope/snapshot", json=body, headers=headers)).status_code == 404
     versions = (await client.get(f"{API}/resumes/{rid}/versions")).json()["versions"]
     assert [v["label"] for v in versions] == ["Applied to Acme: Backend Developer"]  # the student sees what was sent
+
+
+async def test_career_screens_follow_the_persons_permissions(client, act_as, send_event):
+    """A super admin can take one student's career tools away, or one staff member's view of students."""
+    await seed_student(send_event)
+    act_as(STUDENT, role="student", organization_id=ORG_A, defaults=False)
+    assert (await client.get(f"{API}/profile")).status_code == 403
+    act_as(STAFF_A, role="staff", organization_id=ORG_A, defaults=False)
+    assert (await client.get(f"{API}/students/{STUDENT}/profile")).status_code == 403
+    act_as(STAFF_A, role="staff", organization_id=ORG_A)
+    assert (await client.get(f"{API}/students/{STUDENT}/profile")).status_code == 200

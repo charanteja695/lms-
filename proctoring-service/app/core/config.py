@@ -7,12 +7,21 @@ refuses to start staging/production with any of them.
 
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEV_SECRET_MARKER = "insecure-dev"
 
+
+
+def _private_or_https(url: str) -> bool:
+    """https anywhere; plain http only to a private-network host: localhost, a loopback address, or a single-label
+    container/service name such as ``user-management`` (resolvable only inside the deployment's own network)."""
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    return parsed.scheme == "https" or (parsed.scheme == "http" and (host in {"localhost", "127.0.0.1", "::1"} or "." not in host))
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -75,6 +84,9 @@ class Settings(BaseSettings):
     CONSENT_VERSION: str = "2026-09"
     MIN_BANDWIDTH_KBPS_STRICT: int = Field(default=300, ge=0)
     SNAPSHOT_INTERVAL_SECONDS: int = Field(default=25, ge=5)  # what the client is told to use (20-30 s)
+    # Strict: a short microphone clip every AUDIO_INTERVAL_SECONDS for the voice check (0 turns clips off).
+    AUDIO_INTERVAL_SECONDS: int = Field(default=60, ge=0)
+    AUDIO_CLIP_SECONDS: int = Field(default=8, ge=2, le=30)
     HEARTBEAT_INTERVAL_SECONDS: int = Field(default=15, ge=5)
     HEARTBEAT_LOST_AFTER_SECONDS: int = Field(default=60, ge=10)
     MAX_EVENTS_PER_REQUEST: int = Field(default=100, ge=1)
@@ -82,6 +94,12 @@ class Settings(BaseSettings):
     S3_UPLOAD_URL_EXPIRES_SECONDS: int = Field(default=300, ge=30, le=3_600)
     S3_DOWNLOAD_URL_EXPIRES_SECONDS: int = Field(default=120, ge=30, le=3_600)
     MAX_SNAPSHOT_MB: int = Field(default=5, ge=1, le=50)
+    # Strict: before the test the student turns their face left, right, up and down; one frame per pose is kept.
+    LIVENESS_REQUIRED: bool = True
+    # Strict: the whole test is recorded (camera + microphone) and uploaded in chunks of VIDEO_CHUNK_SECONDS.
+    VIDEO_RECORDING_ENABLED: bool = True
+    VIDEO_CHUNK_SECONDS: int = Field(default=30, ge=5, le=300)
+    MAX_VIDEO_CHUNK_MB: int = Field(default=25, ge=1, le=200)
 
     # --- Risk and integrity decisions (app/risk/policy.py has the per-event weights) ---
     # At or below this a finished attempt is cleared automatically; above it (or on any critical finding) a person decides.
@@ -141,12 +159,12 @@ class Settings(BaseSettings):
                 errors.append("DEBUG must be false outside local/test")
             if "*" in self.TRUSTED_HOSTS:
                 errors.append("TRUSTED_HOSTS must list explicit hosts outside local/test")
-            if self.USER_MANAGEMENT_JWKS_URL.startswith("http://") and "localhost" not in self.USER_MANAGEMENT_JWKS_URL:
+            if not _private_or_https(self.USER_MANAGEMENT_JWKS_URL):
                 errors.append("USER_MANAGEMENT_JWKS_URL must use https outside local/test")
             if DEV_SECRET_MARKER in self.INTERNAL_SERVICE_TOKEN.get_secret_value():
                 errors.append("INTERNAL_SERVICE_TOKEN still uses the development default")
-            if self.S3_ENDPOINT_URL is not None:
-                errors.append("S3_ENDPOINT_URL must be unset outside local/test (talk to real AWS S3)")
+            if self.S3_ENDPOINT_URL is not None and not self.S3_ENDPOINT_URL.startswith("https://"):
+                errors.append("S3_ENDPOINT_URL must be unset (AWS S3) or an https URL (S3-compatible storage) outside local/test")
             if self.S3_BUCKET == "lms-proctoring-dev":
                 errors.append("S3_BUCKET still uses the development default")
         if errors:

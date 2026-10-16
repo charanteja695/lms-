@@ -52,25 +52,32 @@ Copy the structure of `user-management/`:
 ## Local stack
 
 The compose file runs PostgreSQL (a `databases` one-shot creates each service's own database), Redis, MinIO (S3-compatible,
-with a `buckets` one-shot) and, for each of the ten built services, a migrate job, the API and a worker built from one image.
+with a `buckets` one-shot), for each of the 18 services a migrate job, the API and a worker built from one image, the API
+gateway, and `web`: the React app served by nginx, which forwards `/api` to the gateway on the same origin.
 
 ```bash
 cd lms-backend
 cp .env.example .env                                   # stack settings (ports, database user, MinIO credentials)
 for s in */.env.docker.example; do cp -n "$s" "${s%.example}"; done   # every service's own settings (keeps existing files)
+# user-management signs access tokens with RS256; every other service verifies them through its JWKS
+(cd user-management && python scripts/generate_jwt_keys.py keys)       # writes keys/ (git-ignored, mounted read-only)
 
 # 1. migrate every service (starts postgres and creates the databases first)
 docker compose --profile tools up $(docker compose --profile tools config --services | grep -- '-migrate$')
 # 2. start everything
-docker compose up -d                                   # user-management is on http://localhost:8001/docs, catalog 8002, ...
-# 3. first admin
+docker compose up -d --build                           # the app is on http://localhost:3000
+# 3. first admin (they set up two-factor at first sign-in)
 docker compose exec user-management python -m app.cli create-super-admin --email ... --username ... --first-name ... --last-name ...
 ```
 
-Host ports: user-management 8001, catalog 8002, media 8003, subscription 8004, learning 8005, code-execution 8006, assessment
-8007, proctoring 8008, certificate 8009, notification 8016 (change them in `.env`); MinIO 9000 (API) and 9001 (console).
+Host ports: web 3000; the gateway 8000 (bound to this machine only — browsers go through `web`); each service on its own port
+for debugging: user-management 8001, catalog 8002, media 8003, subscription 8004, learning 8005, code-execution 8006,
+assessment 8007, proctoring 8008, certificate 8009, ai-gateway 8010, ai-tutor 8011, support 8012, career 8013, job-portal 8014,
+ai-interview 8015, notification 8016, analytics 8017, billing 8018 (change them in `.env`); MinIO 9000 (API) and 9001 (console).
 A single service: `docker compose up -d catalog-service catalog-service-worker`. Images use `lms-backend/` as the build
 context (they install `shared/`), so build one by hand with `docker build -f catalog-service/Dockerfile -t lms-catalog-service .`.
+After adding or renaming an endpoint, regenerate the gateway's routes: `cd api-gateway && python scripts/generate_routes.py`.
+For production settings see [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md).
 
 Things the stack does not give you:
 - **Judge0.** code-execution-service judges through Judge0, which is not part of this compose file; `JUDGE0_URL` points at

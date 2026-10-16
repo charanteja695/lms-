@@ -1,6 +1,10 @@
+import csv
+import io
+from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import APIRouter, Query
+from fastapi.responses import StreamingResponse
 from lms_common.envelopes import PageContext, SortOrder
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -81,6 +85,55 @@ async def list_certificates(query: Annotated[CertificateQuery, Query()], auth: C
         message="Certificates retrieved successfully.",
         certificates=[_out(c, settings) for c in rows],
         page_context=PageContext.build(page=query.page, per_page=query.per_page, total=total, is_exact=exact, sort_column="issued_time", sort_order=query.sort_order),
+    )
+
+
+class CertificateExportQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    course_id: id_field("course_id", "1755000000001001") | None = None  # type: ignore[valid-type]
+    status: CertificateStatus | None = None
+
+
+_EXPORT_COLUMNS = ("certificate_id", "verification_code", "verification_url", "student_name", "institution", "course", "completion_date", "score_percent", "grade", "status", "issued_at", "revoked_at")
+_EXPORT_MAX_ROWS = 10_000
+
+
+@router.get(
+    "/certificates/export",
+    response_class=StreamingResponse,
+    summary="Export certificates (CSV, staff)",
+    description="The same certificates the list shows this person (institution staff: their students'; exam managers: all), "
+    f"filtered by course and status, as CSV. At most {_EXPORT_MAX_ROWS:,} rows, newest first.",
+    responses={200: {"content": {"text/csv": {}}}, **errors(*AUTHENTICATED, 403)},
+)
+async def export_certificates(query: Annotated[CertificateExportQuery, Query()], auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> StreamingResponse:
+    if not (can_manage_certificates(auth) or is_institution_staff(auth)):
+        raise PermissionDeniedError()
+    rows, _, _ = await CertificateService(db, settings).list_certificates(
+        auth, course_id=query.course_id, student_user_id=None, status=query.status, pdf_status=None, page=1, per_page=_EXPORT_MAX_ROWS, ascending=False,
+    )
+
+    def lines() -> Iterator[str]:
+        out = io.StringIO()
+        writer = csv.writer(out)
+        writer.writerow(_EXPORT_COLUMNS)
+        for c in rows:
+            writer.writerow([
+                str(c.public_id), c.verification_code, verification_url(settings, c.verification_code), c.student_name or "", c.institution_name or "",
+                c.course_title or "", c.completion_date.date().isoformat(), f"{c.score_percent:.1f}", c.grade_label or "", c.status,
+                c.issued_at.isoformat(), c.revoked_at.isoformat() if c.revoked_at else "",
+            ])
+            yield out.getvalue()
+            out.seek(0)
+            out.truncate(0)
+        if not rows:
+            yield out.getvalue()
+
+    return StreamingResponse(
+        ("﻿" + chunk if i == 0 else chunk for i, chunk in enumerate(lines())),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="certificates.csv"', "Cache-Control": "private, no-store"},
     )
 
 

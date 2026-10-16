@@ -127,6 +127,7 @@ class AnswerService:
         store = AnswerStore(self.db)
         for attempt_try in range(2):
             try:
+                await store.lock(uuid.UUID(attempt_id))
                 await store.upsert(uuid.UUID(attempt_id), records)
                 await self.db.commit()
                 return

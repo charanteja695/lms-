@@ -230,7 +230,9 @@ class AuthService:
         token.used_at = now
         session.last_used_at = now
         session.ip_address = self.ctx.ip_address
-        issued = self.sessions.issue_tokens(user, institution, session, mfa_enabled=await self.mfa.is_enabled(user))
+        issued = await self.sessions.issue_tokens(
+            user, institution, session, mfa_enabled=await self.mfa.is_enabled(user)
+        )
         self.audit.log(
             AuditAction.TOKEN_REFRESHED,
             actor_id=user.id,

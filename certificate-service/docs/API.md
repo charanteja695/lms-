@@ -18,6 +18,7 @@ message, details[], request_id}`.
 ## Certificates
 
 - `GET /certificates?course_id&user_id&status&pdf_status&sort_order&page&per_page` — scoped by role.
+- `GET /certificates/export?course_id&status` (staff, exam managers) — the same certificates as the list, as CSV (UTF-8 with BOM), at most 10,000 rows, newest first. `403` for students.
 - `GET /certificates/{id}` — includes `verification_url`, `linkedin_add_url`, `pdf_status` (`pending` → `ready`, or `failed`).
 - `GET /certificates/{id}/download` → `{url, filename, expires_in}` (a short-lived presigned S3 link). `409 PDF_NOT_READY`
   while rendering; `403 CERTIFICATE_REVOKED` for a student once revoked.

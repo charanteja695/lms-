@@ -245,3 +245,26 @@ async def test_org_events_keep_names_and_types(send_event, sessionmaker):
     async with sessionmaker() as db:
         a, b, e = await db.get(OrgRef, ORG_A), await db.get(OrgRef, ORG_B), await db.get(OrgRef, EMP_A)
     assert (a.name, a.org_type, a.active) == ("Anna University (Main)", "institution", True) and b.active is False and (e.org_type, e.industry) == ("employer", "Software")
+
+
+# ---------------------------------------------------------------- the super admin runs a company's hiring (no company logins)
+async def test_the_super_admin_keeps_a_company_and_posts_its_jobs_directly(client, who, send_event):
+    await seed_world(send_event)
+    who.manager()
+    early = await client.put(f"{API}/admin/employers/{EMP_A}/profile", json={"about": "We build developer tools."})
+    assert early.status_code == 422 and {d["field"] for d in early.json()["details"]} == {"website"}  # industry comes from the company record
+    kept = await client.put(f"{API}/admin/employers/{EMP_A}/profile", json={"about": "We build developer tools.", "website": "https://acme.example"})
+    assert kept.status_code == 200 and kept.json()["employer"]["status"] == "verified"
+
+    assert (await client.post(f"{API}/employer/jobs", json=job_body())).status_code == 422  # which company?
+    assert (await client.post(f"{API}/employer/jobs", json=job_body(employer_org_id=str(ORG_A)))).status_code == 404  # an institution is not a company
+    internship = job_body(employer_org_id=str(EMP_A), employment_type="internship", stipend_per_month=25_000, duration_months=6, title="Backend Intern")
+    draft = await client.post(f"{API}/employer/jobs", json=internship)
+    assert draft.status_code == 201, draft.text
+    job = draft.json()["job"]
+    assert job["employer_id"] == str(EMP_A) and job["stipend_per_month"] == 25_000 and job["duration_months"] == 6
+    opened = await client.post(f"{API}/employer/jobs/{job['job_id']}/submit")
+    assert opened.status_code == 200 and opened.json()["job"]["status"] == "open"  # no approval step for the super admin's own posting
+    listed = (await client.get(f"{API}/employer/jobs", params={"employer_org_id": str(EMP_A)})).json()["jobs"]
+    assert [j["job_id"] for j in listed] == [job["job_id"]]
+    assert job["job_id"] in {j["job_id"] for j in (await client.get(f"{API}/employer/jobs")).json()["jobs"]}  # every company's

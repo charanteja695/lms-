@@ -20,8 +20,7 @@ from app.core.exceptions import AuthenticationError, NotFoundError, PermissionDe
 from app.core.ids import parse_public_id
 from app.core.security import AccessTokenClaims, TokenError, get_verifier
 from app.gateways.payment import PaymentGateway
-from app.permissions.policy import can_manage_billing, is_billing_contact
-from app.permissions.roles import Role
+from app.permissions.policy import can_buy_plans, can_manage_billing, is_billing_contact
 from app.services.rate_limiter import RateLimiter
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -71,7 +70,7 @@ async def _authenticate(request: Request, settings: SettingsDep, credentials: An
         raise AuthenticationError("Your access token is invalid or has expired.", code="INVALID_TOKEN") from exc
     identity = TokenIdentity(
         session_id=str(claims.session_id), user_id=str(claims.user_id), organization_id=str(claims.organization_id) if claims.organization_id else None,
-        token_version=claims.token_version, issued_at=claims.issued_at,
+        token_version=claims.token_version, issued_at=claims.issued_at, role=claims.role,
     )
     if await is_token_revoked(request.app.state.redis, identity, key_prefix=settings.ACCESS_STATE_KEY_PREFIX):
         raise AuthenticationError("Your access has been revoked. Please log in again.", code="TOKEN_REVOKED")
@@ -94,7 +93,7 @@ RequireBillingAdmin = Annotated[AccessTokenClaims, Depends(_require(can_manage_b
 RequireBillingContact = Annotated[
     AccessTokenClaims, Depends(_require(lambda a: is_billing_contact(a) or can_manage_billing(a), "Only an institution head, an employer admin or a billing manager can do this.", "PERMISSION_DENIED"))
 ]
-RequireEmployerAdmin = Annotated[AccessTokenClaims, Depends(_require(lambda a: a.role == Role.EMPLOYER_ADMIN and a.organization_id is not None, "Only an employer admin can buy a plan.", "EMPLOYER_ADMINS_ONLY"))]
+RequireEmployerAdmin = Annotated[AccessTokenClaims, Depends(_require(can_buy_plans, "Only someone allowed to buy plans for their company can do this.", "EMPLOYER_ADMINS_ONLY"))]
 
 
 def get_payment_gateway(settings: SettingsDep) -> PaymentGateway:

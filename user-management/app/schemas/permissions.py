@@ -13,9 +13,12 @@ Section = Literal[
     "institutions",
     "employers",
     "my_organization",
+    "academics",
+    "hierarchy",
     "users",
     "downloads",
     "audit_logs",
+    "permissions",
     "profile",
     "security",
     # One per other backend service (docs/PRODUCT.md §6), gating that module's whole side-menu entry. Coarse only:
@@ -35,6 +38,7 @@ Section = Literal[
     "notifications",
     "analytics",
     "billing",
+    "ai_gateway",
 ]
 
 
@@ -59,6 +63,11 @@ class OrganizationsPermissionsOut(ResponseSchema):
     reassign_admin: bool
 
 
+class AcademicsPermissionsOut(ResponseSchema):
+    view: bool = Field(description="Sees the institution's departments, programs and sections")
+    manage: bool = Field(description="Creates and changes them, and places students in sections")
+
+
 class AuditLogsPermissionsOut(ResponseSchema):
     view: bool
 
@@ -67,13 +76,20 @@ class PermissionsOut(ResponseSchema):
     role: Role
     organization_type: str | None = Field(description="institution or employer, for organisation members")
     scopes: list[str] = Field(description="Admin scopes of the signed-in person")
+    permissions: list[str] = Field(
+        description="Effective permissions (feature keys): role defaults + scopes + this person's grants − removals. Show buttons from these"
+    )
     sections: list[Section] = Field(description="Menu sections to show, in display order")
+    menu: list[str] = Field(
+        description="Menu entries within those modules this person's role or scopes reach (feature level), in display order"
+    )
     users: UsersPermissionsOut
     admins: AdminsPermissionsOut
     institutions: OrganizationsPermissionsOut
     employers: OrganizationsPermissionsOut
     admin_scopes: list[str] = Field(description="Scopes you can assign to admins (super admins only)")
     audit_logs: AuditLogsPermissionsOut
+    academics: AcademicsPermissionsOut
 
 
 class PermissionsResponse(SuccessResponse):

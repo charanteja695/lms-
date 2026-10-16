@@ -1,9 +1,10 @@
-"""Who may see or change what.
+"""Who may see or change what, as permissions from the access token (user-management's catalog; a super admin can
+grant or remove any of them per person).
 
-  student                    their own profile, resumes, shares (and nobody else's)
-  institution staff / head  read a student's profile inside their own institution (placement work); never edit it
-  careers.manage            read any student's profile; templates
-  super admin               everything
+  career.profile     their own profile, resumes, shares (by default a student; never implied by being a super admin)
+  career.students    read a student's profile inside their own institution (placement work); never edit it (staff, head)
+  careers.manage     read any student's profile; templates
+  super admin        everything
 """
 
 from enum import StrEnum
@@ -21,15 +22,17 @@ def is_super_admin(auth: AccessTokenClaims) -> bool:
 
 
 def is_student(auth: AccessTokenClaims) -> bool:
-    return auth.role == Role.STUDENT
+    """Keeps their own career profile and resumes."""
+    return auth.has_scope("career.profile")
 
 
 def is_institution_staff(auth: AccessTokenClaims) -> bool:
-    return auth.role in {Role.STAFF, Role.INSTITUTION_HEAD} and auth.organization_id is not None
+    """Reads their own institution's students' profiles."""
+    return auth.organization_id is not None and auth.has_scope("career.students")
 
 
 def can_manage_careers(auth: AccessTokenClaims) -> bool:
-    return is_super_admin(auth) or bool(auth.has_scope(Scope.CAREERS_MANAGE.value))
+    return auth.can(Scope.CAREERS_MANAGE.value)
 
 
 def can_view_student_profile(auth: AccessTokenClaims, *, student_user_id: int, student_organization_id: int | None) -> bool:

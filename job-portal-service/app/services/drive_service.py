@@ -121,7 +121,7 @@ class DriveService:
     async def list_for(self, auth: AccessTokenClaims, *, status: str | None, page: int, per_page: int) -> tuple[list[PlacementDrive], int]:
         stmt = select(PlacementDrive)
         if not can_manage_careers(auth):
-            stmt = stmt.where(PlacementDrive.organization_id == auth.organization_id) if auth.role in {"staff", "institution_head"} else stmt.where(PlacementDrive.employer_org_id == auth.organization_id)
+            stmt = stmt.where(PlacementDrive.organization_id == auth.organization_id) if auth.organization_type == "institution" else stmt.where(PlacementDrive.employer_org_id == auth.organization_id)
         if status:
             stmt = stmt.where(PlacementDrive.status == status)
         total = int((await self.db.execute(select(func.count()).select_from(stmt.order_by(None).subquery()))).scalar_one())

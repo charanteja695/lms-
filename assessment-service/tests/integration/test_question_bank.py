@@ -1,4 +1,4 @@
-from tests.conftest import mcq, subjective, true_false
+from tests.conftest import EMPLOYER, ORG_A, RECRUITER, STAFF_A, mcq, subjective, true_false
 
 
 async def test_author_creates_a_draft_question_with_tags(client, who):
@@ -145,3 +145,13 @@ async def test_subjective_rubric_is_stored(client, who):
     who.author()
     question = (await client.post("/api/v1/questions", json=subjective())).json()["question"]
     assert [c["id"] for c in question["working"]["body"]["rubric"]] == ["clarity", "depth"]
+
+
+async def test_assessment_work_follows_the_persons_permissions(client, act_as):
+    """A super admin can stop one recruiter writing questions, or one staff member grading."""
+    act_as(RECRUITER, role="recruiter", organization_id=EMPLOYER, scopes=("assessments.manage",), defaults=False)
+    assert (await client.post("/api/v1/questions", json=mcq())).status_code == 403
+    act_as(STAFF_A, role="staff", organization_id=ORG_A, defaults=False)
+    assert (await client.get("/api/v1/grading/queue")).status_code == 403
+    act_as(STAFF_A, role="staff", organization_id=ORG_A)
+    assert (await client.get("/api/v1/grading/queue")).status_code == 200

@@ -77,7 +77,7 @@ Docker: `docker compose up job-portal-service-migrate job-portal-service job-por
 
 ## Verified
 
-`ruff` and `mypy --strict` clean; **106 tests**: unit (matching text/eligibility/score, the pipeline state machine incl. "the system can never reject")
+`ruff` and `mypy --strict` clean; **107 tests**: unit (matching text/eligibility/score, the pipeline state machine incl. "the system can never reject")
 and integration over SQLite (company verification, job lifecycle and validation, approval, deadline and suspension handling, matching and recommendations,
 batches, preferences, notifications, embeddings vs word overlap, browse/search, applying and every refusal, frozen resume, screening incl. the
 anonymised input, model failures and the audit log, ranking, shortlisting, confirmed rejection batches, the full pipeline with assessment/interview/HR,

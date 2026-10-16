@@ -78,7 +78,7 @@ pytest                                                      # same suite on Post
 ruff check . && ruff format --check .
 ```
 
-93 tests cover authentication, two-factor login, hierarchy and scope isolation, validation, filters, exports, import,
+126 tests cover authentication, two-factor login, hierarchy and scope isolation, validation, filters, exports, import,
 background jobs, event publishing and housekeeping.
 
 ## Migrations

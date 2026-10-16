@@ -70,6 +70,8 @@ class TicketMessage(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     kind: Mapped[str] = mapped_column(String(10), default=MessageKind.PUBLIC)
     body: Mapped[str] = mapped_column(Text)
     canned_reply_id: Mapped[int | None] = mapped_column(BigInteger)
+    # [{key, filename, content_type, size_bytes}], checked against storage when the message was written
+    attachments: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONType)
 
     ticket: Mapped[Ticket] = relationship(back_populates="messages", lazy="raise")
 

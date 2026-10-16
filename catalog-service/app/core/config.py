@@ -7,10 +7,18 @@ refuses to start staging/production with any of them.
 
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
+def _private_or_https(url: str) -> bool:
+    """https anywhere; plain http only to a private-network host: localhost, a loopback address, or a single-label
+    container/service name such as ``user-management`` (resolvable only inside the deployment's own network)."""
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    return parsed.scheme == "https" or (parsed.scheme == "http" and (host in {"localhost", "127.0.0.1", "::1"} or "." not in host))
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -54,6 +62,11 @@ class Settings(BaseSettings):
     # --- Access state published by user-management (read-only; see lms_common.access_state) ---
     ACCESS_STATE_KEY_PREFIX: str = "lms:access"
 
+    # --- Course rules ---
+    # A version goes to review only when every topic ends with its published topic test (course -> modules -> topics
+    # -> lessons -> topic test). Turn off only for content that deliberately has no tests.
+    REQUIRE_TOPIC_TESTS: bool = True
+
     # --- Rate limiting (per client IP unless stated) ---
     RATE_LIMIT_ENABLED: bool = True
     AUTHORING_RATE_LIMIT_PER_MINUTE: int = 60
@@ -88,7 +101,7 @@ class Settings(BaseSettings):
                 errors.append("DEBUG must be false outside local/test")
             if "*" in self.TRUSTED_HOSTS:
                 errors.append("TRUSTED_HOSTS must list explicit hosts outside local/test")
-            if self.USER_MANAGEMENT_JWKS_URL.startswith("http://") and "localhost" not in self.USER_MANAGEMENT_JWKS_URL:
+            if not _private_or_https(self.USER_MANAGEMENT_JWKS_URL):
                 errors.append("USER_MANAGEMENT_JWKS_URL must use https outside local/test")
         if errors:
             raise ValueError("; ".join(errors))

@@ -2,7 +2,7 @@ from sqlalchemy import select
 
 from app.models.faq import FaqEntry
 from app.models.outbox_event import OutboxEvent
-from tests.conftest import COURSE, ORG_A, ORG_B, STAFF_B, STUDENT, STUDENT_2, ask, start_conversation
+from tests.conftest import COURSE, ORG_A, ORG_B, STAFF_A, STAFF_B, STUDENT, STUDENT_2, ask, start_conversation
 
 QUESTION = "How do I reset my attempt limit?"
 ANSWER = "Attempt limits can only be reset by your institution's exam team; ask them through a support request."
@@ -182,3 +182,14 @@ async def test_authors_see_totals_and_the_unhelpful_answers_without_who_asked(cl
     assert str(STUDENT) not in str(items) and str(ORG_A) not in str(items)
     who.student()
     assert (await client.get("/api/v1/feedback/summary", params={"course_id": str(COURSE)})).status_code == 403
+
+
+async def test_the_tutor_and_the_faq_follow_the_persons_permissions(client, act_as):
+    """A super admin can stop one student using the tutor, or let one student write their institution's FAQ."""
+    act_as(STUDENT, role="student", organization_id=ORG_A, defaults=False)
+    assert (await client.post("/api/v1/conversations", json={"course_id": str(COURSE)})).status_code == 403
+    entry = {"scope": "organization", "organization_id": str(ORG_A), "question": "When is the lab open?", "answer": "Weekdays, 9 to 5."}
+    act_as(STUDENT, role="student", organization_id=ORG_A, scopes=("tutor.faq.manage",))
+    assert (await client.post("/api/v1/faq/manage", json=entry)).status_code == 201
+    act_as(STAFF_A, role="staff", organization_id=ORG_A, defaults=False)
+    assert (await client.post("/api/v1/faq/manage", json=entry)).status_code == 403

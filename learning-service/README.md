@@ -12,8 +12,11 @@ Batches, seat-checked enrolment, item/topic/module progress and unlock rules.
 
 Follows the service template and conventions in [lms-backend/README.md](../README.md): verifies
 access tokens against user-management's JWKS (never issues its own), checks the shared Redis
-access-state keys for revocation, and authorises by the `accounts.manage` scope or the
-`institution_head` role — see [app/permissions/](app/permissions).
+access-state keys for revocation, and authorises by the permissions in the token (user-management's
+catalog; a super admin can change them per role or per person) — see [app/api/deps.py](app/api/deps.py):
+`learning.study` (a student's own enrolments, progress, and the batches they are enrolled in),
+`learning.batches.view` / `learning.batches.manage` (their own institution's batches), and
+`accounts.manage` (every institution).
 
 ## Design notes (deviations from the original skeleton sketch worth knowing)
 
@@ -83,7 +86,7 @@ the same value, not a shared secret store (see subscription-service/README.md "N
 
 ## Tests
 
-23 tests (`tests/unit`, `tests/integration`). Five cover test results gating completion (items alone don't complete a
+25 tests (`tests/unit`, `tests/integration`). Five cover test results gating completion (items alone don't complete a
 topic with a test; pass topic then module test → completion events and eligibility; redelivered/older revisions ignored;
 a later failing retake keeps a pass and an invalidation removes it; final/practice/unknown/withdrawn are ignored); the
 migration was verified up → down → up with `alembic check` on a real PostgreSQL. The original 18 cover: authorization (missing token, wrong role,

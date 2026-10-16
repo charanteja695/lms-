@@ -40,6 +40,11 @@ LOCAL_OVERRIDES = {
     "REFRESH_COOKIE_SECURE": "false",
     # The code default depends on the machine's CPU count; the example uses a fixed value.
     "PASSWORD_HASH_CONCURRENCY": "8",
+    # RS256 everywhere but tests: every other service verifies tokens with the public key (JWKS). Keys come from
+    # python scripts/generate_jwt_keys.py keys
+    "JWT_ALGORITHM": "RS256",
+    "JWT_PRIVATE_KEY_FILE": "keys/jwt_private.pem",
+    "JWT_PUBLIC_KEY_FILE": "keys/jwt_public.pem",
 }
 DOCKER_OVERRIDES = {
     **LOCAL_OVERRIDES,
@@ -47,6 +52,8 @@ DOCKER_OVERRIDES = {
     "DATABASE_URL": "postgresql+asyncpg://lms:lms@postgres:5432/lms_user_management",
     "REDIS_URL": "redis://redis:6379/0",
     "JOB_STORAGE_DIR": "/app/var/jobs",
+    "JWT_PRIVATE_KEY_FILE": "/app/keys/jwt_private.pem",
+    "JWT_PUBLIC_KEY_FILE": "/app/keys/jwt_public.pem",
 }
 
 

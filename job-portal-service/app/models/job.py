@@ -27,6 +27,9 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     ctc_min: Mapped[int | None] = mapped_column(BigInteger)  # whole units per year, in ``currency``
     ctc_max: Mapped[int | None] = mapped_column(BigInteger)
     currency: Mapped[str] = mapped_column(String(3), default="INR")
+    # internships: monthly stipend (whole units of ``currency``) and how long it runs
+    stipend_per_month: Mapped[int | None] = mapped_column(BigInteger)
+    duration_months: Mapped[int | None] = mapped_column(Integer)
     required_skills: Mapped[list[str]] = mapped_column(JSONType, default=list)
     preferred_skills: Mapped[list[str]] = mapped_column(JSONType, default=list)
     openings: Mapped[int] = mapped_column(Integer, default=1)

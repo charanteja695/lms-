@@ -55,10 +55,11 @@ class BatchService:
             raise NotFoundError("Batch not found.", code="BATCH_NOT_FOUND")
         return batch
 
-    async def list_batches(self, query: ListQuery, *, organization_id: int | None) -> tuple[list[Batch], int, bool]:
+    async def list_batches(self, query: ListQuery, *, organization_ids: tuple[int, ...] | None) -> tuple[list[Batch], int, bool]:
+        """``organization_ids``: the institutions whose batches to list (``None`` = all)."""
         stmt = select(Batch).options(selectinload(Batch.course_version))
-        if organization_id is not None:
-            stmt = stmt.where(Batch.organization_id == organization_id)
+        if organization_ids is not None:
+            stmt = stmt.where(Batch.organization_id.in_(organization_ids))
         if query.status:
             stmt = stmt.where(Batch.status == query.status)
         stmt = stmt.order_by(Batch.created_at.desc() if query.sort_order == "desc" else Batch.created_at.asc())

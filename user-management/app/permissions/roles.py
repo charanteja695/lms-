@@ -13,7 +13,8 @@ class Role(StrEnum):
     INSTITUTION_HEAD = "institution_head"
     STAFF = "staff"
     STUDENT = "student"
-    EMPLOYER_ADMIN = "employer_admin"  # manages a hiring company's recruiters
+    # Company logins are no longer created (the super admin runs hiring); kept so older accounts still read.
+    EMPLOYER_ADMIN = "employer_admin"
     RECRUITER = "recruiter"
 
 
@@ -37,6 +38,13 @@ class AdminScope(StrEnum):
 
 
 DEFAULT_ADMIN_SCOPES: tuple[AdminScope, ...] = (AdminScope.ACCOUNTS_MANAGE,)
+# What an admin may be given: their institutes and people, support, reports. Courses, tests, exams, jobs, billing and
+# AI are run by the super admin alone, so the other scopes are never granted to an admin (and are ignored if stored).
+ADMIN_SCOPES: tuple[AdminScope, ...] = (
+    AdminScope.ACCOUNTS_MANAGE,
+    AdminScope.SUPPORT_MANAGE,
+    AdminScope.ANALYTICS_VIEW,
+)
 # The scope an admin needs to own organisations of each type.
 SCOPE_FOR_ORGANIZATION: dict[OrganizationType, AdminScope] = {
     OrganizationType.INSTITUTION: AdminScope.ACCOUNTS_MANAGE,

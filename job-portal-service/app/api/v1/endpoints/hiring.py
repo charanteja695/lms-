@@ -13,7 +13,6 @@ from app.api.deps import (
     DbSession,
     GatewayDep,
     JobIdParam,
-    RequireEmployer,
     RequireEmployerOrManager,
     SettingsDep,
     WriteRateLimit,
@@ -142,7 +141,7 @@ async def decisions(
     "/jobs/{job_id}/applications/shortlist", response_model=BulkResult, summary="Shortlist applicants (a recruiter's decision)",
     description="Either `application_ids`, or `threshold` (everyone still undecided whose screening score is at least that).", responses=errors(*AUTHENTICATED, 404, 409, 422), dependencies=[WriteRateLimit],
 )
-async def shortlist(job_id: JobIdParam, body: BulkShortlistRequest, auth: RequireEmployer, db: DbSession, settings: SettingsDep) -> BulkResult:
+async def shortlist(job_id: JobIdParam, body: BulkShortlistRequest, auth: RequireEmployerOrManager, db: DbSession, settings: SettingsDep) -> BulkResult:
     if (body.application_ids is None) == (body.threshold is None):
         raise ValidationFailedError(details=[{"field": "application_ids", "code": "EXACTLY_ONE", "message": "Send application_ids or threshold, not both"}])
     job = await _job(db, settings, auth, job_id)
@@ -156,7 +155,7 @@ async def shortlist(job_id: JobIdParam, body: BulkShortlistRequest, auth: Requir
     description="`confirm` must be true. This is the only way an application is rejected: the AI only recommends, a person confirms each batch. The batch records how many of them "
     "the screening had recommended rejecting and how many it had not.", responses=errors(*AUTHENTICATED, 404, 409, 422), dependencies=[WriteRateLimit],
 )
-async def reject(job_id: JobIdParam, body: RejectRequest, auth: RequireEmployer, db: DbSession, settings: SettingsDep) -> BatchResponse:
+async def reject(job_id: JobIdParam, body: RejectRequest, auth: RequireEmployerOrManager, db: DbSession, settings: SettingsDep) -> BatchResponse:
     job = await _job(db, settings, auth, job_id)
     batch = await ApplicationService(db, settings).reject_batch(auth, job, list(body.application_ids), reason=body.reason, confirmed=body.confirm, threshold=body.threshold)
     return BatchResponse(message=f"{len(body.application_ids)} rejected.", batch=BatchOut.model_validate(batch))
@@ -175,7 +174,7 @@ async def get_application(application_id: ApplicationIdParam, auth: RequireEmplo
     description="`to` is one of shortlisted, assessment_invited, ai_interview_invited, recruiter_review, hr_interview — and only what the job's pipeline allows next. Offered, placed and "
     "rejected have their own steps; assessment and interview completion are recorded by the platform.", responses=errors(*AUTHENTICATED, 404, 409), dependencies=[WriteRateLimit],
 )
-async def transition(application_id: ApplicationIdParam, body: TransitionRequest, auth: RequireEmployer, db: DbSession, settings: SettingsDep) -> RecruiterApplicationResponse:
+async def transition(application_id: ApplicationIdParam, body: TransitionRequest, auth: RequireEmployerOrManager, db: DbSession, settings: SettingsDep) -> RecruiterApplicationResponse:
     service = ApplicationService(db, settings)
     application, job = await service.get_for_employer(auth, application_id)
     application = await service.transition(auth, application, job, body.to, note=body.note, hr_interview_at=body.hr_interview_at)
@@ -183,7 +182,7 @@ async def transition(application_id: ApplicationIdParam, body: TransitionRequest
 
 
 @router.post("/applications/{application_id}/advance", response_model=RecruiterApplicationResponse, summary="Move an applicant to the next stage of this job's pipeline", responses=errors(*AUTHENTICATED, 404, 409), dependencies=[WriteRateLimit])
-async def advance(application_id: ApplicationIdParam, auth: RequireEmployer, db: DbSession, settings: SettingsDep) -> RecruiterApplicationResponse:
+async def advance(application_id: ApplicationIdParam, auth: RequireEmployerOrManager, db: DbSession, settings: SettingsDep) -> RecruiterApplicationResponse:
     service = ApplicationService(db, settings)
     application, job = await service.get_for_employer(auth, application_id)
     application = await service.advance(auth, application, job)
@@ -191,7 +190,7 @@ async def advance(application_id: ApplicationIdParam, auth: RequireEmployer, db:
 
 
 @router.post("/applications/{application_id}/notes", response_model=NoteResponse, status_code=201, summary="Add a private note (the candidate never sees it)", responses=errors(*AUTHENTICATED, 404), dependencies=[WriteRateLimit])
-async def add_note(application_id: ApplicationIdParam, body: NoteIn, auth: RequireEmployer, db: DbSession, settings: SettingsDep) -> NoteResponse:
+async def add_note(application_id: ApplicationIdParam, body: NoteIn, auth: RequireEmployerOrManager, db: DbSession, settings: SettingsDep) -> NoteResponse:
     service = ApplicationService(db, settings)
     application, _ = await service.get_for_employer(auth, application_id)
     note = await service.add_note(auth, application, body.body)
@@ -203,7 +202,7 @@ async def add_note(application_id: ApplicationIdParam, body: NoteIn, auth: Requi
     description="From recruiter review (or the HR interview when the pipeline has one). The candidate has `valid_days` (7 by default) to answer; an unanswered offer expires and is closed as declined.",
     responses=errors(*AUTHENTICATED, 404, 409), dependencies=[WriteRateLimit],
 )
-async def extend_offer(application_id: ApplicationIdParam, body: OfferRequest, auth: RequireEmployer, db: DbSession, settings: SettingsDep) -> OfferResponse:
+async def extend_offer(application_id: ApplicationIdParam, body: OfferRequest, auth: RequireEmployerOrManager, db: DbSession, settings: SettingsDep) -> OfferResponse:
     applications = ApplicationService(db, settings)
     application, job = await applications.get_for_employer(auth, application_id)
     offer = await OfferService(db, settings).extend(
@@ -216,7 +215,7 @@ async def extend_offer(application_id: ApplicationIdParam, body: OfferRequest, a
     "/applications/{application_id}/place", response_model=RecruiterApplicationResponse, summary="Record that the candidate joined",
     description="Emits `candidate.placed`. When placements reach the job's openings, the job closes itself.", responses=errors(*AUTHENTICATED, 404, 409), dependencies=[WriteRateLimit],
 )
-async def place(application_id: ApplicationIdParam, auth: RequireEmployer, db: DbSession, settings: SettingsDep) -> RecruiterApplicationResponse:
+async def place(application_id: ApplicationIdParam, auth: RequireEmployerOrManager, db: DbSession, settings: SettingsDep) -> RecruiterApplicationResponse:
     service = ApplicationService(db, settings)
     application, job = await service.get_for_employer(auth, application_id)
     application = await service.place(auth, application, job)

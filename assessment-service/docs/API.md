@@ -61,7 +61,7 @@ first edit opens a new version that starts as a copy. `POST /submit` (author) â†
 
 `POST /tests` `{title, kind, target_id?, time_mode, duration_minutes?, pass_mark_percent, max_attempts (0 = unlimited),
 cooldown_hours, score_counting, negative_marking_percent, shuffle_questions, shuffle_options, result_visibility,
-review_policy, proctoring_level, requires_schedule, sections?}`.
+review_policy, proctoring_level, proctoring_screen_share (strict only: the student must share their screen), requires_schedule, sections?}`.
 
 - `kind`: `topic`, `module`, `final` (need the catalog `target_id`: topic / module / **course**), `practice`, `hiring`.
 - `time_mode`: `overall` (needs `duration_minutes`) or `per_section` (every section needs `time_limit_minutes`).

@@ -119,7 +119,7 @@ pruned after `RUNS_RETENTION_DAYS`, submissions are never deleted.
 
 ## Tests
 
-209 tests (`tests/unit`, `tests/integration`), ruff-clean. mypy reports only the accepted alias-factory gap
+211 tests (`tests/unit`, `tests/integration`), ruff-clean. mypy reports only the accepted alias-factory gap
 (`text()`/`id_field()` types), as in every service. They cover:
 
 - comparison in every mode, fingerprint stability under renaming, encryption and key rotation, production-config refusals;

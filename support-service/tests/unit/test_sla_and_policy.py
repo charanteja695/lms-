@@ -76,3 +76,14 @@ def test_who_may_assign_others():
     assert not policy.can_assign_others(head, _ticket("platform_support"))
     assert not policy.can_assign_others(_claims(2, "staff", ORG_A), _ticket("batch_staff"))
     assert policy.can_assign_others(_claims(3, "super_admin", None), _ticket("exam_team"))
+
+
+def test_an_admin_manages_support_only_for_the_institutions_they_look_after():
+    from dataclasses import replace
+
+    admin = replace(_claims(1755000000039001, "admin", None, "support.manage"), admin_organization_ids=(ORG_A,))
+    assert policy.can_handle(admin, _ticket(Queue.PLATFORM_SUPPORT, ORG_A))
+    assert not policy.can_handle(admin, _ticket(Queue.PLATFORM_SUPPORT, ORG_B))
+    assert not policy.can_assign_others(admin, _ticket(Queue.BATCH_STAFF, ORG_B))
+    root = _claims(1755000000039002, "super_admin", None)
+    assert policy.can_handle(root, _ticket(Queue.PLATFORM_SUPPORT, ORG_B))

@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
@@ -12,11 +13,12 @@ from app.db.types import uuid7
 from app.models.institution import Institution
 from app.models.session import RefreshToken, UserSession
 from app.models.user import User
-from app.permissions import policies
+from app.permissions.roles import Role
 from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import AuthUserOut, TokenOut
 from app.schemas.summaries import InstitutionRef
+from app.services.permission_service import PermissionService
 
 
 class RevokeReason:
@@ -64,13 +66,24 @@ class SessionService:
         )
         self.repo.add(session)
         await self.db.flush()  # the refresh token row references the session
-        return self.issue_tokens(user, institution, session, mfa_enabled=mfa_enabled)
+        return await self.issue_tokens(user, institution, session, mfa_enabled=mfa_enabled)
 
-    def issue_tokens(
+    async def issue_tokens(
         self, user: User, institution: Institution | None, session: UserSession, *, mfa_enabled: bool
     ) -> IssuedTokens:
-        """Create a new one-time refresh token plus an access token bound to ``session``."""
+        """Create a new one-time refresh token plus an access token bound to ``session``; the access token carries the
+        person's effective permissions (role defaults, scopes, their own grants and removals)."""
         now = utcnow()
+        permissions = await PermissionService(self.db).effective_for(user)
+        admin_orgs: list[int] = []
+        if user.role == Role.ADMIN:
+            admin_orgs = list(
+                (
+                    await self.db.execute(
+                        select(Institution.public_id).where(Institution.admin_id == user.id, Institution.deleted_at.is_(None))
+                    )
+                ).scalars()
+            )
         raw_refresh_token = generate_secure_token()
         refresh_expires_at = min(now + timedelta(days=self.settings.REFRESH_TOKEN_EXPIRE_DAYS), session.expires_at)
         self.repo.add(
@@ -88,7 +101,8 @@ class SessionService:
             organization_id=institution.public_id if institution else None,
             token_version=user.token_version,
             organization_type=institution.org_type if institution else None,
-            scopes=policies.token_scopes(user),
+            scopes=permissions,
+            admin_organization_ids=admin_orgs,
         )
         return IssuedTokens(
             token=TokenOut(
@@ -104,7 +118,7 @@ class SessionService:
                 username=user.username,
                 role=user.role,
                 institution=InstitutionRef.of(institution),
-                scopes=policies.token_scopes(user),
+                scopes=permissions,
                 must_change_password=user.must_change_password,
                 mfa_enabled=mfa_enabled,
                 mfa_setup_required=not mfa_enabled and user.role in self.settings.MFA_REQUIRED_ROLES,

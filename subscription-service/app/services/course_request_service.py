@@ -84,10 +84,10 @@ class CourseRequestService:
             raise NotFoundError("Course request not found.", code="COURSE_REQUEST_NOT_FOUND")
         return request
 
-    async def list_requests(self, query: ListQuery, *, organization_id: int | None) -> tuple[list[CourseRequest], int, bool]:
+    async def list_requests(self, query: ListQuery, *, organization_ids: tuple[int, ...] | None) -> tuple[list[CourseRequest], int, bool]:
         stmt = select(CourseRequest)
-        if organization_id is not None:
-            stmt = stmt.where(CourseRequest.organization_id == organization_id)
+        if organization_ids is not None:  # None: every institution
+            stmt = stmt.where(CourseRequest.organization_id.in_(organization_ids))
         if query.status:
             stmt = stmt.where(CourseRequest.status == query.status)
         stmt = stmt.order_by(

@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 from lms_common.envelopes import PageContext, SortOrder
 
-from app.api.deps import CourseIdParam, DbSession, RequireAuthor
+from app.api.deps import CourseIdParam, CurrentAuth, DbSession, RequireAuthor
 from app.api.responses import errors
 from app.schemas.course import (
     CourseCreate,
@@ -37,7 +37,7 @@ async def create_course(data: CourseCreate, auth: RequireAuthor, db: DbSession) 
     summary="List courses",
     responses=errors(401, 422),
 )
-async def list_courses(query: Annotated[CourseListQuery, Query()], db: DbSession) -> CourseListResponse:
+async def list_courses(query: Annotated[CourseListQuery, Query()], auth: CurrentAuth, db: DbSession) -> CourseListResponse:
     courses, total, is_exact = await CourseService(db).list_courses(query)
     return CourseListResponse(
         message="Courses retrieved successfully.",
@@ -59,7 +59,7 @@ async def list_courses(query: Annotated[CourseListQuery, Query()], db: DbSession
     summary="Get a course",
     responses=errors(401, 404),
 )
-async def get_course(course_id: CourseIdParam, db: DbSession) -> CourseResponse:
+async def get_course(course_id: CourseIdParam, auth: CurrentAuth, db: DbSession) -> CourseResponse:
     course = await CourseService(db).get(course_id)
     return CourseResponse(message="Course retrieved successfully.", course=CourseOut.model_validate(course))
 

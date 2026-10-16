@@ -16,7 +16,7 @@ def _settings() -> Settings:
 
 
 def _request() -> ChatRequest:
-    return ChatRequest(model="claude-sonnet-5", messages=[ChatMessage(role="user", content="Hi")], system="Be terse.", max_tokens=100)
+    return ChatRequest(model="claude-sonnet-5-5", messages=[ChatMessage(role="user", content="Hi")], system="Be terse.", max_tokens=100)
 
 
 def _provider(handler) -> AnthropicProvider:
@@ -28,7 +28,7 @@ async def test_complete_parses_text_and_usage() -> None:
         return httpx.Response(
             200,
             json={
-                "id": "msg_1", "type": "message", "role": "assistant", "model": "claude-sonnet-5",
+                "id": "msg_1", "type": "message", "role": "assistant", "model": "claude-sonnet-5-5",
                 "content": [{"type": "text", "text": "Hello there!"}], "stop_reason": "end_turn",
                 "usage": {"input_tokens": 12, "output_tokens": 4},
             },
@@ -45,14 +45,14 @@ async def test_complete_sends_the_documented_request_shape() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured.append(request)
-        return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}], "model": "claude-sonnet-5", "usage": {"input_tokens": 1, "output_tokens": 1}})
+        return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}], "model": "claude-sonnet-5-5", "usage": {"input_tokens": 1, "output_tokens": 1}})
 
     await _provider(handler).complete(_request())
     sent = captured[0]
     assert sent.headers["x-api-key"] == "sk-ant-test"
     assert sent.headers["anthropic-version"]
     body = json.loads(sent.content)
-    assert body["model"] == "claude-sonnet-5" and body["system"] == "Be terse." and body["stream"] is False
+    assert body["model"] == "claude-sonnet-5-5" and body["system"] == "Be terse." and body["stream"] is False
     assert body["messages"] == [{"role": "user", "content": "Hi"}]
 
 
@@ -62,7 +62,7 @@ async def test_tool_use_blocks_are_returned_separately_from_text() -> None:
             200,
             json={
                 "content": [{"type": "text", "text": "Let me check."}, {"type": "tool_use", "id": "tu_1", "name": "lookup_status", "input": {"attempt_id": "1"}}],
-                "model": "claude-sonnet-5", "usage": {"input_tokens": 5, "output_tokens": 5},
+                "model": "claude-sonnet-5-5", "usage": {"input_tokens": 5, "output_tokens": 5},
             },
         )
 

@@ -3,6 +3,11 @@
 Live monitoring and integrity review belong to the platform's exam managers (``exams.manage``), to the staff and head of
 the *student's own institution* for platform tests, and to the owning employer's members for that employer's hiring
 assessments (a test with an owning organisation). An institution's staff never see an employer's hiring assessment.
+
+Permissions come from the access token (user-management's catalog; a super admin can grant or remove any per person):
+  proctoring.take      sit proctored exams; their own integrity cases and appeals (by default a student)
+  proctoring.monitor   their own organisation's live sessions and cases (staff, head, employer admin, recruiter)
+  exams.manage         every session and case; appeals
 """
 
 from enum import StrEnum
@@ -27,20 +32,30 @@ def is_super_admin(auth: AccessTokenClaims) -> bool:
     return auth.role == Role.SUPER_ADMIN
 
 
+TAKE, MONITOR = "proctoring.take", "proctoring.monitor"
+
+
 def is_student(auth: AccessTokenClaims) -> bool:
-    return auth.role == Role.STUDENT
+    """Sits proctored exams (a person's own; never implied by being a super admin)."""
+    return auth.has_scope(TAKE)
 
 
 def can_manage_exams(auth: AccessTokenClaims) -> bool:
-    return is_super_admin(auth) or auth.has_scope(EXAMS_MANAGE)
+    return auth.can(EXAMS_MANAGE)
+
+
+def _monitors(auth: AccessTokenClaims, kind: str) -> bool:
+    return auth.organization_id is not None and auth.organization_type == kind and auth.has_scope(MONITOR)
 
 
 def is_institution_staff(auth: AccessTokenClaims) -> bool:
-    return auth.role in {Role.STAFF, Role.INSTITUTION_HEAD} and auth.organization_id is not None
+    """Watches their own institution's students' sessions on platform tests."""
+    return _monitors(auth, "institution")
 
 
 def is_employer_member(auth: AccessTokenClaims) -> bool:
-    return auth.role in {Role.EMPLOYER_ADMIN, Role.RECRUITER} and auth.organization_id is not None
+    """Watches their own company's hiring-assessment sessions."""
+    return _monitors(auth, "employer")
 
 
 def can_monitor(auth: AccessTokenClaims, *, student_organization_id: int | None, test_owner_id: int | None) -> bool:

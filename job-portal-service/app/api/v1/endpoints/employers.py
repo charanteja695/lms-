@@ -18,6 +18,7 @@ from app.api.presenters import company_names, employer_out
 from app.api.responses import AUTHENTICATED, errors
 from app.core.exceptions import NotFoundError
 from app.domain.enums import EmployerStatus
+from app.models.refs import OrgRef
 from app.permissions.policy import can_manage_careers
 from app.schemas.employer import EmployerPage, EmployerProfileUpdate, EmployerResponse, NoteRequest, ReviewRequest
 from app.services.employer_service import EmployerService
@@ -89,6 +90,21 @@ async def review_queue(
     names = await company_names(db, {p.organization_id for p in profiles})
     context = PageContext.build(page=page, per_page=per_page, total=total, is_exact=True, sort_column="submitted_at", sort_order=SortOrder.ASC)
     return EmployerPage(message="", employers=[employer_out(p, names.get(p.organization_id, "Company")) for p in profiles], page_context=context)
+
+
+@admin.put(
+    "/{organization_id}/profile", response_model=EmployerResponse, summary="Keep a company's profile (careers manager)",
+    description="For companies the super admin runs (there are no company logins). `about`, `website` and `industry` are required; saving a complete "
+    "profile verifies the company so its jobs can go live.", responses=errors(*AUTHENTICATED, 404, 409, 422), dependencies=[WriteRateLimit],
+)
+async def manage_profile(organization_id: OrgIdParam, body: EmployerProfileUpdate, auth: RequireCareersManager, db: DbSession) -> EmployerResponse:
+    service = EmployerService(db)
+    if await db.get(OrgRef, organization_id) is None:
+        raise NotFoundError("Employer not found.", code="EMPLOYER_NOT_FOUND")
+    profile = await service.manage(organization_id, body.model_dump(exclude_unset=True), auth.user_id)
+    return EmployerResponse(
+        message="Saved. The company is verified.", employer=employer_out(profile, await service.company_name(organization_id), open_jobs=await service.open_job_count(organization_id), include_review=True)
+    )
 
 
 @admin.post(

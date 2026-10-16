@@ -1,16 +1,37 @@
+from typing import Any
+
 from lms_common.envelopes import PageContext, RequestSchema, ResponseSchema, SuccessResponse
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.domain.enums import CannedScope, Category, Priority, Queue, Source, TicketStatus
 from app.schemas.types import PublicIdOut, Timestamp, id_field, multiline_text, text
 
 
 # ---------------------------------------------------------------- requests
+class AttachmentIn(RequestSchema):
+    """A file already uploaded with an upload URL from `POST /attachments/upload-url`."""
+
+    key: text(400)  # type: ignore[valid-type]
+    filename: text(200)  # type: ignore[valid-type]
+
+
+# How many a message may carry is ATTACHMENT_MAX_FILES (checked by the service); this only bounds the request.
+Attachments = list[AttachmentIn]
+_ATTACHMENTS: Any = Field(default_factory=list, max_length=20, description="Files uploaded beforehand; at most ATTACHMENT_MAX_FILES")
+
+
+class AttachmentUploadRequest(RequestSchema):
+    filename: text(200)  # type: ignore[valid-type]
+    content_type: text(120)  # type: ignore[valid-type]
+    size_bytes: int = Field(gt=0)
+
+
 class TicketCreate(RequestSchema):
     subject: text(200, min_length=3)  # type: ignore[valid-type]
     description: multiline_text(8_000)  # type: ignore[valid-type]
     category: Category
     course_id: id_field("Course", "1755000000001001") | None = None  # type: ignore[valid-type]
+    attachments: Attachments = _ATTACHMENTS
 
 
 class InternalTicketCreate(RequestSchema):
@@ -29,6 +50,7 @@ class InternalTicketCreate(RequestSchema):
 
 class ReplyCreate(RequestSchema):
     body: multiline_text(8_000)  # type: ignore[valid-type]
+    attachments: Attachments = _ATTACHMENTS
 
 
 class AgentReplyCreate(RequestSchema):
@@ -36,6 +58,7 @@ class AgentReplyCreate(RequestSchema):
     internal: bool = Field(default=False, description="An internal note: never shown to the student, does not stop the SLA clock")
     then: TicketStatus | None = Field(default=None, description="Optionally move the ticket on: waiting_on_student or resolved")
     canned_reply_id: id_field("Canned reply", "1755000000009001") | None = None  # type: ignore[valid-type]
+    attachments: Attachments = _ATTACHMENTS
 
 
 class AssignRequest(RequestSchema):
@@ -72,6 +95,12 @@ class SlaPolicyUpsert(RequestSchema):
 
 
 # ---------------------------------------------------------------- responses
+class AttachmentOut(ResponseSchema):
+    filename: str
+    content_type: str
+    size_bytes: int
+
+
 class MessageOut(ResponseSchema):
     message_id: PublicIdOut = Field(validation_alias="public_id")
     seq: int
@@ -79,7 +108,13 @@ class MessageOut(ResponseSchema):
     author_role: str
     kind: str
     body: str
+    attachments: list[AttachmentOut] = Field(default_factory=list, description="Download one with .../messages/{message_id}/attachments/{index}")
     created_at: Timestamp
+
+    @field_validator("attachments", mode="before")
+    @classmethod
+    def _none_is_empty(cls, value: object) -> object:
+        return value or []
 
 
 class TicketOut(ResponseSchema):
@@ -250,3 +285,23 @@ class SlaReportOut(ResponseSchema):
 
 class SlaReportResponse(SuccessResponse):
     report: SlaReportOut
+
+
+class AttachmentUpload(ResponseSchema):
+    key: str = Field(description="Send this back in a message's `attachments` once the upload has finished")
+    upload: dict[str, Any] = Field(description="A presigned POST: `url` and the form `fields` to send with the file")
+    expires_in: int
+
+
+class AttachmentUploadResponse(SuccessResponse):
+    attachment: AttachmentUpload
+
+
+class AttachmentLink(ResponseSchema):
+    filename: str
+    url: str
+    expires_in: int
+
+
+class AttachmentLinkResponse(SuccessResponse):
+    attachment: AttachmentLink

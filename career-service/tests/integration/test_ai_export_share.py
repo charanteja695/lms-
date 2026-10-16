@@ -113,6 +113,12 @@ async def test_pdf_export_of_the_draft_and_of_a_version(client, who, send_event)
     await client.post(f"{API}/resumes/{rid}/versions", json={})
     assert (await client.get(f"{API}/resumes/{rid}/export/pdf?version_no=1")).status_code == 200
     assert (await client.get(f"{API}/resumes/{rid}/export/pdf?version_no=7")).status_code == 404
+    # preview another template with the student's own data, shown in the browser, without changing the resume
+    preview = await client.get(f"{API}/resumes/{rid}/export/pdf", params={"template_key": "modern", "inline": "true"})
+    assert preview.status_code == 200 and preview.content.startswith(b"%PDF") and preview.headers["content-disposition"].startswith("inline;")
+    assert preview.content != pdf.content
+    assert (await client.get(f"{API}/resumes/{rid}")).json()["resume"]["template_key"] != "modern"
+    assert (await client.get(f"{API}/resumes/{rid}/export/pdf", params={"template_key": "no-such-template"})).status_code == 422
     await client.patch(f"{API}/resumes/{rid}", json={"expected_revision": 0, "title": "आशा resume"})
     who.student(STUDENT_2)
     assert (await client.get(f"{API}/resumes/{rid}/export/pdf")).status_code == 404

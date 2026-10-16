@@ -11,9 +11,9 @@ from app.api.deps import (
     SettingsDep,
     SubscriptionIdParam,
     ensure_organization_visible,
+    institutions_listed,
 )
 from app.api.responses import errors
-from app.permissions.scopes import Scope
 from app.schemas.common import ListQuery
 from app.schemas.subscription import CancelRequest, SubscriptionListResponse, SubscriptionOut, SubscriptionResponse
 from app.services.subscription_service import SubscriptionService
@@ -31,9 +31,9 @@ router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
 async def list_subscriptions(
     query: Annotated[ListQuery, Query()], auth: CurrentAuth, db: DbSession, settings: SettingsDep, redis: RedisDep
 ) -> SubscriptionListResponse:
-    organization_id = None if auth.has_scope(Scope.ACCOUNTS_MANAGE.value) else auth.organization_id
+    organization_ids = institutions_listed(auth)
     subscriptions, total, is_exact = await SubscriptionService(db, settings, redis).list_subscriptions(
-        query, organization_id=organization_id
+        query, organization_ids=organization_ids
     )
     return SubscriptionListResponse(
         message="Subscriptions retrieved successfully.",

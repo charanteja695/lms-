@@ -25,7 +25,13 @@ from app.core.security import AccessTokenClaims
 from app.domain.enums import ApplicationStatus, DriveStatus
 from app.models.application import Application
 from app.models.offer import Offer, PlacementDrive
-from app.permissions.policy import can_manage_careers, is_employer_admin, is_institution_head
+from app.permissions.policy import (
+    can_manage_careers,
+    is_employer_admin,
+    is_employer_member,
+    is_institution_head,
+    is_institution_staff,
+)
 from app.schemas.application import (
     CandidateSummary,
     InstitutionApplicationOut,
@@ -117,7 +123,7 @@ async def list_drives(
     auth: CurrentAuth, db: DbSession, settings: SettingsDep, status: Annotated[DriveStatus | None, Query()] = None, page: Annotated[int, Query(ge=1, le=10_000)] = 1,
     per_page: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> DrivePage:
-    if not (is_institution_head(auth) or auth.role == "staff" or is_employer_admin(auth) or auth.role == "recruiter" or can_manage_careers(auth)):
+    if not (is_institution_staff(auth) or is_institution_head(auth) or is_employer_member(auth) or is_employer_admin(auth) or can_manage_careers(auth)):
         raise PermissionDeniedError()
     rows, total = await DriveService(db, settings).list_for(auth, status=status.value if status else None, page=page, per_page=per_page)
     context = PageContext.build(page=page, per_page=per_page, total=total, is_exact=True, sort_column="created_at", sort_order=SortOrder.DESC)

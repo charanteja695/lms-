@@ -14,8 +14,15 @@ from sqlalchemy import ColumnElement, and_, false, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.clients.user_management import UserManagementClient, UserManagementUnavailable
 from app.core.config import Settings
-from app.core.exceptions import ConflictError, NotFoundError, PermissionDeniedError, ValidationFailedError
+from app.core.exceptions import (
+    ConflictError,
+    NotFoundError,
+    PermissionDeniedError,
+    UpstreamUnavailableError,
+    ValidationFailedError,
+)
 from app.core.ids import new_public_id
 from app.core.security import AccessTokenClaims
 from app.core.time import utcnow
@@ -33,6 +40,7 @@ from app.domain.enums import (
 from app.models.config import CannedReply, SlaPolicy, UserRef
 from app.models.ticket import Ticket, TicketEvent, TicketMessage
 from app.permissions import policy
+from app.permissions.policy import HANDLER_PERMISSIONS
 from app.permissions.roles import Role
 from app.services.outbox import write_event
 from app.sla import Targets, due_at, is_breached, minutes_between, paused_total, targets_for
@@ -80,9 +88,12 @@ class TicketService:
             },
         )
 
-    async def _add_message(self, ticket: Ticket, *, author_user_id: int | None, role: AuthorRole, kind: MessageKind, body: str, canned_id: int | None = None) -> TicketMessage:
+    async def _add_message(
+        self, ticket: Ticket, *, author_user_id: int | None, role: AuthorRole, kind: MessageKind, body: str, canned_id: int | None = None,
+        attachments: list[dict[str, Any]] | None = None,
+    ) -> TicketMessage:
         last = (await self.db.execute(select(func.max(TicketMessage.seq)).where(TicketMessage.ticket_id == ticket.id))).scalar_one()
-        message = TicketMessage(public_id=new_public_id(), ticket_id=ticket.id, seq=(last or 0) + 1, author_user_id=author_user_id, author_role=role, kind=kind, body=body, canned_reply_id=canned_id)
+        message = TicketMessage(public_id=new_public_id(), ticket_id=ticket.id, seq=(last or 0) + 1, author_user_id=author_user_id, author_role=role, kind=kind, body=body, canned_reply_id=canned_id, attachments=attachments)
         self.db.add(message)
         ticket.last_activity_at = utcnow()
         await self.db.flush()
@@ -116,6 +127,7 @@ class TicketService:
     async def create(
         self, *, requester_user_id: int, organization_id: int | None, subject: str, description: str, category: Category, source: Source,
         source_ref: str | None = None, course_id: int | None = None, idempotency_key: str | None = None, reason: str | None = None,
+        attachments: list[dict[str, Any]] | None = None,
     ) -> tuple[Ticket, bool]:
         """Open a ticket. With an ``idempotency_key`` a retry returns the ticket it already opened. Returns ``(ticket, created)``."""
         if idempotency_key:
@@ -140,7 +152,7 @@ class TicketService:
                 raise
             winner = (await self.db.execute(select(Ticket).where(Ticket.idempotency_key == idempotency_key))).scalar_one()
             return winner, False
-        await self._add_message(ticket, author_user_id=requester_user_id, role=AuthorRole.REQUESTER, kind=MessageKind.PUBLIC, body=description)
+        await self._add_message(ticket, author_user_id=requester_user_id, role=AuthorRole.REQUESTER, kind=MessageKind.PUBLIC, body=description, attachments=attachments)
         self._audit(ticket, "created", requester_user_id, source=str(source), **({"reason": reason} if reason else {}))
         self._emit("ticket.created", ticket, source=str(source), course_id=str(course_id) if course_id else None, first_response_due_at=_iso(ticket.first_response_due_at))
         return ticket, True
@@ -157,11 +169,19 @@ class TicketService:
             stmt = stmt.where(TicketMessage.kind != MessageKind.INTERNAL)
         return list((await self.db.execute(stmt)).scalars())
 
+    async def message(self, ticket: Ticket, message_public_id: int, *, include_internal: bool) -> TicketMessage:
+        message = (
+            await self.db.execute(select(TicketMessage).where(TicketMessage.ticket_id == ticket.id, TicketMessage.public_id == message_public_id))
+        ).scalar_one_or_none()
+        if message is None or (message.kind == MessageKind.INTERNAL and not include_internal):
+            raise NotFoundError("Message not found.", code="MESSAGE_NOT_FOUND")
+        return message
+
     async def events(self, ticket: Ticket) -> list[TicketEvent]:
         return list((await self.db.execute(select(TicketEvent).where(TicketEvent.ticket_id == ticket.id).order_by(TicketEvent.created_at, TicketEvent.id))).scalars())
 
     # ------------------------------------------------------------------ the requester
-    async def reply_as_requester(self, ticket: Ticket, user_id: int, body: str) -> tuple[Ticket, TicketMessage]:
+    async def reply_as_requester(self, ticket: Ticket, user_id: int, body: str, attachments: list[dict[str, Any]] | None = None) -> tuple[Ticket, TicketMessage]:
         ticket = await self._lock(ticket)
         now = utcnow()
         if ticket.status == TicketStatus.CLOSED:
@@ -170,7 +190,7 @@ class TicketService:
             if ticket.resolved_at is not None and now > ticket.resolved_at + timedelta(days=self.settings.REOPEN_WINDOW_DAYS):
                 raise ConflictError("This ticket was resolved too long ago to reopen. Please open a new one.", code="REOPEN_WINDOW_PASSED")
             await self._reopen(ticket, user_id)
-        message = await self._add_message(ticket, author_user_id=user_id, role=AuthorRole.REQUESTER, kind=MessageKind.PUBLIC, body=body)
+        message = await self._add_message(ticket, author_user_id=user_id, role=AuthorRole.REQUESTER, kind=MessageKind.PUBLIC, body=body, attachments=attachments)
         if ticket.status == TicketStatus.WAITING_ON_STUDENT:
             self._set_status(ticket, TicketStatus.ASSIGNED if ticket.assignee_user_id else TicketStatus.OPEN, user_id)
         self._audit(ticket, "requester_replied", user_id)
@@ -225,7 +245,8 @@ class TicketService:
             raise PermissionDeniedError("You do not handle this ticket's queue.", code="NOT_YOUR_QUEUE")
 
     async def reply_as_agent(
-        self, ticket: Ticket, auth: AccessTokenClaims, *, body: str, internal: bool, then: str | None, canned_reply_id: int | None = None
+        self, ticket: Ticket, auth: AccessTokenClaims, *, body: str, internal: bool, then: str | None, canned_reply_id: int | None = None,
+        attachments: list[dict[str, Any]] | None = None,
     ) -> tuple[Ticket, TicketMessage]:
         self._require_handler(auth, ticket)
         ticket = await self._lock(ticket)
@@ -233,7 +254,8 @@ class TicketService:
             raise ConflictError("This ticket is closed.", code="TICKET_CLOSED")
         now = utcnow()
         message = await self._add_message(
-            ticket, author_user_id=auth.user_id, role=AuthorRole.AGENT, kind=MessageKind.INTERNAL if internal else MessageKind.PUBLIC, body=body, canned_id=canned_reply_id
+            ticket, author_user_id=auth.user_id, role=AuthorRole.AGENT, kind=MessageKind.INTERNAL if internal else MessageKind.PUBLIC, body=body, canned_id=canned_reply_id,
+            attachments=attachments,
         )
         if internal:
             self._audit(ticket, "internal_note", auth.user_id)
@@ -311,24 +333,37 @@ class TicketService:
 
     @staticmethod
     def _eligible(ticket: Ticket) -> ColumnElement[bool]:
-        """Who may hold a ticket of this queue: its institution's staff/head for batch_staff, platform admins otherwise."""
+        """The candidates for a ticket of this queue: its institution's staff/head for batch_staff, platform admins otherwise.
+        Whether each still holds the permission to handle it is asked of user-management (``_holders``)."""
         if ticket.queue == Queue.BATCH_STAFF:
             return and_(UserRef.role.in_((Role.STAFF, Role.INSTITUTION_HEAD)), UserRef.organization_id == ticket.organization_id)
         return UserRef.role.in_((Role.ADMIN, Role.SUPER_ADMIN))
 
-    async def assignees(self, ticket: Ticket, auth: AccessTokenClaims) -> list[UserRef]:
+    @staticmethod
+    async def _holders(ticket: Ticket, people: UserManagementClient, user_ids: list[int]) -> set[int]:
+        """Of the candidates, those whose permissions (per person, right now) let them handle this ticket's queue."""
+        permissions = HANDLER_PERMISSIONS[Queue(ticket.queue)]
+        try:
+            return await people.holders(permissions, user_ids)
+        except UserManagementUnavailable as exc:
+            raise UpstreamUnavailableError("Could not check who may take this ticket. Try again shortly.") from exc
+
+    async def assignees(self, ticket: Ticket, auth: AccessTokenClaims, people: UserManagementClient) -> list[UserRef]:
         """The people this ticket may be assigned to — the same rule ``assign`` enforces."""
         if not policy.can_assign_others(auth, ticket):
             raise PermissionDeniedError("You may not assign this ticket to someone else.", code="CANNOT_ASSIGN")
         stmt = select(UserRef).where(UserRef.active.is_(True), self._eligible(ticket)).order_by(UserRef.first_name, UserRef.last_name).limit(200)
-        return list((await self.db.execute(stmt)).scalars())
+        candidates = list((await self.db.execute(stmt)).scalars())
+        allowed = await self._holders(ticket, people, [c.user_id for c in candidates])
+        return [c for c in candidates if c.user_id in allowed]
 
-    async def assign(self, ticket: Ticket, auth: AccessTokenClaims, assignee_user_id: int) -> Ticket:
+    async def assign(self, ticket: Ticket, auth: AccessTokenClaims, assignee_user_id: int, people: UserManagementClient) -> Ticket:
         if not policy.can_assign_others(auth, ticket):
             raise PermissionDeniedError("You may not assign this ticket to someone else.", code="CANNOT_ASSIGN")
-        eligible = (
+        candidate = (
             await self.db.execute(select(UserRef.user_id).where(UserRef.user_id == assignee_user_id, UserRef.active.is_(True), self._eligible(ticket)))
         ).scalar_one_or_none() is not None
+        eligible = candidate and assignee_user_id in await self._holders(ticket, people, [assignee_user_id])
         if not eligible:
             raise ValidationFailedError("That person cannot handle this ticket's queue.", code="ASSIGNEE_NOT_ELIGIBLE")
         ticket = await self._lock(ticket)
@@ -380,10 +415,14 @@ class TicketService:
     # ------------------------------------------------------------------ lists and reports
     @staticmethod
     def visible_to(auth: AccessTokenClaims) -> ColumnElement[bool]:
-        """The tickets an agent may see: everything for a manager, else the queues they handle."""
-        if policy.is_manager(auth):
-            return Ticket.id.is_not(None)
+        """The tickets an agent may see: everything for the super admin, an admin's institutions' tickets, else the queues
+        they handle."""
         clauses: list[ColumnElement[bool]] = []
+        if policy.is_manager(auth):
+            care = auth.organizations_in_care()
+            if care is None:
+                return Ticket.id.is_not(None)
+            clauses.append(Ticket.organization_id.in_(care))
         if policy.is_exam_team(auth):
             clauses.append(Ticket.queue == Queue.EXAM_TEAM)
         if policy.is_institution_staff(auth):

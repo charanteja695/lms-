@@ -31,6 +31,8 @@ DOCKER_OVERRIDES = {
     **LOCAL_OVERRIDES,
     "LOG_JSON": "true",
     "REDIS_URL": "redis://redis:6379/0",
+    # In compose the `web` container (nginx) is in front and sets X-Forwarded-For to the real caller.
+    "TRUST_PROXY_HEADERS": "true",
     "USER_MANAGEMENT_JWKS_URL": "http://user-management:8000/.well-known/jwks.json",
     # Every service is reached by its compose service name on the shared network, not localhost.
     "UPSTREAM_URLS": json.dumps({name: f"http://{name}:8000" for name in [

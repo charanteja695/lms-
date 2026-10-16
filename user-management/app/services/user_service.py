@@ -8,6 +8,7 @@ import re
 import secrets
 import unicodedata
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from datetime import timedelta
@@ -36,6 +37,7 @@ from app.notifications.notifier import Notifier
 from app.permissions import policies
 from app.permissions.policies import Action
 from app.permissions.roles import (
+    ADMIN_SCOPES,
     DEFAULT_ADMIN_SCOPES,
     SCOPE_FOR_ORGANIZATION,
     InstitutionStatus,
@@ -91,6 +93,15 @@ _ROLE_LABELS = {
     Role.STUDENT: "student",
     Role.SUPER_ADMIN: "super admin",
 }
+
+
+def _check_admin_scopes(scopes: Iterable[str]) -> None:
+    """Courses, tests, exams, jobs, billing and AI stay with the super admin: an admin cannot be given them."""
+    owner_only = sorted(str(scope) for scope in scopes if scope not in ADMIN_SCOPES)
+    if owner_only:
+        raise ValidationFailedError(
+            details=[_detail("scopes", "SUPER_ADMIN_ONLY", f"Only the super admin handles: {', '.join(owner_only)}")]
+        )
 
 
 def _detail(field: str, code: str, message: str) -> dict[str, str]:
@@ -393,6 +404,7 @@ class UserService:
 
         if role == Role.ADMIN:
             scopes = data.scopes if data.scopes is not None else DEFAULT_ADMIN_SCOPES
+            _check_admin_scopes(scopes)
             user.set_scopes([scope.value for scope in scopes])
         elif data.scopes:
             raise ValidationFailedError(details=[_detail("scopes", "NOT_ALLOWED", "Only admins have scopes")])
@@ -530,6 +542,7 @@ class UserService:
             if new_role != Role.ADMIN:
                 raise ValidationFailedError(details=[_detail("scopes", "NOT_ALLOWED", "Only admins have scopes")])
             if set(data.scopes) != set(target.scope_list):
+                _check_admin_scopes(data.scopes)
                 await self._ensure_scopes_keep_ownership(target, [scope.value for scope in data.scopes])
                 target.set_scopes([scope.value for scope in data.scopes])
                 scopes_changed = True

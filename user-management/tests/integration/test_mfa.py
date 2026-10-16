@@ -149,3 +149,47 @@ async def test_disable_and_admin_reset(client: AsyncClient, hierarchy: Hierarchy
         f"{API}/auth/mfa/disable", json={"password": NEW_PASSWORD, "code": _code(secret, 1)}, headers=headers
     )
     assert off.status_code == 200, off.text
+
+
+def _fixed_code(value: str | None) -> Iterator[str | None]:
+    settings = get_settings()
+    original = settings.MFA_TEST_CODE
+    settings.MFA_TEST_CODE = value
+    try:
+        yield value
+    finally:
+        settings.MFA_TEST_CODE = original
+
+
+@pytest.fixture
+def mfa_test_code() -> Iterator[str | None]:
+    yield from _fixed_code("123456")
+
+
+@pytest.fixture
+def no_mfa_test_code() -> Iterator[str | None]:
+    yield from _fixed_code(None)  # whatever a developer's .env says
+
+
+async def test_a_test_server_accepts_its_fixed_code_again_and_again(client: AsyncClient, super_admin: User, mfa_test_code: str) -> None:
+    headers = bearer(await login(client, SUPER_ADMIN_USERNAME, STRONG_PASSWORD))
+    setup = await client.post(f"{API}/auth/mfa/setup", json={"password": STRONG_PASSWORD}, headers=headers)
+    assert (await client.post(f"{API}/auth/mfa/enable", json={"code": mfa_test_code}, headers=headers)).status_code == 200, setup.text
+    for _ in range(2):  # unlike a real code, the fixed one is not used up
+        challenge = (await client.post(f"{API}/auth/login", json={"identifier": SUPER_ADMIN_USERNAME, "password": STRONG_PASSWORD})).json()["mfa_challenge"]
+        verified = await client.post(f"{API}/auth/mfa/verify", json={"mfa_token": challenge["mfa_token"], "code": mfa_test_code})
+        assert verified.status_code == 200, verified.text
+
+
+@pytest.mark.usefixtures("no_mfa_test_code")
+async def test_without_the_setting_the_fixed_code_is_just_a_wrong_code(client: AsyncClient, super_admin: User) -> None:
+    headers = bearer(await login(client, SUPER_ADMIN_USERNAME, STRONG_PASSWORD))
+    await client.post(f"{API}/auth/mfa/setup", json={"password": STRONG_PASSWORD}, headers=headers)
+    assert (await client.post(f"{API}/auth/mfa/enable", json={"code": "123456"}, headers=headers)).status_code == 400
+
+
+def test_production_refuses_to_start_with_a_fixed_code() -> None:
+    from app.core.config import Settings
+
+    with pytest.raises(ValueError, match="MFA_TEST_CODE"):
+        Settings(_env_file=None, ENVIRONMENT="production", MFA_TEST_CODE="123456").validate_security()

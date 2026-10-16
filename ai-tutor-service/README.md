@@ -91,7 +91,7 @@ pytest -m postgres                        # 6 tests on a real embedded PostgreSQ
 
 ## Verification (2026-09-24)
 
-**133 tests** — 44 unit (chunking, transcript windows, cosine/lexical scoring, escalation and hint-ladder rules, the blocking
+**134 tests** — 44 unit (chunking, transcript windows, cosine/lexical scoring, escalation and hint-ladder rules, the blocking
 window, history assembly), 83 integration on SQLite, **6 on a real PostgreSQL** (migration up → down → up with `alembic check`
 finding no drift; JSON null stored as SQL NULL; concurrent workers never claim the same index job or escalation; concurrent messages
 in one conversation get consecutive numbers; concurrent hint requests climb the ladder exactly once each). ruff and `mypy --strict` clean.

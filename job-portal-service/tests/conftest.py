@@ -45,10 +45,15 @@ def _settings(**overrides: Any) -> Settings:
     return Settings(**values)
 
 
-def make_claims(*, user_id: int, role: str, organization_id: int | None, scopes: tuple[str, ...] = ()) -> AccessTokenClaims:
+# What user-management puts in a token by default (its permission catalog), for the permissions this service checks.
+ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {"student": ("jobs.apply",), "staff": ("jobs.placements",), "institution_head": ("jobs.placements", "jobs.drives.propose"), "employer_admin": ("jobs.hire", "jobs.company.manage"), "recruiter": ("jobs.hire",)}
+
+
+def make_claims(*, user_id: int, role: str, organization_id: int | None, scopes: tuple[str, ...] = (), defaults: bool = True) -> AccessTokenClaims:
+    scopes = (*ROLE_PERMISSIONS.get(role, ()), *scopes) if defaults else scopes  # "defaults": the role's own
     now = datetime.now(UTC)
     return AccessTokenClaims(
-        user_id=user_id, session_id=1755000000070002, role=role, organization_id=organization_id, organization_type="institution" if role in {"student", "staff", "institution_head"} else None,
+        user_id=user_id, session_id=1755000000070002, role=role, organization_id=organization_id, organization_type="institution" if role in {"student", "staff", "institution_head"} else "employer" if role in {"employer_admin", "recruiter"} else None,
         scopes=scopes, token_version=0, token_id="test-token", issued_at=int(now.timestamp()), expires_at=now,
     )
 
@@ -217,8 +222,8 @@ async def client(app) -> AsyncIterator[AsyncClient]:
 
 @pytest.fixture
 def act_as(app) -> Callable[..., AccessTokenClaims]:
-    def _set(user_id: int, *, role: str, organization_id: int | None, scopes: tuple[str, ...] = ()) -> AccessTokenClaims:
-        claims = make_claims(user_id=user_id, role=role, organization_id=organization_id, scopes=scopes)
+    def _set(user_id: int, *, role: str, organization_id: int | None, scopes: tuple[str, ...] = (), defaults: bool = True) -> AccessTokenClaims:
+        claims = make_claims(user_id=user_id, role=role, organization_id=organization_id, scopes=scopes, defaults=defaults)
         app.dependency_overrides[_authenticate] = lambda: claims
         return claims
 

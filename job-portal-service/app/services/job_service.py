@@ -108,6 +108,7 @@ class JobService:
             public_id=new_public_id(), employer_org_id=employer_org_id, created_by=auth.user_id, status=JobStatus.DRAFT, revision=0, visibility=Visibility.PUBLIC,
             title=fields["title"], description=fields["description"], employment_type=fields["employment_type"], location_type=fields["location_type"], locations=fields["locations"],
             experience_min_months=fields["experience_min_months"], experience_max_months=fields["experience_max_months"], ctc_min=fields["ctc_min"], ctc_max=fields["ctc_max"],
+            stipend_per_month=fields.get("stipend_per_month"), duration_months=fields.get("duration_months"),
             currency=fields["currency"], required_skills=fields["required_skills"], preferred_skills=fields["preferred_skills"], openings=fields["openings"], deadline_at=fields["deadline_at"],
             eligibility=eligibility_json(fields["eligibility"]), pipeline=pipeline_json(fields["pipeline"]),
         )
@@ -124,7 +125,7 @@ class JobService:
         if job.status not in _EDITABLE:
             raise ConflictError("A closed job cannot be edited.", code="JOB_CLOSED")
         before = {name: getattr(job, name) for name in _MATCH_FIELDS}
-        for name in ("title", "description", "employment_type", "location_type", "locations", "experience_min_months", "experience_max_months", "ctc_min", "ctc_max", "currency", "required_skills", "preferred_skills", "openings", "deadline_at"):
+        for name in ("title", "description", "employment_type", "location_type", "locations", "experience_min_months", "experience_max_months", "ctc_min", "ctc_max", "stipend_per_month", "duration_months", "currency", "required_skills", "preferred_skills", "openings", "deadline_at"):
             if name in fields:
                 setattr(job, name, fields[name])
         if "eligibility" in fields and fields["eligibility"] is not None:
@@ -293,8 +294,9 @@ class JobService:
         return len(rows)
 
     # ------------------------------------------------------------------ listing
-    async def list_for_employer(self, employer_org_id: int, *, status: str | None, q: str | None, page: int, per_page: int) -> tuple[list[Job], int]:
-        stmt = select(Job).where(Job.employer_org_id == employer_org_id)
+    async def list_for_employer(self, employer_org_id: int | None, *, status: str | None, q: str | None, page: int, per_page: int) -> tuple[list[Job], int]:
+        """One company's jobs, or every company's (``None``: a careers manager's view)."""
+        stmt = select(Job) if employer_org_id is None else select(Job).where(Job.employer_org_id == employer_org_id)
         if status:
             stmt = stmt.where(Job.status == status)
         if q:

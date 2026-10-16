@@ -32,13 +32,17 @@ def _settings() -> Settings:
     )
 
 
+# What user-management puts in a token by default (its permission catalog), for the permissions this service checks.
+ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {"institution_head": ("subscriptions.request",)}
+
+
 def make_claims(
     *,
     user_id: int = TEST_USER_ID,
     scopes: tuple[str, ...] = (),
     role: str = "admin",
-    organization_id: int | None = None,
-) -> AccessTokenClaims:
+    organization_id: int | None = None, defaults: bool = True) -> AccessTokenClaims:
+    scopes = (*ROLE_PERMISSIONS.get(role, ()), *scopes) if defaults else scopes  # "defaults": the role's own
     now = datetime.now(UTC)
     return AccessTokenClaims(
         user_id=user_id,
@@ -51,6 +55,8 @@ def make_claims(
         token_id="test-token",
         issued_at=int(now.timestamp()),
         expires_at=now,
+        # an admin looks after the test institution (accounts.manage reaches only the institutions an admin looks after)
+        admin_organization_ids=(TEST_ORG_ID,) if role == "admin" else (),
     )
 
 
@@ -85,9 +91,9 @@ async def client(app) -> AsyncIterator[AsyncClient]:
 @pytest.fixture
 def authed(app) -> Callable[..., AccessTokenClaims]:
     def _set(
-        *, scopes: tuple[str, ...] = (), user_id: int = TEST_USER_ID, role: str = "admin", organization_id: int | None = None
+        *, scopes: tuple[str, ...] = (), user_id: int = TEST_USER_ID, role: str = "admin", organization_id: int | None = None, defaults: bool = True
     ) -> AccessTokenClaims:
-        claims = make_claims(user_id=user_id, scopes=scopes, role=role, organization_id=organization_id)
+        claims = make_claims(user_id=user_id, scopes=scopes, role=role, organization_id=organization_id, defaults=defaults)
         app.dependency_overrides[_authenticate] = lambda: claims
         return claims
 

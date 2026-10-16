@@ -7,12 +7,21 @@ refuses to start staging/production with any of them.
 
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEV_SECRET_MARKER = "insecure-dev"
 
+
+
+def _private_or_https(url: str) -> bool:
+    """https anywhere; plain http only to a private-network host: localhost, a loopback address, or a single-label
+    container/service name such as ``user-management`` (resolvable only inside the deployment's own network)."""
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    return parsed.scheme == "https" or (parsed.scheme == "http" and (host in {"localhost", "127.0.0.1", "::1"} or "." not in host))
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -108,14 +117,14 @@ class Settings(BaseSettings):
                 errors.append("DEBUG must be false outside local/test")
             if "*" in self.TRUSTED_HOSTS:
                 errors.append("TRUSTED_HOSTS must list explicit hosts outside local/test")
-            if self.USER_MANAGEMENT_JWKS_URL.startswith("http://") and "localhost" not in self.USER_MANAGEMENT_JWKS_URL:
+            if not _private_or_https(self.USER_MANAGEMENT_JWKS_URL):
                 errors.append("USER_MANAGEMENT_JWKS_URL must use https outside local/test")
             if DEV_SECRET_MARKER in token_secret:
                 errors.append("TOKEN_HASH_SECRET still uses the development default")
             if self.AWS_ACCESS_KEY_ID is None or self.AWS_SECRET_ACCESS_KEY is None:
                 errors.append("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required outside local/test")
-            if self.S3_ENDPOINT_URL is not None:
-                errors.append("S3_ENDPOINT_URL must be unset outside local/test (talk to real AWS S3)")
+            if self.S3_ENDPOINT_URL is not None and not self.S3_ENDPOINT_URL.startswith("https://"):
+                errors.append("S3_ENDPOINT_URL must be unset (AWS S3) or an https URL (S3-compatible storage) outside local/test")
             if self.S3_BUCKET == "lms-media-dev":
                 errors.append("S3_BUCKET still uses the development default")
         if errors:

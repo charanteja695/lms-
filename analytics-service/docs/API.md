@@ -8,7 +8,7 @@ Base URL `/api/v1` (port 8017). Machine-readable contract: [openapi.json](openap
 
 | Caller | Sees |
 |---|---|
-| **Institution head / staff** | their own institution's dashboard (`GET /dashboards/institution`, no `organization_id` needed: it defaults to their own) |
+| **Institution head / staff** | their own institution's dashboard (`GET /dashboards/institution`, no `organization_id` needed: it defaults to their own), and their own students' hiring outcomes (`GET /dashboards/hiring?organization_id=<their own>`) |
 | **Employer admin / recruiter** | their own company's hiring funnel (`GET /dashboards/hiring`, no `employer_id` needed: it defaults to their own) |
 | **Platform admin holding the domain's scope** | that platform-wide dashboard — `content.review` → content, `exams.manage` → exam-integrity, `support.manage` → support, `careers.manage` → hiring (any employer), `ai.manage` → ai-usage, `billing.manage` → billing |
 | **`analytics.view`** | every dashboard, platform-wide — the catch-all for someone whose job is analytics itself, not managing one domain |
@@ -30,7 +30,7 @@ Every dashboard takes `?days=` (1–90, default 7: how many trailing days includ
 - `GET /hiring?days=&employer_id=&organization_id=` → applications by pipeline stage, placements (and average CTC),
   offers extended/accepted/declined/expired, interviews completed (AI recommendation mix), human review overrides.
   Send neither id for the platform-wide view (needs `careers.manage` or `analytics.view`); send `employer_id` for one
-  company's own jobs; send `organization_id` for one institution's own students' hiring outcomes.
+  company's own jobs; send `organization_id` for one institution's own students' hiring outcomes (that institution's own head and staff, or a platform scope).
 - `GET /ai-usage?days=&organization_id=` → calls (by capability), total cost (cents), total tokens.
 - `GET /billing?days=&organization_id=` → invoices issued/paid/overdue/voided and their amounts, credit notes, plans
   activated/expired. From billing-service's events; amounts are paise. `plan.*` events carry the employer, so `organization_id` shows only an institution's invoices.

@@ -21,15 +21,20 @@ from app.core.config import Settings
 from app.core.exceptions import ConflictError, NotFoundError, ValidationFailedError
 from app.core.ids import new_public_id
 from app.core.time import utcnow
-from app.domain.enums import AnalysisStatus, SessionStatus, SnapshotKind
+from app.domain.enums import LIVENESS_POSES, AnalysisStatus, SessionStatus, SnapshotKind
 from app.models.session import MediaAccess, ProctorSession, Snapshot
 from app.services.session_service import SessionService
 from app.storage import s3
 
 logger = logging.getLogger(__name__)
 
-_PRE_TEST_KINDS = (SnapshotKind.ID_PHOTO, SnapshotKind.FACE_ENROL)
-_EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "audio/webm": "webm", "audio/ogg": "ogg", "audio/mpeg": "mp3"}
+_PRE_TEST_KINDS = (SnapshotKind.ID_PHOTO, SnapshotKind.FACE_ENROL, SnapshotKind.LIVENESS)
+_EXTENSIONS = {
+    "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "audio/webm": "webm", "audio/ogg": "ogg", "audio/mpeg": "mp3",
+    "video/webm": "webm", "video/mp4": "mp4",
+}
+# Kept for a person to review; the image analyzer does not take them (its contract is single frames and audio clips).
+_REVIEW_ONLY = {SnapshotKind.LIVENESS: "face movement check, kept for review", SnapshotKind.VIDEO: "test recording, kept for review"}
 _MAX_BACKOFF_SECONDS = 300
 
 
@@ -46,15 +51,25 @@ class SnapshotService:
             raise ConflictError("Snapshots are only taken in strict proctoring.", code="NOT_APPLICABLE")
         if kind in _PRE_TEST_KINDS and session.status not in (SessionStatus.PRECHECK, SessionStatus.READY, SessionStatus.ACTIVE):
             raise ConflictError("This session no longer takes identity photos.", code="SESSION_NOT_OPEN")
-        if kind not in _PRE_TEST_KINDS and session.status != SessionStatus.ACTIVE:
+        if kind == SnapshotKind.VIDEO:
+            if not self.settings.VIDEO_RECORDING_ENABLED:
+                raise ConflictError("This test is not recorded.", code="NOT_APPLICABLE")
+            # the last chunk is flushed as the student submits, so a just-submitted session still takes it
+            if session.status not in (SessionStatus.ACTIVE, SessionStatus.SUBMITTED):
+                raise ConflictError("Recording is only accepted while the test is running.", code="SESSION_NOT_ACTIVE")
+        elif kind not in _PRE_TEST_KINDS and session.status != SessionStatus.ACTIVE:
             raise ConflictError("Snapshots are only accepted while the test is running.", code="SESSION_NOT_ACTIVE")
 
-    async def upload_url(self, session: ProctorSession, kind: SnapshotKind, content_type: str) -> dict[str, Any]:
+    async def upload_url(self, session: ProctorSession, kind: SnapshotKind, content_type: str, *, pose: str | None = None) -> dict[str, Any]:
         self._check_kind(session, kind)
-        if (kind == SnapshotKind.AUDIO) != content_type.startswith("audio/"):
-            raise ValidationFailedError(details=[{"field": "content_type", "code": "INVALID_TYPE", "message": "Use audio for audio clips and an image otherwise"}])
-        key = f"sessions/{session.public_id}/{kind}/{uuid.uuid4().hex}.{_EXTENSIONS[content_type]}"
-        max_bytes = self.settings.MAX_SNAPSHOT_MB * 1024 * 1024
+        wanted = "audio/" if kind == SnapshotKind.AUDIO else "video/" if kind == SnapshotKind.VIDEO else "image/"
+        if not content_type.startswith(wanted):
+            raise ValidationFailedError(details=[{"field": "content_type", "code": "INVALID_TYPE", "message": f"A {kind} upload must be {wanted[:-1]}"}])
+        if (kind == SnapshotKind.LIVENESS) != (pose is not None):
+            raise ValidationFailedError(details=[{"field": "pose", "code": "POSE_REQUIRED" if pose is None else "NOT_ALLOWED", "message": "A pose goes with liveness frames only"}])
+        name = f"{pose}-{uuid.uuid4().hex}" if pose else uuid.uuid4().hex
+        key = f"sessions/{session.public_id}/{kind}/{name}.{_EXTENSIONS[content_type]}"
+        max_bytes = (self.settings.MAX_VIDEO_CHUNK_MB if kind == SnapshotKind.VIDEO else self.settings.MAX_SNAPSHOT_MB) * 1024 * 1024
         upload = await s3.presign_upload(self.settings, key, content_type=content_type, max_bytes=max_bytes, expires_seconds=self.settings.S3_UPLOAD_URL_EXPIRES_SECONDS)
         return {"key": key, "upload": upload, "expires_in": self.settings.S3_UPLOAD_URL_EXPIRES_SECONDS}
 
@@ -78,11 +93,17 @@ class SnapshotService:
         if kind == SnapshotKind.PERIODIC:
             session.snapshot_seq += 1
             sequence = session.snapshot_seq
+        elif kind == SnapshotKind.VIDEO:  # recording chunks play back in this order
+            sequence = 1 + int((await self.db.execute(select(func.count()).where(Snapshot.session_id == session.id, Snapshot.kind == SnapshotKind.VIDEO))).scalar_one())
+        elif kind == SnapshotKind.LIVENESS:  # the pose, from the file name the upload URL gave it
+            sequence = 1 + LIVENESS_POSES.index(key.rsplit("/", 1)[-1].split("-", 1)[0]) if key.rsplit("/", 1)[-1].split("-", 1)[0] in LIVENESS_POSES else 0
         snapshot = Snapshot(
             public_id=new_public_id(), session_id=session.id, kind=kind, sequence=sequence, s3_key=key,
             taken_at=self._when(taken_at, now), size_bytes=int(head.get("ContentLength", 0)), delete_after=now + timedelta(days=self.settings.MEDIA_RETENTION_DAYS),
         )
-        if not self.analyzer.configured:
+        if kind in _REVIEW_ONLY:
+            snapshot.analysis_status, snapshot.skip_reason = AnalysisStatus.SKIPPED, _REVIEW_ONLY[kind]
+        elif not self.analyzer.configured:
             snapshot.analysis_status, snapshot.skip_reason = AnalysisStatus.SKIPPED, "no analyzer configured"
         elif kind == SnapshotKind.PERIODIC and sequence % self.settings.ANALYSIS_SAMPLE_EVERY != 0 and await self._backlog_high():
             snapshot.analysis_status, snapshot.skip_reason = AnalysisStatus.SKIPPED, "sampled out under load"

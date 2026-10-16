@@ -12,6 +12,8 @@ from app.render.layout import (
 )
 from app.render.pdf import CertificateData, render_pdf
 
+TEMPLATE = {**DEFAULT_TEMPLATE, "accent_color": "#00663C"}  # the accent comes from settings (CERTIFICATE_DEFAULT_ACCENT_COLOR)
+
 
 def data(**overrides) -> CertificateData:
     values = {
@@ -25,7 +27,7 @@ def data(**overrides) -> CertificateData:
         "issuer": "LMS",
         "verification_url": "https://lms.example/verify/abc123",
         "verification_code": "abc123",
-        "template": DEFAULT_TEMPLATE,
+        "template": TEMPLATE,
     }
     values.update(overrides)
     return CertificateData(**values)
@@ -38,7 +40,7 @@ def test_the_pdf_is_a_real_pdf_and_identical_for_identical_input():
 
 
 def test_the_pdf_changes_with_the_content_and_supports_signatories():
-    template = {**DEFAULT_TEMPLATE, "signatories": [{"name": "Dr. R. Iyer", "title": "Dean"}, {"name": "S. Mehta", "title": "Director"}]}
+    template = {**TEMPLATE, "signatories": [{"name": "Dr. R. Iyer", "title": "Dean"}, {"name": "S. Mehta", "title": "Director"}]}
     assert render_pdf(data(template=template)) != render_pdf(data())
     assert render_pdf(data(student_name="Someone Else")) != render_pdf(data())
 

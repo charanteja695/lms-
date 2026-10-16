@@ -5,7 +5,7 @@ from sqlalchemy import select, update
 from app.core.time import utcnow
 from app.models.certificate import Certificate
 from app.models.outbox_event import OutboxEvent
-from tests.conftest import ATTEMPT, COURSE, ORG_A, STAFF_B, STUDENT, STUDENT_2, VERSION, passed_payload
+from tests.conftest import ATTEMPT, COURSE, ORG_A, ORG_B, STAFF_A, STAFF_B, STUDENT, STUDENT_2, VERSION, passed_payload
 
 
 async def outbox(sessionmaker, event_type: str) -> list[dict]:
@@ -217,3 +217,30 @@ async def test_the_public_endpoint_is_rate_limited(client, app, settings, send_e
     codes = [(await client.get("/api/v1/public/verify/nope")).status_code for _ in range(5)]
     assert codes == [404, 404, 404, 429, 429]
     assert ORG_A
+
+
+async def test_certificates_follow_the_persons_permissions(client, act_as):
+    """A super admin can take the student-certificates list away from one staff member."""
+    act_as(STAFF_A, role="staff", organization_id=ORG_A, defaults=False)
+    assert (await client.get("/api/v1/certificates")).status_code == 403
+    act_as(STAFF_A, role="staff", organization_id=ORG_A)
+    assert (await client.get("/api/v1/certificates")).status_code == 200
+    act_as(STUDENT, role="student", organization_id=ORG_A, defaults=False)
+    assert (await client.get("/api/v1/certificates")).status_code == 403
+
+
+
+async def test_staff_export_their_students_certificates_as_csv(client, who, send_event, directory):
+    await issue(send_event, directory)
+    await send_event("course.passed", passed_payload(student=STUDENT_2, attempt=ATTEMPT + 1, org=ORG_B))
+
+    who.staff()  # ORG_A: their own student only
+    export = await client.get("/api/v1/certificates/export")
+    assert export.status_code == 200 and export.headers["content-type"].startswith("text/csv")
+    lines = export.text.lstrip("﻿").strip().splitlines()
+    assert lines[0].startswith("certificate_id,verification_code,verification_url,student_name") and len(lines) == 2
+
+    who.exam_manager()  # everyone's
+    assert len((await client.get("/api/v1/certificates/export")).text.strip().splitlines()) == 3
+    who.student()
+    assert (await client.get("/api/v1/certificates/export")).status_code == 403

@@ -85,6 +85,8 @@ class StudentProfile(TimestampMixin, Base):
     branch: Mapped[str | None] = mapped_column(String(100))  # e.g. Computer Science
     year_of_study: Mapped[int | None] = mapped_column(SmallInteger)
     section: Mapped[str | None] = mapped_column(String(20))
+    # the section in the institution's academic structure (app/models/academics.py); fills the four fields above
+    class_section_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("class_sections.id", ondelete="SET NULL"))
     graduation_year: Mapped[int | None] = mapped_column(SmallInteger)
     cgpa: Mapped[Decimal | None] = mapped_column(Numeric(4, 2))
 
@@ -94,6 +96,7 @@ class StudentProfile(TimestampMixin, Base):
         # Admission numbers are never reused inside an institution, even after the student is deleted.
         UniqueConstraint("institution_id", "admission_number"),
         Index("ix_student_profiles_institution_graduation_branch", "institution_id", "graduation_year", "branch"),
+        Index("ix_student_profiles_class_section_id", "class_section_id"),
         Index(
             "ix_student_profiles_admission_number_trgm",
             "admission_number",

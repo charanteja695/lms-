@@ -26,7 +26,18 @@ Base URL `/api/v1` (port 8012). Machine-readable contract: [openapi.json](openap
 A ticket: `{ticket_id, subject, category, queue, priority, status, source, course_id, requester_user_id, organization_id,
 assignee_user_id, first_response_due_at, resolution_due_at, first_response_breached, resolution_breached, first_response_at,
 resolved_at, closed_at, reopened_count, csat_requested_at, csat_rating, created_at, last_activity_at}`. A message:
-`{message_id, seq, author_user_id, author_role, kind: public|internal, body, created_at}`.
+`{message_id, seq, author_user_id, author_role, kind: public|internal, body, attachments: [{filename, content_type, size_bytes}], created_at}`.
+
+## Attachments
+
+- `POST /attachments/upload-url {filename, content_type, size_bytes}` (anyone who opens or answers tickets) →
+  `{attachment: {key, upload: {url, fields}, expires_in}}`. `422 INVALID_FILE_TYPE` / `OUT_OF_RANGE` per `ATTACHMENT_ALLOWED_EXTENSIONS`
+  and `ATTACHMENT_MAX_MB`. POST the file to `upload.url` with `upload.fields` (it goes straight to S3).
+- `POST /tickets`, `POST /tickets/{id}/replies` and `POST /agent/tickets/{id}/replies` accept `attachments: [{key, filename}]` (up to
+  `ATTACHMENT_MAX_FILES`). `422 NOT_YOUR_FILE` (another person's upload), `FILE_NOT_UPLOADED` (not in storage yet), `TOO_MANY_FILES`.
+- `GET /tickets/{id}/messages/{message_id}/attachments/{index}` (the requester; public messages) and
+  `GET /agent/tickets/{id}/messages/{message_id}/attachments/{index}` (an agent who handles it; internal notes too) →
+  `{attachment: {filename, url, expires_in}}`, a short-lived download link. `404 ATTACHMENT_NOT_FOUND` / `MESSAGE_NOT_FOUND`.
 
 ## Agent — `/agent`
 
@@ -41,7 +52,7 @@ resolved_at, closed_at, reopened_count, csat_requested_at, csat_rating, created_
   service has decided the agent may handle the ticket (message ids let the agent promote an answer to the tutor FAQ). `404 NO_TRANSCRIPT`
   for a portal ticket or a deleted conversation, `502 UPSTREAM_UNAVAILABLE` when ai-tutor does not answer.
 - `POST /tickets/{id}/replies {body, internal?, then?: waiting_on_student|resolved, canned_reply_id?}`
-- `GET /tickets/{id}/assignees` — who it may be assigned to (managers; a head for their batch_staff queue), the same rule `/assign` enforces.
+- `GET /tickets/{id}/assignees` — who it may be assigned to (managers; a head for their batch_staff queue), the same rule `/assign` enforces: candidates of the queue who hold its permission right now (asked of user-management; `502` if it does not answer).
 - `POST /tickets/{id}/claim` · `/assign {assignee_user_id}` (`422 ASSIGNEE_NOT_ELIGIBLE`, `403 CANNOT_ASSIGN`) · `/release` ·
   `/resolve` · `/reopen` · `/close`; `PATCH /tickets/{id} {priority?, category?}`.
   Errors: `409 ALREADY_ASSIGNED`, `409 NOT_ACTIVE`, `409 NOT_RESOLVED`, `409 TICKET_CLOSED`, `403 NOT_YOUR_QUEUE`.

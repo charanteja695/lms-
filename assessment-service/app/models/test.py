@@ -87,6 +87,8 @@ class Test(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     review_policy: Mapped[str] = mapped_column(String(10), default=ReviewPolicy.NONE, server_default=ReviewPolicy.NONE)
     proctoring_level: Mapped[str] = mapped_column(String(10), default=ProctoringLevel.NONE, server_default=ProctoringLevel.NONE)
+    # strict only: the student must share their screen (captured periodically) for the whole test
+    proctoring_screen_share: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     requires_schedule: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
     # Fixed when published, from the sections.

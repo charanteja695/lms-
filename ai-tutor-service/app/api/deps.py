@@ -100,7 +100,7 @@ async def _authenticate(request: Request, settings: SettingsDep, credentials: An
     identity = TokenIdentity(
         session_id=str(claims.session_id), user_id=str(claims.user_id),
         organization_id=str(claims.organization_id) if claims.organization_id else None,
-        token_version=claims.token_version, issued_at=claims.issued_at,
+        token_version=claims.token_version, issued_at=claims.issued_at, role=claims.role,
     )
     if await is_token_revoked(request.app.state.redis, identity, key_prefix=settings.ACCESS_STATE_KEY_PREFIX):
         raise AuthenticationError("Your access has been revoked. Please log in again.", code="TOKEN_REVOKED")

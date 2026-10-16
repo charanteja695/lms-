@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.core.time import utcnow
 from app.models.interview import Interview
 from app.services.interview_service import InterviewService
-from tests.conftest import API, create_published_plan, round_body
+from tests.conftest import API, EMPLOYER, INSTITUTION, RECRUITER, STUDENT, create_published_plan, round_body
 
 
 def evaluate_reply(rounds: dict[str, dict[str, tuple[int, str]]], *, summary: str = "A solid interview.") -> str:
@@ -224,3 +224,13 @@ async def test_a_candidate_can_reload_the_conversation_so_far_and_nobody_else_ca
     assert (current["type"], current["number"], current["total"]) == ("technical", 2, 2) and current["key"] == turns[-1]["round"]
     who.student(user_id=1755000000999999)
     assert (await client.get(f"{API}/student/interviews/{interview_id}/transcript")).status_code == 404
+
+
+async def test_interviews_follow_the_persons_permissions(client, act_as):
+    """A super admin can take interviews away from one student, or screening away from one recruiter."""
+    act_as(STUDENT, role="student", organization_id=INSTITUTION, defaults=False)
+    assert (await client.get(f"{API}/student/interviews")).status_code == 403
+    act_as(RECRUITER, role="recruiter", organization_id=EMPLOYER, defaults=False)
+    assert (await client.get(f"{API}/employer/interviews")).status_code == 403
+    act_as(RECRUITER, role="recruiter", organization_id=EMPLOYER)
+    assert (await client.get(f"{API}/employer/interviews")).status_code == 200

@@ -1211,6 +1211,141 @@
         }
       }
     },
+    "/api/v1/certificates/export": {
+      "get": {
+        "tags": [
+          "Certificates"
+        ],
+        "summary": "Export certificates (CSV, staff)",
+        "description": "The same certificates the list shows this person (institution staff: their students'; exam managers: all), filtered by course and status, as CSV. At most 10,000 rows, newest first.",
+        "operationId": "export_certificates_api_v1_certificates_export_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "course_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]{9,18}$",
+                  "examples": [
+                    "1755000000001001"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Course Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CertificateStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/csv": {}
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/certificates/{certificate_id}": {
       "get": {
         "tags": [

@@ -32,6 +32,7 @@ from app.permissions.policy import (
     can_author_owned_by,
     can_read_owned_by,
     can_review_owned_by,
+    is_employer_member,
     is_super_admin,
 )
 from app.schemas.common import QuestionQuery
@@ -142,7 +143,7 @@ class QuestionService:
         staff get the platform's."""
         if is_super_admin(auth):
             return requested_org
-        if auth.organization_id is not None and auth.role in {"employer_admin", "recruiter"}:
+        if is_employer_member(auth):
             return auth.organization_id
         if can_read_owned_by(auth, None):
             return None

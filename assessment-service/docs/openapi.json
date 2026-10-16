@@ -13712,6 +13712,12 @@
             "$ref": "#/components/schemas/ProctoringLevel",
             "default": "none"
           },
+          "proctoring_screen_share": {
+            "type": "boolean",
+            "title": "Proctoring Screen Share",
+            "description": "Strict proctoring only: the student shares their screen for the whole test",
+            "default": false
+          },
           "requires_schedule": {
             "type": "boolean",
             "title": "Requires Schedule",
@@ -14187,6 +14193,10 @@
             "type": "string",
             "title": "Review Policy"
           },
+          "proctoring_screen_share": {
+            "type": "boolean",
+            "title": "Proctoring Screen Share"
+          },
           "requires_schedule": {
             "type": "boolean",
             "title": "Requires Schedule"
@@ -14249,6 +14259,7 @@
           "shuffle_options",
           "result_visibility",
           "review_policy",
+          "proctoring_screen_share",
           "requires_schedule",
           "review_note",
           "created_by",
@@ -14501,6 +14512,17 @@
                 "type": "null"
               }
             ]
+          },
+          "proctoring_screen_share": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proctoring Screen Share"
           },
           "requires_schedule": {
             "anyOf": [

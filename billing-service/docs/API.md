@@ -9,7 +9,7 @@ Base URL `/api/v1` (port 8018). Machine-readable contract: [openapi.json](openap
 
 | Caller | Can |
 |---|---|
-| **Institution head / employer admin** | their own organisation's billing profile, quotes (ask, accept, cancel), issued invoices (never drafts), online payment; an employer admin also buys plans |
+| **Institution head / employer admin** | their own organisation's billing profile, issued invoices (never drafts), online payment; an institution head asks for, accepts and cancels course quotes; an employer admin buys plans |
 | **Billing manager** (`billing.manage`, or super admin) | everything, for any organisation: prices, profiles, discounts, drafts (edit, issue, void), manual payments, credit notes |
 | Staff, recruiters, students | no billing |
 
@@ -28,7 +28,8 @@ The legal name, GSTIN and state a GST invoice needs (user-management does not ca
 ## Quotes
 
 - `POST /quotes {lines: [{course_id, seats, term_days}], organization_id?}` → `201`. Each line = seats × price × term/365 (rounded half up); GST by the profile's state
-  (IGST until a profile exists). `422 NO_PRICE` for a course with no price. `GET /quotes`, `GET /quotes/{id}`.
+  (IGST until a profile exists). `422 NO_PRICE` for a course with no price; `409 NOT_AN_INSTITUTION` for a company (course seats are for institutions; a company buys an
+  employer plan). `GET /quotes?status=&organization_id=` (the organisation filter is for billing managers; everyone else always sees their own), `GET /quotes/{id}`.
 - `POST /quotes/{id}/accept` (`409 QUOTE_NOT_OPEN`, `QUOTE_EXPIRED`) · `POST /quotes/{id}/cancel` · `POST /admin/quotes/{id}/discount {amount, note}` (open quotes only).
   Accepting fixes the price; it does not create a subscription. When subscription-service activates one for the same course and seats, its invoice uses the quoted price
   (and the quote's discount, pro-rata to that line).

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Query
 from app.api.deps import CurrentAuth, DbSession
 from app.api.responses import AUTHENTICATED, errors
 from app.core.ids import parse_public_id
+from app.permissions.policy import is_employer_member
 from app.schemas.dashboard import (
     AIUsageDashboardResponse,
     BillingDashboardResponse,
@@ -69,7 +70,7 @@ async def support_dashboard(auth: CurrentAuth, db: DbSession, days: Days = 7, or
 async def hiring_dashboard(
     auth: CurrentAuth, db: DbSession, days: Days = 7, employer_id: Annotated[str | None, Query()] = None, organization_id: Annotated[str | None, Query()] = None
 ) -> HiringDashboardResponse:
-    employer = parse_public_id(employer_id) if employer_id else (auth.organization_id if auth.role in {"employer_admin", "recruiter"} else None)
+    employer = parse_public_id(employer_id) if employer_id else (auth.organization_id if is_employer_member(auth) else None)
     org = parse_public_id(organization_id) if organization_id else None
     check_dashboard_access(auth, "hiring", organization_id=org, employer_id=employer)
     since, until = date_range(days)

@@ -9,8 +9,10 @@ from app.core.config import Settings
 from app.models.institution import Institution
 from app.models.user import User
 from app.permissions import policies
+from app.permissions.effective import menu_for, modules_for
 from app.permissions.policies import Action
 from app.permissions.roles import (
+    ADMIN_SCOPES,
     DEFAULT_ADMIN_SCOPES,
     EMPLOYER_MEMBER_ROLES,
     INSTITUTION_MEMBER_ROLES,
@@ -100,65 +102,14 @@ def _organization_rights(actor: User, org_type: OrganizationType, statuses: list
         "create": policies.can_create_organization(actor, org_type),
         "filter_statuses": statuses,
         "filter_by_admin": actor.role == Role.SUPER_ADMIN,
-        "reassign_admin": policies.can_reassign_institution_admin(actor),
+        # companies belong to the super admin; only institutions move between admins
+        "reassign_admin": org_type == OrganizationType.INSTITUTION and policies.can_reassign_institution_admin(actor),
     }
 
 
-_STAFF = Role.STAFF
-_HEAD = Role.INSTITUTION_HEAD
-_STUDENT = Role.STUDENT
-_EMPLOYER_ADMIN = Role.EMPLOYER_ADMIN
-_RECRUITER = Role.RECRUITER
-
-# One row per other backend service's menu entry (docs/PRODUCT.md §6): the member roles and the admin scopes
-# that each reach it, read straight from that service's own "who may do what" table (docs/API.md) so a role
-# either has the module (1) or does not (0) in exactly one place — no separate per-role tuple to keep in sync.
-# Coarse show/hide only: each service's own API still decides what within its section this person may do.
-_MODULE_ACCESS: dict[str, tuple[frozenset[Role], frozenset[AdminScope]]] = {
-    "catalog": (frozenset({_STUDENT, _STAFF, _HEAD}), frozenset({AdminScope.CONTENT_AUTHOR, AdminScope.CONTENT_REVIEW})),
-    "subscriptions": (frozenset({_HEAD}), frozenset({AdminScope.ACCOUNTS_MANAGE})),
-    "learning": (frozenset({_STUDENT, _STAFF, _HEAD}), frozenset({AdminScope.ACCOUNTS_MANAGE})),
-    "code_execution": (frozenset({_STUDENT, _STAFF, _HEAD}), frozenset({AdminScope.CONTENT_AUTHOR, AdminScope.CONTENT_REVIEW})),
-    "assessments": (
-        frozenset({_STUDENT, _STAFF, _HEAD, _EMPLOYER_ADMIN, _RECRUITER}),
-        frozenset({AdminScope.CONTENT_AUTHOR, AdminScope.CONTENT_REVIEW, AdminScope.EXAMS_MANAGE}),
-    ),
-    "proctoring": (frozenset({_STUDENT, _STAFF, _HEAD, _EMPLOYER_ADMIN, _RECRUITER}), frozenset({AdminScope.EXAMS_MANAGE})),
-    "certificates": (
-        frozenset({_STUDENT, _STAFF, _HEAD}),
-        frozenset({AdminScope.CONTENT_AUTHOR, AdminScope.CONTENT_REVIEW, AdminScope.EXAMS_MANAGE}),
-    ),
-    "ai_tutor": (
-        frozenset({_STUDENT, _STAFF, _HEAD}),
-        frozenset({AdminScope.CONTENT_AUTHOR, AdminScope.SUPPORT_MANAGE, AdminScope.AI_MANAGE}),
-    ),
-    "support": (frozenset({_STUDENT, _STAFF, _HEAD}), frozenset({AdminScope.EXAMS_MANAGE, AdminScope.SUPPORT_MANAGE})),
-    "career": (frozenset({_STUDENT, _STAFF, _HEAD}), frozenset({AdminScope.CAREERS_MANAGE})),
-    "job_portal": (frozenset({_STUDENT, _STAFF, _HEAD, _EMPLOYER_ADMIN, _RECRUITER}), frozenset({AdminScope.CAREERS_MANAGE})),
-    "ai_interview": (frozenset({_STUDENT, _EMPLOYER_ADMIN, _RECRUITER}), frozenset({AdminScope.CAREERS_MANAGE})),
-    "notifications": (frozenset({_STUDENT, _STAFF, _HEAD, _EMPLOYER_ADMIN, _RECRUITER}), frozenset()),
-    "analytics": (
-        frozenset({_STAFF, _HEAD, _EMPLOYER_ADMIN, _RECRUITER}),
-        frozenset({
-            AdminScope.CONTENT_REVIEW, AdminScope.EXAMS_MANAGE, AdminScope.SUPPORT_MANAGE,
-            AdminScope.CAREERS_MANAGE, AdminScope.AI_MANAGE, AdminScope.BILLING_MANAGE, AdminScope.ANALYTICS_VIEW,
-        }),
-    ),
-    "billing": (frozenset({_HEAD, _EMPLOYER_ADMIN}), frozenset({AdminScope.BILLING_MANAGE})),
-}
-
-
-def _module_sections(actor: User, role: Role) -> list[str]:
-    """The other backend services' menu entries this person's role and scopes reach, from the single
-    ``_MODULE_ACCESS`` table above."""
-    if role == Role.SUPER_ADMIN:
-        return list(_MODULE_ACCESS)
-    scopes = {AdminScope(scope) for scope in actor.scope_list} if role == Role.ADMIN else frozenset[AdminScope]()
-    return [module for module, (roles, admin_scopes) in _MODULE_ACCESS.items() if role in roles or scopes & admin_scopes]
-
-
-def my_permissions(actor: User) -> dict[str, object]:
-    """Menu sections, list filters and create rights for the signed-in person."""
+def my_permissions(actor: User, permissions: list[str]) -> dict[str, object]:
+    """Menu sections, list filters and create rights for the signed-in person. ``permissions`` are their effective
+    permissions (PermissionService.effective_for): the modules and menu entries shown are derived from them."""
     role = Role(actor.role)
     is_super = role == Role.SUPER_ADMIN
     member_view_roles = _roles(actor, Action.VIEW, exclude=frozenset({Role.ADMIN}))
@@ -168,25 +119,32 @@ def my_permissions(actor: User) -> dict[str, object]:
 
     sections = ["dashboard"]
     if is_super:
-        sections.append("admins")
+        sections += ["admins", "permissions"]  # roles & permissions: the 1/0 matrix and per-person grants
     if policies.can_create_organization(actor, OrganizationType.INSTITUTION):
         sections.append("institutions")
     if policies.can_create_organization(actor, OrganizationType.EMPLOYER):
         sections.append("employers")
     if organization_type is not None:
         sections.append("my_organization")
+    if role in (Role.SUPER_ADMIN, Role.ADMIN, Role.INSTITUTION_HEAD):
+        sections.append("hierarchy")  # the organisation tree, their own part of it
+    # the academic structure: kept by the head (and the owning admin / super admin), read by staff
+    if is_super or (role == Role.ADMIN and policies.has_scope(actor, AdminScope.ACCOUNTS_MANAGE)) or {"academics.view", "academics.manage"} & set(permissions):
+        sections.append("academics")
     if member_view_roles:
         sections += ["users", "downloads"]
     if role in (Role.SUPER_ADMIN, Role.ADMIN, Role.INSTITUTION_HEAD, Role.EMPLOYER_ADMIN):
         sections.append("audit_logs")
-    sections += _module_sections(actor, role)
+    sections += modules_for(permissions)
     sections += ["profile", "security"]
 
     return {
         "role": role.value,
         "organization_type": organization_type.value if organization_type else None,
         "scopes": policies.token_scopes(actor),
+        "permissions": permissions,
         "sections": sections,
+        "menu": menu_for(permissions),
         "users": {
             "view_roles": member_view_roles,
             "create_roles": member_create_roles,
@@ -200,6 +158,10 @@ def my_permissions(actor: User) -> dict[str, object]:
         "employers": _organization_rights(actor, OrganizationType.EMPLOYER, statuses),
         "admin_scopes": [scope.value for scope in AdminScope] if is_super else [],
         "audit_logs": {"view": "audit_logs" in sections},
+        "academics": {
+            "view": "academics" in sections,
+            "manage": is_super or (role == Role.ADMIN and policies.has_scope(actor, AdminScope.ACCOUNTS_MANAGE)) or "academics.manage" in permissions,
+        },
     }
 
 
@@ -259,7 +221,7 @@ def user_form_options(actor: User, settings: Settings, *, role: str | None, targ
         },
         "scopes": {
             "shown": chosen == Role.ADMIN,
-            "options": [scope.value for scope in AdminScope],
+            "options": [scope.value for scope in ADMIN_SCOPES],
             "default": [scope.value for scope in DEFAULT_ADMIN_SCOPES] if target is None else [],
         },
         "manager": {

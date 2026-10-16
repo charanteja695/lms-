@@ -5030,6 +5030,23 @@
           "min_bandwidth_kbps": {
             "type": "integer",
             "title": "Min Bandwidth Kbps"
+          },
+          "screen_share": {
+            "type": "boolean",
+            "title": "Screen Share",
+            "description": "Strict: share the entire screen; a screen capture goes up with each periodic snapshot",
+            "default": false
+          },
+          "audio_interval_seconds": {
+            "type": "integer",
+            "title": "Audio Interval Seconds",
+            "description": "Strict: record an audio clip this often (0 = never)",
+            "default": 0
+          },
+          "audio_clip_seconds": {
+            "type": "integer",
+            "title": "Audio Clip Seconds",
+            "default": 0
           }
         },
         "type": "object",

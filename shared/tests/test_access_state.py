@@ -35,3 +35,13 @@ async def test_organization_without_id_ignores_the_org_key() -> None:
     await redis.set("lms:access:org:3", "999_999_999")
     no_org = TokenIdentity(session_id="1", user_id="2", organization_id=None, token_version=5, issued_at=1_000)
     assert await is_token_revoked(redis, no_org) is False
+
+
+async def test_role_key_makes_everyone_in_that_role_refresh() -> None:
+    redis = FakeAsyncRedis(decode_responses=True)
+    await redis.set("lms:access:role:staff", "2_000")
+    staff = TokenIdentity("1", "2", "3", 5, 1_000, role="staff")
+    assert await is_token_revoked(redis, staff) is True  # issued before the role's permissions changed
+    assert await is_token_revoked(redis, TokenIdentity("1", "2", "3", 5, 3_000, role="staff")) is False
+    assert await is_token_revoked(redis, TokenIdentity("1", "2", "3", 5, 1_000, role="student")) is False
+    assert await is_token_revoked(redis, IDENTITY) is False  # no role given: unaffected

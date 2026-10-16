@@ -86,7 +86,7 @@ Docker: `docker compose up ai-interview-service-migrate ai-interview-service ai-
 
 ## Verified
 
-`ruff` and `mypy --strict` clean; **75 tests**: unit (plan validation and rubric weight normalisation, the director's next-question/
+`ruff` and `mypy --strict` clean; **76 tests**: unit (plan validation and rubric weight normalisation, the director's next-question/
 follow-up/round/wrap-up logic including a blank follow-up, the rubric's quote verification and score clamping, calibration metrics and the
 four-fifths comparison) and integration over SQLite (plan lifecycle and every validation rule, permissions per kind and per company, a
 full mock interview end to end incl. evaluation and a report that never carries the recommendation, a model-proposed follow-up, a

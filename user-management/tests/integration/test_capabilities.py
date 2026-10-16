@@ -7,7 +7,7 @@ from tests.conftest import API, Hierarchy
 
 async def test_my_permissions_follow_the_hierarchy(client: AsyncClient, hierarchy: Hierarchy) -> None:
     root = (await client.get(f"{API}/users/me/permissions", headers=hierarchy.root)).json()["permissions"]
-    assert root["sections"][:3] == ["dashboard", "admins", "institutions"]
+    assert root["sections"][:4] == ["dashboard", "admins", "permissions", "institutions"]
     assert root["users"]["filter_statuses"] == ["active", "suspended", "deleted"]
     assert root["admins"] == {"view": True, "create": True}
 
@@ -29,6 +29,7 @@ async def test_my_permissions_follow_the_hierarchy(client: AsyncClient, hierarch
     admin = (await client.get(f"{API}/users/me/permissions", headers=hierarchy.admin)).json()["permissions"]
     assert admin["scopes"] == ["accounts.manage"]
     assert {"subscriptions", "learning"} <= set(admin["sections"])
+    assert "notifications" in admin["sections"]  # every signed-in person has an inbox, whatever their scopes
 
     student = (await client.get(f"{API}/users/me/permissions", headers=hierarchy.student)).json()["permissions"]
     assert student["sections"] == [
@@ -105,3 +106,47 @@ async def test_user_form_options_describe_the_form_for_each_role(client: AsyncCl
 
     hidden = await client.get(url, params={"user_id": hierarchy.head_id}, headers=hierarchy.staff)
     assert hidden.status_code == 404
+
+
+
+async def test_the_menu_shows_each_role_its_own_screens(client, hierarchy) -> None:
+    async def menu(headers: dict[str, str]) -> list[str]:
+        response = await client.get(f"{API}/users/me/permissions", headers=headers)
+        return response.json()["permissions"]["menu"]
+
+    student = await menu(hierarchy.student)
+    assert {"my_learning", "my_tests", "my_submissions", "my_integrity_cases"} <= set(student)
+    assert not {"batches", "courses", "grading", "attempts", "proctoring", "billing", "question_bank"} & set(student)
+
+    staff = await menu(hierarchy.staff)
+    assert {"batches", "courses", "grading", "attempts", "proctoring"} <= set(staff)
+    assert not {"my_learning", "my_tests", "course_requests", "billing"} & set(staff)
+
+    head = await menu(hierarchy.head)
+    assert {"course_requests", "subscriptions", "billing", "batches"} <= set(head)
+
+    # an accounts.manage admin: batches and course requests, nothing a student or exam manager sees
+    admin = await menu(hierarchy.admin)
+    assert {"batches", "course_requests", "subscriptions"} <= set(admin)
+    assert not {"my_learning", "grading", "question_bank"} & set(admin)
+
+    # super admin: everything an admin scope reaches, never a student's own pages
+    root = await menu(hierarchy.root)
+    assert {"question_bank", "grading", "billing", "analytics"} <= set(root)
+    assert not {"my_learning", "my_tests", "my_submissions", "my_integrity_cases"} & set(root)
+
+
+async def test_ai_settings_reach_the_super_admin_and_their_own_institutions_usage_only(client: AsyncClient, hierarchy: Hierarchy) -> None:
+    head, student = await _perms(client, hierarchy.head), await _perms(client, hierarchy.student)
+    assert "ai_settings" in head["menu"] and "ai_gateway" in head["sections"]  # their own institution's usage (ai.usage.own)
+    assert "ai_settings" not in student["menu"] and "ai_gateway" not in student["sections"]
+    root = await _perms(client, hierarchy.root)
+    assert "ai_settings" in root["menu"] and "ai_gateway" in root["sections"]
+    refused = await client.put(f"{API}/users/{hierarchy.admin_id}/permissions", json={"changes": {"ai.manage": True}}, headers=hierarchy.root)
+    assert refused.status_code == 422  # AI settings are the super admin's alone
+    admin = await _perms(client, hierarchy.admin)
+    assert "ai_settings" not in admin["menu"]
+
+
+async def _perms(client: AsyncClient, headers: dict[str, str]) -> dict:
+    return (await client.get(f"{API}/users/me/permissions", headers=headers)).json()["permissions"]

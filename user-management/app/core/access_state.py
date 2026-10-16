@@ -24,7 +24,9 @@ from app.core.config import Settings
 SESSION_REVOKED = "access.session_revoked"
 USER_REVOKED = "access.user_revoked"
 ORGANIZATION_REVOKED = "access.organization_revoked"
-ACCESS_EVENTS = frozenset({SESSION_REVOKED, USER_REVOKED, ORGANIZATION_REVOKED})
+# A role's permissions changed: tokens of that role issued before ``revoked_at`` must refresh (not sign out).
+ROLE_REVOKED = "access.role_revoked"
+ACCESS_EVENTS = frozenset({SESSION_REVOKED, USER_REVOKED, ORGANIZATION_REVOKED, ROLE_REVOKED})
 
 
 def _ttl_seconds(settings: Settings) -> int:
@@ -39,6 +41,10 @@ def user_key(settings: Settings, user_id: str) -> str:
     return f"{settings.ACCESS_STATE_KEY_PREFIX}:user:{user_id}"
 
 
+def role_key(settings: Settings, role: str) -> str:
+    return f"{settings.ACCESS_STATE_KEY_PREFIX}:role:{role}"
+
+
 def organization_key(settings: Settings, organization_id: str) -> str:
     return f"{settings.ACCESS_STATE_KEY_PREFIX}:org:{organization_id}"
 
@@ -50,5 +56,7 @@ async def apply_access_event(redis: Redis, settings: Settings, event_type: str, 
         await redis.set(session_key(settings, payload["session_id"]), "1", ex=ttl)
     elif event_type == USER_REVOKED:
         await redis.set(user_key(settings, payload["user_id"]), int(payload["token_version"]), ex=ttl)
+    elif event_type == ROLE_REVOKED:
+        await redis.set(role_key(settings, payload["role"]), int(payload["revoked_at"]), ex=ttl)
     elif event_type == ORGANIZATION_REVOKED:
         await redis.set(organization_key(settings, payload["organization_id"]), int(payload["revoked_at"]), ex=ttl)

@@ -16,6 +16,7 @@ from app.api.deps import (
 )
 from app.api.responses import AUTHENTICATED, errors
 from app.core.exceptions import ValidationFailedError
+from app.core.ids import parse_public_id
 from app.domain.enums import QuoteStatus
 from app.permissions.policy import can_manage_billing
 from app.schemas.billing import DiscountIn, QuoteCreate, QuoteOut, QuotePage, QuoteResponse
@@ -37,10 +38,12 @@ async def create_quote(body: QuoteCreate, auth: RequireBillingContact, db: DbSes
 
 @router.get("", response_model=QuotePage, summary="My organisation's quotes", responses=errors(*AUTHENTICATED))
 async def list_quotes(
-    auth: RequireBillingContact, db: DbSession, settings: SettingsDep, status: Annotated[QuoteStatus | None, Query()] = None, page: Annotated[int, Query(ge=1, le=10_000)] = 1,
+    auth: RequireBillingContact, db: DbSession, settings: SettingsDep, status: Annotated[QuoteStatus | None, Query()] = None,
+    organization_id: Annotated[str | None, Query(description="Billing managers: one organisation's quotes")] = None, page: Annotated[int, Query(ge=1, le=10_000)] = 1,
     per_page: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> QuotePage:
-    quotes, total = await QuoteService(db, settings).list_quotes(auth, org_id=None, status=status.value if status else None, page=page, per_page=per_page)
+    org = parse_public_id(organization_id) if organization_id and can_manage_billing(auth) else None
+    quotes, total = await QuoteService(db, settings).list_quotes(auth, org_id=org, status=status.value if status else None, page=page, per_page=per_page)
     return QuotePage(
         message="", quotes=[QuoteOut.model_validate(q) for q in quotes],
         page_context=PageContext.build(page=page, per_page=per_page, total=total, is_exact=True, sort_column="created_at", sort_order=SortOrder.DESC),

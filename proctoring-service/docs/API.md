@@ -22,13 +22,18 @@ Another owner's session or case answers `404`, not `403`.
 POST /sessions {test_id}                         start the pre-check (returns requirements: consent, fullscreen, camera, …)
 POST /sessions/{id}/snapshots/upload-url {kind}  strict: id_photo, then face_enrol   → presigned S3 POST
 POST /sessions/{id}/snapshots {kind, key}        register the uploaded file
-POST /sessions/{id}/precheck {consent, consent_version, browser, fullscreen_supported, camera, microphone, bandwidth_kbps}
+POST /sessions/{id}/precheck {consent, consent_version, browser, fullscreen_supported, camera, microphone, bandwidth_kbps, screen_share}
      → {ready: true}  and assessment-service will now start the test   (or failures[] to fix and retry)
    … the student starts the attempt in assessment-service; `attempt.started` makes the session active …
 POST /sessions/{id}/heartbeat                    every heartbeat_interval_seconds: proof of life + staff directives
 POST /sessions/{id}/events {events:[{type, occurred_at?, detail?}]}    batched browser events
 POST /sessions/{id}/snapshots/upload-url {kind:"periodic"} + register   about every snapshot_interval_seconds (strict)
 ```
+
+Strict sessions also send, per `requirements`: a `screen` capture with each periodic snapshot when `screen_share` is true (the
+test requires sharing the entire screen; the pre-check fails `SCREEN_SHARE_REQUIRED` without it), and an `audio` clip
+(`content_type` `audio/webm`, `audio_clip_seconds` long) every `audio_interval_seconds` for the voice check. The test's
+`proctoring_screen_share` comes from assessment-service's `test.published`.
 
 Event types a client may report: `fullscreen_exit`, `tab_switch`, `window_blur`, `copy_paste`, `right_click`,
 `devtools_open`, `multiple_monitors`, `network_lost`, and (strict) `camera_off`, `mic_off`, `screen_share_stopped`. Others are

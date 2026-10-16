@@ -15,8 +15,8 @@ async def create(client, who, tests_published, test_id=TEST_BASIC) -> dict:
     return response.json()
 
 
-async def upload(client, s3_bucket, settings, session_id: str, kind: str) -> dict:
-    issued = await client.post(f"/api/v1/sessions/{session_id}/snapshots/upload-url", json={"kind": kind})
+async def upload(client, s3_bucket, settings, session_id: str, kind: str, *, pose: str | None = None, content_type: str = "image/jpeg") -> dict:
+    issued = await client.post(f"/api/v1/sessions/{session_id}/snapshots/upload-url", json={"kind": kind, "content_type": content_type, **({"pose": pose} if pose else {})})
     assert issued.status_code == 200, issued.text
     key = issued.json()["file"]["key"]
     s3_bucket.put_object(Bucket=settings.S3_BUCKET, Key=key, Body=b"\xff\xd8\xff fake jpeg", ContentType="image/jpeg")
@@ -25,10 +25,16 @@ async def upload(client, s3_bucket, settings, session_id: str, kind: str) -> dic
     return registered.json()["snapshot"]
 
 
+async def liveness(client, s3_bucket, settings, session_id: str) -> None:
+    """The face turned left, right, up and down: one frame per pose."""
+    for pose in ("left", "right", "up", "down"):
+        await upload(client, s3_bucket, settings, session_id, "liveness", pose=pose)
+
+
 async def test_a_proctored_test_starts_a_precheck_with_its_requirements(client, who, tests_published):
     body = await create(client, who, tests_published, TEST_STRICT)
     assert body["session"]["status"] == "precheck" and body["session"]["level"] == "strict"
-    assert body["requirements"]["needs"] == ["consent", "fullscreen", "camera", "microphone", "bandwidth", "id_photo", "face_enrolment"]
+    assert body["requirements"]["needs"] == ["consent", "fullscreen", "camera", "microphone", "bandwidth", "id_photo", "face_enrolment", "liveness"]
     assert body["requirements"]["snapshot_interval_seconds"] == 25 and body["requirements"]["consent_version"] == "2026-09"
     basic = await create(client, who, tests_published, TEST_BASIC)
     assert basic["requirements"]["needs"] == ["consent", "fullscreen"]
@@ -68,12 +74,13 @@ async def test_a_basic_precheck_needs_consent_and_fullscreen_and_publishes_the_r
 async def test_a_strict_precheck_also_needs_devices_bandwidth_and_identity_photos(client, who, tests_published, s3_bucket, settings, redis):
     session_id = (await create(client, who, tests_published, TEST_STRICT))["session"]["session_id"]
     weak = await client.post(f"/api/v1/sessions/{session_id}/precheck", json={**GOOD, "camera": False, "microphone": False, "bandwidth_kbps": 50})
-    assert {f["code"] for f in weak.json()["failures"]} == {"CAMERA_REQUIRED", "MICROPHONE_REQUIRED", "BANDWIDTH_TOO_LOW", "ID_PHOTO_REQUIRED", "FACE_ENROLMENT_REQUIRED"}
+    assert {f["code"] for f in weak.json()["failures"]} == {"CAMERA_REQUIRED", "MICROPHONE_REQUIRED", "BANDWIDTH_TOO_LOW", "ID_PHOTO_REQUIRED", "FACE_ENROLMENT_REQUIRED", "LIVENESS_REQUIRED"}
 
     await upload(client, s3_bucket, settings, session_id, "id_photo")
     partial = await client.post(f"/api/v1/sessions/{session_id}/precheck", json=GOOD)
-    assert [f["code"] for f in partial.json()["failures"]] == ["FACE_ENROLMENT_REQUIRED"]
+    assert [f["code"] for f in partial.json()["failures"]] == ["FACE_ENROLMENT_REQUIRED", "LIVENESS_REQUIRED"]
     await upload(client, s3_bucket, settings, session_id, "face_enrol")
+    await liveness(client, s3_bucket, settings, session_id)
     ready = await client.post(f"/api/v1/sessions/{session_id}/precheck", json=GOOD)
     assert ready.json()["ready"] is True
     assert await redis.exists(f"lms:proctor:ready:{STUDENT}:{TEST_STRICT}") == 1
@@ -139,3 +146,58 @@ async def test_a_new_attempt_supersedes_an_older_open_session_and_flags_two_live
     assert statuses.count("superseded") >= 1 and rows[ATTEMPT + 1].status == "active"
     assert "multiple_sessions" in rows[ATTEMPT + 1].risk_breakdown
     assert first and EMPLOYER and boto3 and await outbox(sessionmaker, "integrity.flagged") == []
+
+
+async def test_a_test_that_requires_screen_sharing_says_so_and_refuses_to_start_without_it(client, who, tests_published, send_event, s3_bucket, settings):
+    await tests_published()
+    await send_event("test.published", {"test_id": str(TEST_STRICT), "title": "Final", "kind": "final", "proctoring_level": "strict", "proctoring_screen_share": True, "organization_id": None})
+    who.student()
+    body = (await client.post("/api/v1/sessions", json={"test_id": str(TEST_STRICT)})).json()
+    requirements = body["requirements"]
+    assert requirements["screen_share"] is True and "screen_share" in requirements["needs"]
+    assert requirements["audio_interval_seconds"] == settings.AUDIO_INTERVAL_SECONDS and requirements["audio_clip_seconds"] == settings.AUDIO_CLIP_SECONDS
+    session_id = body["session"]["session_id"]
+    await upload(client, s3_bucket, settings, session_id, "id_photo")
+    await upload(client, s3_bucket, settings, session_id, "face_enrol")
+    await liveness(client, s3_bucket, settings, session_id)
+    refused = (await client.post(f"/api/v1/sessions/{session_id}/precheck", json=GOOD)).json()
+    assert refused["ready"] is False and [f["code"] for f in refused["failures"]] == ["SCREEN_SHARE_REQUIRED"]
+    assert (await client.post(f"/api/v1/sessions/{session_id}/precheck", json={**GOOD, "screen_share": True})).json()["ready"] is True
+
+
+async def test_screen_sharing_is_never_asked_of_a_test_that_does_not_need_it(client, who, tests_published):
+    requirements = (await create(client, who, tests_published, TEST_STRICT))["requirements"]
+    assert requirements["screen_share"] is False and "screen_share" not in requirements["needs"]
+    basic = (await create(client, who, tests_published, TEST_BASIC))["requirements"]
+    assert basic["audio_interval_seconds"] == 0 and basic["audio_clip_seconds"] == 0
+
+
+async def test_liveness_frames_and_the_test_recording(client, who, tests_published, send_event, s3_bucket, settings):
+    """Before a strict test the face turns each way (one frame per pose); during it the camera and microphone are recorded in chunks."""
+    from tests.conftest import started_payload
+
+    body = await create(client, who, tests_published, TEST_STRICT)
+    session_id = body["session"]["session_id"]
+    assert body["requirements"]["liveness_poses"] == ["left", "right", "up", "down"]
+    assert body["requirements"]["video_recording"] is True and body["requirements"]["video_chunk_seconds"] == 30
+    assert (await client.post(f"/api/v1/sessions/{session_id}/snapshots/upload-url", json={"kind": "liveness"})).json()["details"][0]["code"] == "POSE_REQUIRED"
+    assert (await client.post(f"/api/v1/sessions/{session_id}/snapshots/upload-url", json={"kind": "video", "content_type": "video/webm"})).status_code == 409  # not yet
+
+    await upload(client, s3_bucket, settings, session_id, "id_photo")
+    await upload(client, s3_bucket, settings, session_id, "face_enrol")
+    await upload(client, s3_bucket, settings, session_id, "liveness", pose="left")
+    partial = await client.post(f"/api/v1/sessions/{session_id}/precheck", json=GOOD)
+    assert [f["code"] for f in partial.json()["failures"]] == ["LIVENESS_REQUIRED"]
+    for pose in ("right", "up", "down"):
+        frame = await upload(client, s3_bucket, settings, session_id, "liveness", pose=pose)
+        assert frame["analysis_status"] == "skipped"
+    assert (await client.post(f"/api/v1/sessions/{session_id}/precheck", json=GOOD)).json()["ready"] is True
+
+    await send_event("attempt.started", started_payload(test_id=TEST_STRICT, level="strict"))
+    who.student()
+    wrong = await client.post(f"/api/v1/sessions/{session_id}/snapshots/upload-url", json={"kind": "video", "content_type": "image/jpeg"})
+    assert wrong.status_code == 422
+    first = await upload(client, s3_bucket, settings, session_id, "video", content_type="video/webm")
+    second = await upload(client, s3_bucket, settings, session_id, "video", content_type="video/webm")
+    assert (first["kind"], first["sequence"], second["sequence"]) == ("video", 1, 2)
+

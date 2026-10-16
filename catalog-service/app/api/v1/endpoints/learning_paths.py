@@ -3,8 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 from lms_common.envelopes import PageContext, SortOrder
 
-from app.api.deps import CourseIdParam, DbSession, LearningPathIdParam, RequireAuthor
+from app.api.deps import CourseIdParam, CurrentAuth, DbSession, LearningPathIdParam, RequireAuthor, sees_drafts
 from app.api.responses import errors
+from app.core.exceptions import NotFoundError
+from app.domain.enums import ContentStatus
 from app.schemas.common import ListQuery, ReorderRequest
 from app.schemas.learning_path import (
     LearningPathCreate,
@@ -26,8 +28,8 @@ async def create_learning_path(data: LearningPathCreate, auth: RequireAuthor, db
 
 
 @router.get("", response_model=LearningPathListResponse, summary="List learning paths", responses=errors(401, 422))
-async def list_learning_paths(query: Annotated[ListQuery, Query()], db: DbSession) -> LearningPathListResponse:
-    paths, total, is_exact = await LearningPathService(db).list_learning_paths(query)
+async def list_learning_paths(query: Annotated[ListQuery, Query()], auth: CurrentAuth, db: DbSession) -> LearningPathListResponse:
+    paths, total, is_exact = await LearningPathService(db).list_learning_paths(query, published_only=not sees_drafts(auth))
     return LearningPathListResponse(
         message="Learning paths retrieved successfully.",
         learning_paths=[LearningPathOut.model_validate(path) for path in paths],
@@ -39,8 +41,10 @@ async def list_learning_paths(query: Annotated[ListQuery, Query()], db: DbSessio
 
 
 @router.get("/{learning_path_id}", response_model=LearningPathResponse, summary="Get a learning path", responses=errors(401, 404))
-async def get_learning_path(learning_path_id: LearningPathIdParam, db: DbSession) -> LearningPathResponse:
+async def get_learning_path(learning_path_id: LearningPathIdParam, auth: CurrentAuth, db: DbSession) -> LearningPathResponse:
     path = await LearningPathService(db).get(learning_path_id)
+    if path.status != ContentStatus.PUBLISHED and not sees_drafts(auth):
+        raise NotFoundError("Learning path not found.", code="LEARNING_PATH_NOT_FOUND")
     return LearningPathResponse(message="Learning path retrieved successfully.", learning_path=LearningPathOut.model_validate(path))
 
 

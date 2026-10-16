@@ -27,7 +27,7 @@ class TemplateCreate(RequestSchema):
     title_text: text(120) = "Certificate of Completion"  # type: ignore[valid-type]
     body_text: multiline_text(1_000) | None = None  # type: ignore[valid-type]
     footer_text: text(300) | None = None  # type: ignore[valid-type]
-    accent_color: str = "#1F4E79"
+    accent_color: str | None = Field(default=None, description="#RRGGBB; empty: the platform's CERTIFICATE_DEFAULT_ACCENT_COLOR")
     signatories: list[SignatoryIn] = Field(default_factory=list, max_length=3)
     grade_bands: list[GradeBandIn] | None = Field(default=None, max_length=8)
 

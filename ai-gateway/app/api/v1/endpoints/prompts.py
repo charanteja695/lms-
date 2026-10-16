@@ -7,8 +7,10 @@ from lms_common.envelopes import PageContext, SortOrder
 
 from app.api.deps import AdminRateLimit, DbSession, RequireAiManager, RequireAiManagerDep
 from app.api.responses import errors
+from app.permissions.policy import is_super_admin
 from app.schemas.prompt import (
     PromptCreateIn,
+    PromptDetailResponse,
     PromptListResponse,
     PromptOut,
     PromptResponse,
@@ -34,10 +36,12 @@ async def list_prompts(db: DbSession, page: Annotated[int, Query(ge=1, le=10_000
     return PromptListResponse(message="", prompts=[PromptOut.model_validate(p) for p in prompts], page_context=context)
 
 
-@router.get("/{key}", response_model=PromptResponse, summary="Get a prompt", responses=errors(401, 403, 404, 429))
-async def get_prompt(key: Annotated[str, Path()], db: DbSession) -> PromptResponse:
-    prompt = await PromptService(db).get_prompt(key)
-    return PromptResponse(message="", prompt=PromptOut.model_validate(prompt))
+@router.get("/{key}", response_model=PromptDetailResponse, summary="Get a prompt with all its versions", responses=errors(401, 403, 404, 429))
+async def get_prompt(key: Annotated[str, Path()], db: DbSession) -> PromptDetailResponse:
+    service = PromptService(db)
+    prompt = await service.get_prompt(key)
+    versions = await service.list_versions(prompt)
+    return PromptDetailResponse(message="", prompt=PromptOut.model_validate(prompt), versions=[PromptVersionOut.model_validate(v) for v in versions])
 
 
 @router.post("/{key}/versions", response_model=PromptVersionResponse, status_code=201, summary="Draft a new version", responses=errors(401, 403, 404, 422, 429))
@@ -53,7 +57,7 @@ async def activate_version(key: Annotated[str, Path()], version: Annotated[int, 
     service = PromptService(db)
     prompt = await service.get_prompt(key)
     row = await service.get_version(prompt, version)
-    activated = await service.activate_version(prompt, row, activated_by=auth.user_id)
+    activated = await service.activate_version(prompt, row, activated_by=auth.user_id, self_approval=is_super_admin(auth))
     return PromptVersionResponse(message="Prompt version activated.", version=PromptVersionOut.model_validate(activated))
 
 

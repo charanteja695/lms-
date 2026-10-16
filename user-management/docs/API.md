@@ -94,12 +94,40 @@ password changed → two-factor enrolled (if mandatory for the role) → role al
 | Set password | Yes, must change it | Ended now | Temporary password |
 | Delete | No | Ended now | Hidden; email/username reusable; employee codes and admission numbers never reused |
 
+### Permissions: role-based and person-based (feature level)
+
+Every feature is one **permission** in a single catalog (`app/permissions/features.py`): key, label, the menu modules it
+opens, its **audience** (who may hold it at all: `platform` = admins, `institution`, `employer`, `member` = any organisation
+member) and the **roles that get it by default**. The admin scopes are the platform permissions.
+
+A person's **effective permissions** = their role's defaults (a super admin may change any member role's row) + an admin's
+scopes + their own **grants** − their own **removals**. A super admin holds everything and cannot be restricted. They travel
+in the access token's `scopes` claim, so every service checks them (`AccessTokenClaims.can`); `GET /users/me/permissions`
+returns them as `permissions`, and the menu (`sections`, `menu`) is derived from them.
+
+*What* you may do comes from permissions; *whose data* does not: an organisation member acts within their own organisation,
+platform staff across the platform. Granting "grade attempts" to a staff member lets them grade their own institution's
+students only.
+
+| Endpoint | Who | Does |
+| --- | --- | --- |
+| `GET /permissions/catalog` | anyone signed in | every permission with label, description, modules, audience, default roles |
+| `GET /permissions/roles` | super admin | each member role's permissions, 1/0, and whether that differs from the catalog |
+| `PUT /permissions/roles/{role}` `{changes: {key: true|false|null}}` | super admin | change a role's row (`null` = back to the catalog) |
+| `GET /users/{user_id}/permissions` | super admin | per permission the person may hold: from their role, their own grant/removal, the result |
+| `PUT /users/{user_id}/permissions` `{changes: {key: true|false|null}, reason?}` | super admin | grant, remove, or back to the role; for an admin this edits their scopes |
+
+`422 UNKNOWN_PERMISSION` / `NOT_FOR_THIS_ROLE` (e.g. a platform permission on an organisation member); `403` for a super admin
+target. Every change is audit-logged (`permission.role_changed`, `permission.user_changed`) and nobody is signed out: a person
+change bumps their token version (`access.user_revoked`, sessions kept), a role change publishes `access.role_revoked
+{role, revoked_at}`; old access tokens are refused within seconds and the client's refresh brings the new permissions.
+
 ### What the client shows comes from the server
 
 | Endpoint / field | Use it for |
 | --- | --- |
 | `allowed_actions` on every user, admin, institution and employer | Which buttons and menu items to show for that record: `update`, `suspend`, `activate`, `revoke_sessions`, `reset_mfa`, `set_password`, `delete` (users); `update`, `suspend`, `activate`, `revoke_sessions`, `delete`, `add_member`, `view_members` (organisations) |
-| `GET /users/me/permissions` | Menu `sections`, `organization_type`, `scopes`, viewable/creatable roles, import/export rights, list filter options, admin scopes you can assign |
+| `GET /users/me/permissions` | Menu `sections` (modules) and `menu` (the entries inside them this role or scope reaches, e.g. a student's `my_learning` vs staff's `batches` — `_MENU_ACCESS` in `app/permissions/capabilities.py`), `organization_type`, `scopes`, viewable/creatable roles, import/export rights, list filter options, admin scopes you can assign |
 | `GET /users/form-options?role=staff` (`&user_id=` when editing) | Roles to offer (when only one is returned, use it), whether the organisation/manager/scopes/employment/student sections show, required fields, whether email is optional, default scopes and values |
 
 ```json
@@ -463,6 +491,14 @@ Members are created with `POST /users` using `role: "employer_admin"` (by the ow
 
 ---
 
+### Directory (platform staff)
+
+`GET /directory/organizations?type=institution|employer&search_text=&page=&per_page=&sort_order=` and
+`GET /directory/organizations/{organization_id}` return `{organization_id, organization_type, name, code, city, status}`
+and nothing more, for any admin or super admin. `/institutions` and `/employers` show an admin only the organisations
+they own; an admin whose work spans the platform in another service (analytics, hiring, AI, billing, support, exams)
+still has to pick or name an organisation there. Members get `403`: they only ever see their own organisation.
+
 ## 9. Audit log
 
 `GET /audit-logs`: who did what and when, newest first. Super admins see everything, admins see their organisations
@@ -532,6 +568,11 @@ Every change writes an event in the same transaction; the worker publishes it to
 
 Consume with `XGROUP CREATE lms:events <service> $ MKSTREAM` and `XREADGROUP GROUP <service> <consumer> STREAMS lms:events >`.
 The `access.*` events are also applied to the Redis access-state keys (§4) by the worker.
+
+**Internal API** (other services only, header `X-Internal-Service-Token` = `INTERNAL_SERVICE_TOKEN`, the same value in every
+service): `POST /internal/permission-holders {permission, user_ids: [...]}` → `{user_ids}`, those of the given people who are
+active and hold the permission right now (role defaults, an admin's scopes, per-person grants and removals; a super admin holds
+everything). support-service uses it before assigning a ticket. `403 INTERNAL_CALLER_REQUIRED` without the token.
 
 ---
 

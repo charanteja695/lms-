@@ -42,3 +42,15 @@ def test_upstream_urls_must_be_a_json_object_of_strings():
         _settings(UPSTREAM_URLS='["a"]').validate_security()
     with pytest.raises(ValueError):
         _settings(UPSTREAM_URLS='{"a": 1}').validate_security()
+
+
+@pytest.mark.parametrize("url", ["http://user-management:8000/.well-known/jwks.json", "http://localhost:8001/.well-known/jwks.json", "https://auth.example/.well-known/jwks.json"])
+def test_production_takes_the_keys_over_https_or_from_a_private_service_name(url):
+    """One server with docker compose: user-management is reached by its service name, inside the private network."""
+    _settings(ENVIRONMENT="production", TRUSTED_HOSTS=["app.example"], CORS_ORIGINS=["https://app.example"], USER_MANAGEMENT_JWKS_URL=url).validate_security()
+
+
+@pytest.mark.parametrize("url", ["http://auth.example.com/.well-known/jwks.json", "http://10.0.0.5:8001/.well-known/jwks.json"])
+def test_production_never_takes_the_keys_over_plain_http_from_an_address(url):
+    with pytest.raises(ValueError):
+        _settings(ENVIRONMENT="production", TRUSTED_HOSTS=["app.example"], CORS_ORIGINS=["https://app.example"], USER_MANAGEMENT_JWKS_URL=url).validate_security()

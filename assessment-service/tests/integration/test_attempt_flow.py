@@ -364,3 +364,28 @@ async def test_direct_mode_writes_answers_straight_to_the_database(client, who, 
     await client.put(f"/api/v1/attempts/{attempt_id}/answers/{q1}", json={"response": {"selected": "b"}, "revision": 1})
     async with sessionmaker() as db:
         assert (await db.execute(select(AttemptAnswer))).scalar_one().response == {"selected": "b"}
+
+
+async def test_staff_see_their_students_marks_and_results_summary(client, who, enroll, make_question, make_test, work):
+    from tests.conftest import ORG_B, STAFF_B, STUDENT, STUDENT_2
+
+    test_id, q1, q2 = await module_test(make_question, make_test)
+    await enroll()
+    who.student()
+    attempt_id = (await client.post(f"/api/v1/tests/{test_id}/attempts", json={"start_now": True})).json()["attempt"]["attempt_id"]
+    await client.put(f"/api/v1/attempts/{attempt_id}/answers/{q1}", json={"response": {"selected": "b"}, "revision": 1})
+    await client.post(f"/api/v1/attempts/{attempt_id}/submit")
+    await work.grade()
+
+    who.staff()  # the institution's staff: their own students
+    summary = await client.post("/api/v1/results/summary", json={"user_ids": [str(STUDENT), str(STUDENT_2)]})
+    assert summary.status_code == 200, summary.text
+    body = summary.json()
+    assert [t["test_id"] for t in body["tests"]] == [test_id] and body["tests"][0]["pass_mark_percent"] == 60
+    assert len(body["rows"]) == 1  # the second student has not attempted it
+    row = body["rows"][0]
+    assert row["user_id"] == str(STUDENT) and row["attempts"] == 1 and row["best_percent"] == 40 and row["passed"] is False
+
+    who.staff(STAFF_B, ORG_B)  # another institution's staff see none of it
+    assert (await client.post("/api/v1/results/summary", json={"user_ids": [str(STUDENT)]})).json()["rows"] == []
+    assert (await client.post("/api/v1/results/summary", json={"user_ids": []})).status_code == 422

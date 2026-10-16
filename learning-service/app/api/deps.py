@@ -20,7 +20,6 @@ from app.core.context import RequestContext
 from app.core.exceptions import AuthenticationError, NotFoundError, PermissionDeniedError
 from app.core.ids import parse_public_id
 from app.core.security import AccessTokenClaims, TokenError, get_verifier
-from app.permissions.roles import Role
 from app.permissions.scopes import Scope
 from app.services.rate_limiter import RateLimiter
 
@@ -135,7 +134,7 @@ async def _authenticate(
         user_id=str(claims.user_id),
         organization_id=str(claims.organization_id) if claims.organization_id else None,
         token_version=claims.token_version,
-        issued_at=claims.issued_at,
+        issued_at=claims.issued_at, role=claims.role,
     )
     if await is_token_revoked(request.app.state.redis, identity, key_prefix=settings.ACCESS_STATE_KEY_PREFIX):
         raise AuthenticationError("Your access has been revoked. Please log in again.", code="TOKEN_REVOKED")
@@ -145,9 +144,36 @@ async def _authenticate(
 CurrentAuth = Annotated[AccessTokenClaims, Depends(_authenticate)]
 
 
+# Permissions come from the access token (user-management's catalog; a super admin can grant or remove any per person):
+#   learning.study          their own enrolments and progress (a student)
+#   learning.batches.view   their own institution's batches and who is in them (staff, head)
+#   learning.batches.manage create batches, enrol and withdraw, for their own institution (a head)
+#   accounts.manage         every institution's batches and enrolments
+STUDY, BATCHES_VIEW, BATCHES_MANAGE = "learning.study", "learning.batches.view", "learning.batches.manage"
+
+
+def sees_all_institutions(auth: AccessTokenClaims) -> bool:
+    """accounts.manage: the super admin reaches every institution, an admin only the ones they look after."""
+    return auth.can(Scope.ACCOUNTS_MANAGE.value)
+
+
+def institutions_in_care(auth: AccessTokenClaims) -> tuple[int, ...] | None:
+    """For accounts.manage: ``None`` = every institution (the super admin), else the admin's own institutions."""
+    return auth.organizations_in_care()
+
+
+def manages_institution(auth: AccessTokenClaims, organization_id: int) -> bool:
+    care = institutions_in_care(auth)
+    return sees_all_institutions(auth) and (care is None or organization_id in care)
+
+
+def sees_own_batches(auth: AccessTokenClaims) -> bool:
+    return auth.organization_id is not None and (auth.has_scope(BATCHES_VIEW) or auth.has_scope(BATCHES_MANAGE))
+
+
 def require_scope(scope: Scope) -> Callable[[AccessTokenClaims], AccessTokenClaims]:
     def dependency(auth: CurrentAuth) -> AccessTokenClaims:
-        if not auth.has_scope(scope.value):
+        if not auth.can(scope.value):
             raise PermissionDeniedError()
         return auth
 
@@ -160,9 +186,9 @@ RequireAccountsManage = Annotated[AccessTokenClaims, Depends(require_scope(Scope
 def require_batch_manager(auth: CurrentAuth) -> AccessTokenClaims:
     """Creates/manages batches and enrolments: an institution head for their own institution,
     or a platform admin for any institution."""
-    if auth.has_scope(Scope.ACCOUNTS_MANAGE.value):
+    if sees_all_institutions(auth):
         return auth
-    if auth.role == Role.INSTITUTION_HEAD and auth.organization_id is not None:
+    if auth.organization_id is not None and auth.has_scope(BATCHES_MANAGE):
         return auth
     raise PermissionDeniedError()
 
@@ -172,6 +198,6 @@ RequireBatchManager = Annotated[AccessTokenClaims, Depends(require_batch_manager
 
 def ensure_organization_visible(auth: AccessTokenClaims, organization_id: int) -> None:
     """accounts.manage sees every institution's records; anyone else only their own."""
-    if auth.has_scope(Scope.ACCOUNTS_MANAGE.value) or auth.organization_id == organization_id:
+    if manages_institution(auth, organization_id) or (auth.organization_id == organization_id and sees_own_batches(auth)):
         return
     raise PermissionDeniedError()

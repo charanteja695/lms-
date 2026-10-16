@@ -174,6 +174,7 @@ def create_access_token(
     token_version: int,
     organization_type: str | None = None,
     scopes: list[str] | None = None,
+    admin_organization_ids: list[int] | None = None,
 ) -> tuple[str, int]:
     """Return ``(token, expires_in_seconds)``."""
     settings = get_settings()
@@ -188,6 +189,8 @@ def create_access_token(
         "org": str(organization_id) if organization_id else None,
         "org_type": organization_type,
         "scopes": scopes or [],
+        # an admin's institutions: other services limit accounts.manage-style permissions to these
+        **({"admin_orgs": [str(i) for i in admin_organization_ids]} if admin_organization_ids else {}),
         "ver": token_version,
         "type": ACCESS_TOKEN_TYPE,
         "jti": uuid.uuid4().hex,

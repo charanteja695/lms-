@@ -47,7 +47,12 @@ pytest
 
 ## Tests
 
-23 tests (`tests/unit`, `tests/integration`) cover: authorization (missing token, missing scope,
+**Who can read what.** Course and learning-path listings (titles and status) need a sign-in: every role names courses
+somewhere (course requests, prices, job requirements). A course version's content needs a reader permission
+(`catalog.read`, `catalog.browse`, `content.author`, `content.review`, or platform staff), and an unpublished version or
+learning path is visible only to its authors and reviewers (others get 404). The review trail is authors/reviewers only.
+
+27 tests (`tests/unit`, `tests/integration`) cover: authorization (missing token, missing scope,
 correct scope), course CRUD and pagination, the full draft → submit → approve/reject → retire
 lifecycle including the "empty course" and "already immutable" guards, module/topic reorder,
 learning path authoring (add/remove/reorder courses, publish/archive), the inbound event

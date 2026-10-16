@@ -8,6 +8,6 @@ until mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSW
     sleep 1
 done
 
-for bucket in lms-media-dev lms-assessment-dev lms-proctoring-dev lms-certificates-dev; do
+for bucket in lms-media-dev lms-assessment-dev lms-proctoring-dev lms-certificates-dev lms-support-dev; do
     mc mb --ignore-existing "local/$bucket"
 done

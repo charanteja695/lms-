@@ -46,6 +46,7 @@ def _base(job: Job, company_name: str | None) -> dict[str, Any]:
         "job_id": job.public_id, "employer_id": job.employer_org_id, "company_name": company_name, "title": job.title, "description": job.description,
         "employment_type": job.employment_type, "location_type": job.location_type, "locations": list(job.locations or []),
         "experience_min_months": job.experience_min_months, "experience_max_months": job.experience_max_months, "ctc_min": job.ctc_min, "ctc_max": job.ctc_max,
+        "stipend_per_month": job.stipend_per_month, "duration_months": job.duration_months,
         "currency": job.currency, "required_skills": list(job.required_skills or []), "preferred_skills": list(job.preferred_skills or []), "openings": job.openings,
         "deadline_at": job.deadline_at, "visibility": job.visibility, "drive_id": job.drive_id, "status": job.status, "published_at": job.published_at, "created_at": job.created_at,
     }

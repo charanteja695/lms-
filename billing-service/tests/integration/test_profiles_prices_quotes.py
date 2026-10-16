@@ -11,6 +11,7 @@ from tests.conftest import (
     API,
     COURSE_PY,
     COURSE_SQL,
+    EMPLOYER,
     INSTITUTION,
     INSTITUTION_2,
     PROFILE,
@@ -127,6 +128,32 @@ async def test_accepting_a_quote_is_only_for_its_own_organisation_and_only_once(
     assert again.status_code == 409 and again.json()["code"] == "QUOTE_NOT_OPEN"
 
 
+async def test_a_company_cannot_ask_for_course_seats(client, who, send_event):
+    await seed_orgs(send_event)
+    await add_price(client, who)
+    who.employer_admin()
+    refused = await client.post(f"{API}/quotes", json={"lines": [{"course_id": str(COURSE_PY), "seats": 10, "term_days": 365}]})
+    assert refused.status_code == 409 and refused.json()["code"] == "NOT_AN_INSTITUTION"
+    who.billing()
+    on_behalf = await client.post(f"{API}/quotes", json={"organization_id": str(EMPLOYER), "lines": [{"course_id": str(COURSE_PY), "seats": 10, "term_days": 365}]})
+    assert on_behalf.status_code == 409
+
+
+async def test_a_billing_manager_filters_quotes_by_organisation_and_members_cannot(client, who, send_event):
+    await seed_orgs(send_event)
+    await add_price(client, who)
+    for org in (INSTITUTION, INSTITUTION_2):
+        who.head(organization_id=org)
+        assert (await client.post(f"{API}/quotes", json={"lines": [{"course_id": str(COURSE_PY), "seats": 5, "term_days": 365}]})).status_code == 201
+    who.billing()
+    assert len((await client.get(f"{API}/quotes")).json()["quotes"]) == 2
+    only = (await client.get(f"{API}/quotes", params={"organization_id": str(INSTITUTION_2)})).json()["quotes"]
+    assert [q["organization_id"] for q in only] == [str(INSTITUTION_2)]
+    who.head()  # a member's filter is ignored: always their own
+    mine = (await client.get(f"{API}/quotes", params={"organization_id": str(INSTITUTION_2)})).json()["quotes"]
+    assert [q["organization_id"] for q in mine] == [str(INSTITUTION)]
+
+
 async def test_an_expired_quote_cannot_be_accepted_and_the_sweep_expires_stale_ones(client, who, send_event, sessionmaker, settings):
     await seed_orgs(send_event)
     await add_price(client, who)
@@ -143,3 +170,14 @@ async def test_an_expired_quote_cannot_be_accepted_and_the_sweep_expires_stale_o
     async with sessionmaker() as db:
         assert await QuoteService(db, settings).expire_stale() == 1  # the other open one
     assert (await client.get(f"{API}/quotes/{second}")).json()["quote"]["status"] == "expired"
+
+
+async def test_billing_follows_the_persons_permissions_not_their_role(client, who, send_event):
+    """A super admin can make a staff member the billing contact, or take billing away from a head."""
+    await seed_orgs(send_event)
+    who.staff()
+    assert (await client.get(f"{API}/billing-profile")).status_code == 403
+    who.staff(granted=("billing.contact",))
+    assert (await client.put(f"{API}/billing-profile", json=PROFILE)).status_code == 200  # their own institution's
+    who.head_without("billing.contact")
+    assert (await client.get(f"{API}/billing-profile")).status_code == 403

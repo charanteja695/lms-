@@ -42,7 +42,7 @@ There is no end-user-facing part of this API: students and staff never call it d
 ## Prompt registry (`/prompts`, `ai.manage`)
 
 - `POST /prompts {key, capability, owner_service, description}` — `key` is a dotted slug (`tutor.explain_concept`).
-- `GET /prompts`, `GET /prompts/{key}`.
+- `GET /prompts`, `GET /prompts/{key}` (with `versions[]`, newest first: drafts, the active one, retired ones).
 - `POST /prompts/{key}/versions {template, variables[], allowed_tools[], model_params}` — a new **draft**. Every
   `{{placeholder}}` in `template` must be listed in `variables` (`422 UNDECLARED_VARIABLE` otherwise).
 - `POST /prompts/{key}/versions/{version}/activate` — makes it the version served when a caller doesn't pin one,

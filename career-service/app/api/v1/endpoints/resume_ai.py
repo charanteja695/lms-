@@ -1,9 +1,9 @@
 """AI assistance (through ai-gateway) and exports. AI answers are suggestions checked against the student's own facts; nothing is saved."""
 
 import json
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Query, Response
 
 from app.api.deps import (
     AiRateLimit,
@@ -106,17 +106,23 @@ async def _document_for(service: ResumeService, resume: Resume, version_no: int 
 
 @router.get(
     "/resumes/{resume_id}/export/pdf", summary="Download as PDF", response_class=Response, responses={200: {"content": {"application/pdf": {}}, "description": "The PDF"}, **errors(*AUTHENTICATED, 404)},
-    description="Server-rendered with the resume's template, from the current draft or from a saved `version_no`. The PDF uses standard fonts: characters outside "
+    description="Server-rendered with the resume's template, from the current draft or from a saved `version_no`. `template_key` renders it with another "
+    "template instead, to preview that template with the student's own data (nothing is saved); `inline=true` asks the browser to show it rather than "
+    "download it. The PDF uses standard fonts: characters outside "
     "Latin-1 (for example Devanagari) print as `?`, and `X-Unrenderable-Characters` says how many.", dependencies=[ExportRateLimit],
 )
-async def export_pdf(resume_id: ResumeIdParam, auth: RequireStudent, db: DbSession, settings: SettingsDep, version_no: int | None = None) -> Response:
+async def export_pdf(
+    resume_id: ResumeIdParam, auth: RequireStudent, db: DbSession, settings: SettingsDep, version_no: int | None = None,
+    template_key: Annotated[str | None, Query(max_length=40, description="Preview with this template instead of the resume's own")] = None,
+    inline: bool = False,
+) -> Response:
     service = ResumeService(db, settings)
     resume = await service.get(auth.user_id, resume_id)
-    document, _, template_key = await _document_for(service, resume, version_no)
-    template = await service.template(template_key)
+    document, _, own_template = await _document_for(service, resume, version_no)
+    template = await service.template(template_key or own_template)
     pdf, lost = render_pdf(document, template.config, title=resume.title)
     safe = "".join(c if c.isalnum() or c in "-_" else "-" for c in resume.title)[:60] or "resume"
-    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{safe}.pdf"', "X-Unrenderable-Characters": str(lost), "Cache-Control": "private, no-store"})
+    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'{"inline" if inline else "attachment"}; filename="{safe}.pdf"', "X-Unrenderable-Characters": str(lost), "Cache-Control": "private, no-store"})
 
 
 @router.get("/resumes/{resume_id}/export/json-resume", summary="Download as JSON Resume", responses=errors(*AUTHENTICATED, 404), dependencies=[ExportRateLimit])

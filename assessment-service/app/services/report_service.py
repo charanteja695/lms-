@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from lms_common.pagination import paginate
-from sqlalchemy import Select, func, select, tuple_
+from sqlalchemy import Select, case, func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.exceptions import PermissionDeniedError
@@ -18,9 +18,9 @@ from app.models.test import Test
 from app.permissions.policy import (
     can_manage_exams,
     can_review_platform,
-    is_employer_member,
     is_institution_staff,
     is_student,
+    runs_employer_tests,
 )
 from app.schemas.common import AttemptQuery, GradingQueueQuery
 
@@ -36,7 +36,7 @@ def scope_attempts(stmt: Select[Any], auth: AccessTokenClaims) -> Select[Any]:
         return stmt
     if is_institution_staff(auth):  # their own students, on platform tests (an employer's hiring test is private to it)
         return stmt.where(Attempt.organization_id == auth.organization_id, Test.organization_id.is_(None))
-    if is_employer_member(auth):
+    if runs_employer_tests(auth):
         return stmt.where(Test.organization_id == auth.organization_id)
     raise PermissionDeniedError()
 
@@ -45,7 +45,7 @@ def scope_answers_to_grade(stmt: Select[Any], auth: AccessTokenClaims) -> Select
     """Answers awaiting a grade that the caller may grade (see ``can_grade_attempt``)."""
     if can_manage_exams(auth):
         return stmt
-    if is_employer_member(auth):
+    if runs_employer_tests(auth):
         return stmt.where(Test.organization_id == auth.organization_id)
     if is_institution_staff(auth):
         return stmt.where(Attempt.organization_id == auth.organization_id, Test.organization_id.is_(None))
@@ -76,6 +76,37 @@ class ReportService:
             stmt = stmt.where(Attempt.plagiarism_flagged.is_(query.plagiarism_flagged))
         stmt = stmt.order_by(Attempt.created_at.asc() if query.sort_order == "asc" else Attempt.created_at.desc(), Attempt.id)
         return await paginate(self.db, stmt, query.page, query.per_page)
+
+    async def results_summary(self, auth: AccessTokenClaims, user_ids: list[int], test_public_id: int | None) -> tuple[list[Test], list[dict[str, Any]]]:
+        """Each student's marks per test: how many attempts, the best score, whether any passed (marks and results)."""
+        stmt = (
+            select(
+                Attempt.user_id,
+                Attempt.test_id,
+                func.count(),
+                func.max(Attempt.percent),
+                func.max(Attempt.score),
+                func.max(Attempt.max_score),
+                func.max(case((Attempt.result == AttemptResult.PASSED, 1), else_=0)),
+                func.max(Attempt.submitted_at),
+            )
+            .join(Test, Test.id == Attempt.test_id)
+            .where(Attempt.user_id.in_(user_ids), Attempt.submitted_at.is_not(None), Attempt.result != AttemptResult.INVALIDATED)
+            .group_by(Attempt.user_id, Attempt.test_id)
+        )
+        stmt = scope_attempts(stmt, auth)
+        if test_public_id is not None:
+            stmt = stmt.where(Attempt.test_public_id == test_public_id)
+        grouped = (await self.db.execute(stmt)).tuples().all()
+        tests = {t.id: t for t in (await self.db.execute(select(Test).where(Test.id.in_({row[1] for row in grouped})))).scalars()} if grouped else {}
+        rows = [
+            {
+                "user_id": user_id, "test_id": tests[test_id].public_id, "attempts": count, "best_percent": best_percent, "best_score": best_score,
+                "max_score": max_score, "passed": bool(passed), "last_submitted_at": last,
+            }
+            for user_id, test_id, count, best_percent, best_score, max_score, passed, last in grouped
+        ]
+        return sorted(tests.values(), key=lambda t: t.title), rows
 
     # ------------------------------------------------------------------ grading queue
 

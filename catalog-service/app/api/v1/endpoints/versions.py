@@ -1,8 +1,19 @@
 from fastapi import APIRouter
 from lms_common.envelopes import PageContext, SortOrder
 
-from app.api.deps import CourseIdParam, CurrentAuth, DbSession, RequireAuthor, RequireReviewer, VersionIdParam
+from app.api.deps import (
+    CourseIdParam,
+    DbSession,
+    RequireAuthor,
+    RequireDraftReader,
+    RequireReader,
+    RequireReviewer,
+    VersionIdParam,
+    sees_drafts,
+)
 from app.api.responses import errors
+from app.core.exceptions import NotFoundError
+from app.domain.enums import ContentStatus
 from app.schemas.course_rule import CourseRuleOut, CourseRuleUpdate
 from app.schemas.review import RejectRequest, ReviewListResponse, ReviewOut
 from app.schemas.version import (
@@ -41,8 +52,10 @@ async def create_draft(course_id: CourseIdParam, auth: RequireAuthor, db: DbSess
     description="Full authoring tree: rules, modules, topics and topic items.",
     responses=errors(401, 404),
 )
-async def get_version(course_id: CourseIdParam, version_id: VersionIdParam, auth: CurrentAuth, db: DbSession) -> CourseVersionDetailResponse:
+async def get_version(course_id: CourseIdParam, version_id: VersionIdParam, auth: RequireReader, db: DbSession) -> CourseVersionDetailResponse:
     version = await VersionService(db).get_detail(course_id, version_id)
+    if version.status not in (ContentStatus.PUBLISHED, ContentStatus.ARCHIVED) and not sees_drafts(auth):
+        raise NotFoundError("Course version not found.", code="COURSE_VERSION_NOT_FOUND")  # a draft is its authors' business
     return CourseVersionDetailResponse(
         message="Course version retrieved successfully.", version=CourseVersionDetail.model_validate(version)
     )
@@ -122,7 +135,7 @@ async def retire(course_id: CourseIdParam, version_id: VersionIdParam, auth: Req
     summary="Lifecycle audit trail for a version",
     responses=errors(401, 404),
 )
-async def list_reviews(course_id: CourseIdParam, version_id: VersionIdParam, auth: CurrentAuth, db: DbSession) -> ReviewListResponse:
+async def list_reviews(course_id: CourseIdParam, version_id: VersionIdParam, auth: RequireDraftReader, db: DbSession) -> ReviewListResponse:
     version = await VersionService(db).get(course_id, version_id)
     reviews = await ReviewService(db).list_reviews(version)
     return ReviewListResponse(

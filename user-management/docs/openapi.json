@@ -10017,6 +10017,841 @@
           }
         }
       }
+    },
+    "/api/v1/directory/organizations": {
+      "get": {
+        "tags": [
+          "Directory"
+        ],
+        "summary": "Look up organisations by name or code",
+        "operationId": "list_directory_api_v1_directory_organizations_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "search_text",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100,
+                  "minLength": 2
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive 'contains' search, at least 2 characters",
+              "title": "Search Text"
+            },
+            "description": "Case-insensitive 'contains' search, at least 2 characters"
+          },
+          {
+            "name": "created_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date",
+                  "examples": [
+                    "2026-01-01"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+              "title": "Created From"
+            },
+            "description": "Created on or after this date (YYYY-MM-DD, UTC)"
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date",
+                  "examples": [
+                    "2026-01-01"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+              "title": "Created To"
+            },
+            "description": "Created on or before this date (YYYY-MM-DD, UTC)"
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "default": "desc"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 1,
+              "description": "Page number, starting at 1",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number, starting at 1"
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Records per page (max 100)",
+              "default": 20,
+              "title": "Per Page"
+            },
+            "description": "Records per page (max 100)"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/OrganizationType",
+              "description": "institution or employer"
+            },
+            "description": "institution or employer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "personal_info.phone",
+                      "code": "INVALID_PHONE",
+                      "message": "Enter a valid phone number, e.g. +919876543210"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/directory/organizations/{organization_id}": {
+      "get": {
+        "tags": [
+          "Directory"
+        ],
+        "summary": "One organisation's name",
+        "operationId": "get_directory_entry_api_v1_directory_organizations__organization_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "358672738414054064"
+              ],
+              "title": "Organization Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryEntryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found (or outside your access)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "USER_NOT_FOUND",
+                  "message": "User not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/permissions/catalog": {
+      "get": {
+        "tags": [
+          "Permissions"
+        ],
+        "summary": "Every permission there is",
+        "operationId": "catalog_api_v1_permissions_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/permissions/roles": {
+      "get": {
+        "tags": [
+          "Permissions"
+        ],
+        "summary": "Each member role's permissions (1/0)",
+        "operationId": "role_matrix_api_v1_permissions_roles_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleMatrixResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/permissions/roles/{role}": {
+      "put": {
+        "tags": [
+          "Permissions"
+        ],
+        "summary": "Change a role's permissions",
+        "description": "Applies to everyone with the role. Their open sessions pick it up on their next token refresh (within seconds); nobody is signed out.",
+        "operationId": "set_role_api_v1_permissions_roles__role__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionChanges"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleMatrixResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "personal_info.phone",
+                      "code": "INVALID_PHONE",
+                      "message": "Enter a valid phone number, e.g. +919876543210"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{user_id}/permissions": {
+      "get": {
+        "tags": [
+          "Permissions"
+        ],
+        "summary": "One person's permissions",
+        "operationId": "person_api_v1_users__user_id__permissions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "358672738860850316"
+              ],
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonPermissionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found (or outside your access)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "USER_NOT_FOUND",
+                  "message": "User not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Permissions"
+        ],
+        "summary": "Grant or remove permissions for one person",
+        "description": "true grants, false removes, null goes back to what their role gives. For an admin this edits their scopes. Takes effect on their next token refresh (within seconds); they stay signed in.",
+        "operationId": "set_person_api_v1_users__user_id__permissions_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "358672738860850316"
+              ],
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionChanges"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonPermissionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found (or outside your access)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "USER_NOT_FOUND",
+                  "message": "User not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "personal_info.phone",
+                      "code": "INVALID_PHONE",
+                      "message": "Enter a valid phone number, e.g. +919876543210"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/internal/permission-holders": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "summary": "Which of these people hold a permission",
+        "description": "Effective permissions now (role defaults, an admin's scopes, per-person grants and removals; a super admin holds everything), for active people only. Lets a service check someone other than the caller, e.g. who may be assigned a ticket.",
+        "operationId": "permission_holders_api_v1_internal_permission_holders_post",
+        "parameters": [
+          {
+            "name": "X-Internal-Service-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Service-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionHoldersRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionHoldersResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "personal_info.phone",
+                      "code": "INVALID_PHONE",
+                      "message": "Enter a valid phone number, e.g. +919876543210"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -11282,6 +12117,87 @@
         ],
         "title": "Body_import_users_api_v1_users_import_post"
       },
+      "CatalogEntry": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "modules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Modules"
+          },
+          "audience": {
+            "type": "string",
+            "title": "Audience",
+            "description": "platform (admins), institution, employer or member: who may hold it"
+          },
+          "default_roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Default Roles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "description",
+          "modules",
+          "audience",
+          "default_roles"
+        ],
+        "title": "CatalogEntry"
+      },
+      "CatalogResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogEntry"
+            },
+            "type": "array",
+            "title": "Permissions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "permissions"
+        ],
+        "title": "CatalogResponse"
+      },
       "ChangePasswordRequest": {
         "properties": {
           "current_password": {
@@ -11512,6 +12428,118 @@
           "delivery"
         ],
         "title": "CredentialsOut"
+      },
+      "DirectoryEntry": {
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "title": "Organization Id",
+            "examples": [
+              "358672738860850316"
+            ]
+          },
+          "organization_type": {
+            "$ref": "#/components/schemas/OrganizationType"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "organization_id",
+          "organization_type",
+          "name",
+          "code",
+          "city",
+          "status"
+        ],
+        "title": "DirectoryEntry"
+      },
+      "DirectoryEntryResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "organization": {
+            "$ref": "#/components/schemas/DirectoryEntry"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "organization"
+        ],
+        "title": "DirectoryEntryResponse"
+      },
+      "DirectoryResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "organizations": {
+            "items": {
+              "$ref": "#/components/schemas/DirectoryEntry"
+            },
+            "type": "array",
+            "title": "Organizations"
+          },
+          "page_context": {
+            "$ref": "#/components/schemas/PageContext"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "organizations",
+          "page_context"
+        ],
+        "title": "DirectoryResponse"
       },
       "EmployerCreate": {
         "properties": {
@@ -14309,6 +15337,14 @@
         "title": "MyProfileUpdate",
         "description": "What users may change about themselves. Names, birth date and role are managed by their institution."
       },
+      "OrganizationType": {
+        "type": "string",
+        "enum": [
+          "institution",
+          "employer"
+        ],
+        "title": "OrganizationType"
+      },
       "OrganizationsPermissionsOut": {
         "properties": {
           "create": {
@@ -14447,6 +15483,113 @@
         ],
         "title": "PasswordResetTokenOut"
       },
+      "PermissionChanges": {
+        "properties": {
+          "changes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "maxProperties": 60,
+            "minProperties": 1,
+            "title": "Changes",
+            "description": "permission key \u2192 true (allow), false (remove), null (back to the default)"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "changes"
+        ],
+        "title": "PermissionChanges"
+      },
+      "PermissionHoldersRequest": {
+        "properties": {
+          "permission": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Permission",
+            "examples": [
+              "support.agent"
+            ]
+          },
+          "user_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "User Ids",
+            "description": "Public user ids (strings)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "permission",
+          "user_ids"
+        ],
+        "title": "PermissionHoldersRequest"
+      },
+      "PermissionHoldersResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "user_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "User Ids",
+            "description": "Those of the given people who are active and hold the permission right now"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "user_ids"
+        ],
+        "title": "PermissionHoldersResponse"
+      },
       "PermissionsOut": {
         "properties": {
           "role": {
@@ -14472,6 +15615,14 @@
             "title": "Scopes",
             "description": "Admin scopes of the signed-in person"
           },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Permissions",
+            "description": "Effective permissions (feature keys): role defaults + scopes + this person's grants \u2212 removals. Show buttons from these"
+          },
           "sections": {
             "items": {
               "type": "string",
@@ -14484,6 +15635,7 @@
                 "users",
                 "downloads",
                 "audit_logs",
+                "permissions",
                 "profile",
                 "security",
                 "catalog",
@@ -14500,12 +15652,21 @@
                 "ai_interview",
                 "notifications",
                 "analytics",
-                "billing"
+                "billing",
+                "ai_gateway"
               ]
             },
             "type": "array",
             "title": "Sections",
             "description": "Menu sections to show, in display order"
+          },
+          "menu": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Menu",
+            "description": "Menu entries within those modules this person's role or scopes reach (feature level), in display order"
           },
           "users": {
             "$ref": "#/components/schemas/UsersPermissionsOut"
@@ -14536,7 +15697,9 @@
           "role",
           "organization_type",
           "scopes",
+          "permissions",
           "sections",
+          "menu",
           "users",
           "admins",
           "institutions",
@@ -14577,6 +15740,98 @@
           "permissions"
         ],
         "title": "PermissionsResponse"
+      },
+      "PersonCell": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "from_role": {
+            "type": "boolean",
+            "title": "From Role",
+            "description": "Their role (or, for an admin, their scopes) gives it"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override",
+            "description": "This person's own grant (true) or removal (false); null when none"
+          },
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed",
+            "description": "The result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "from_role",
+          "override",
+          "allowed"
+        ],
+        "title": "PersonCell"
+      },
+      "PersonPermissions": {
+        "properties": {
+          "editable": {
+            "type": "boolean",
+            "title": "Editable",
+            "description": "False for a super admin, who always holds everything"
+          },
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/PersonCell"
+            },
+            "type": "array",
+            "title": "Permissions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "editable",
+          "permissions"
+        ],
+        "title": "PersonPermissions"
+      },
+      "PersonPermissionsResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "user_permissions": {
+            "$ref": "#/components/schemas/PersonPermissions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "user_permissions"
+        ],
+        "title": "PersonPermissionsResponse"
       },
       "PersonalInfoInput": {
         "properties": {
@@ -15040,6 +16295,87 @@
           "recruiter"
         ],
         "title": "Role"
+      },
+      "RoleCell": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          },
+          "changed": {
+            "type": "boolean",
+            "title": "Changed",
+            "description": "True when a super admin changed this from the catalog default"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "allowed",
+          "changed"
+        ],
+        "title": "RoleCell"
+      },
+      "RoleMatrixResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/RoleRow"
+            },
+            "type": "array",
+            "title": "Roles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "roles"
+        ],
+        "title": "RoleMatrixResponse"
+      },
+      "RoleRow": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/RoleCell"
+            },
+            "type": "array",
+            "title": "Permissions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "permissions"
+        ],
+        "title": "RoleRow"
       },
       "SessionListResponse": {
         "properties": {
@@ -15750,7 +17086,7 @@
               }
             ],
             "title": "Manager User Id",
-            "description": "user_id of the person this user reports to (staff → head, student → staff). Defaults to the creator when the creator ranks higher in the same institution."
+            "description": "user_id of the person this user reports to (staff \u2192 head, student \u2192 staff). Defaults to the creator when the creator ranks higher in the same institution."
           },
           "account": {
             "$ref": "#/components/schemas/AccountInput"
@@ -16420,7 +17756,7 @@
                 "type": "null"
               }
             ],
-            "description": "Only institution_head ↔ staff changes are allowed"
+            "description": "Only institution_head \u2194 staff changes are allowed"
           },
           "organization_id": {
             "anyOf": [

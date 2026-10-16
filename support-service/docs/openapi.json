@@ -604,6 +604,153 @@
         }
       }
     },
+    "/api/v1/tickets/{ticket_id}/messages/{message_id}/attachments/{index}": {
+      "get": {
+        "tags": [
+          "Tickets (student)"
+        ],
+        "summary": "Download an attachment on my ticket",
+        "description": "A short-lived link (`S3_DOWNLOAD_URL_EXPIRES_SECONDS`) to the file; `index` is its position in the message's `attachments`.",
+        "operationId": "attachment_api_v1_tickets__ticket_id__messages__message_id__attachments__index__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          },
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentLinkResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tickets/{ticket_id}/close": {
       "post": {
         "tags": [
@@ -886,6 +1033,117 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/attachments/upload-url": {
+      "post": {
+        "tags": [
+          "Attachments"
+        ],
+        "summary": "Get a URL to upload one attachment",
+        "description": "Checks the file type and size (`ATTACHMENT_ALLOWED_EXTENSIONS`, `ATTACHMENT_MAX_MB`) and returns a presigned POST. Upload the file to it, then list `{key, filename}` in the `attachments` of a new ticket or a reply.",
+        "operationId": "upload_url_api_v1_attachments_upload_url_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachmentUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentUploadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/agent/tickets": {
@@ -2198,6 +2456,152 @@
                   "status": "error",
                   "code": "DUPLICATE_DATA",
                   "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/{ticket_id}/messages/{message_id}/attachments/{index}": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Download an attachment on a ticket I handle (internal notes included)",
+        "operationId": "attachment_api_v1_agent_tickets__ticket_id__messages__message_id__attachments__index__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          },
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentLinkResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
                   "details": [],
                   "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
                 },
@@ -4085,6 +4489,15 @@
               }
             ],
             "title": "Canned Reply Id"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentIn"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Attachments",
+            "description": "Files uploaded beforehand; at most ATTACHMENT_MAX_FILES"
           }
         },
         "additionalProperties": false,
@@ -4170,6 +4583,195 @@
           "assignees"
         ],
         "title": "AssigneesResponse"
+      },
+      "AttachmentIn": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Filename"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "filename"
+        ],
+        "title": "AttachmentIn",
+        "description": "A file already uploaded with an upload URL from `POST /attachments/upload-url`."
+      },
+      "AttachmentLink": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "url",
+          "expires_in"
+        ],
+        "title": "AttachmentLink"
+      },
+      "AttachmentLinkResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "attachment": {
+            "$ref": "#/components/schemas/AttachmentLink"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "attachment"
+        ],
+        "title": "AttachmentLinkResponse"
+      },
+      "AttachmentOut": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "content_type",
+          "size_bytes"
+        ],
+        "title": "AttachmentOut"
+      },
+      "AttachmentUpload": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Send this back in a message's `attachments` once the upload has finished"
+          },
+          "upload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Upload",
+            "description": "A presigned POST: `url` and the form `fields` to send with the file"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "upload",
+          "expires_in"
+        ],
+        "title": "AttachmentUpload"
+      },
+      "AttachmentUploadRequest": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Filename"
+          },
+          "content_type": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Content Type"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Size Bytes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "filename",
+          "content_type",
+          "size_bytes"
+        ],
+        "title": "AttachmentUploadRequest"
+      },
+      "AttachmentUploadResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "attachment": {
+            "$ref": "#/components/schemas/AttachmentUpload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "attachment"
+        ],
+        "title": "AttachmentUploadResponse"
       },
       "CannedCreate": {
         "properties": {
@@ -4716,6 +5318,14 @@
             "type": "string",
             "title": "Body"
           },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentOut"
+            },
+            "type": "array",
+            "title": "Attachments",
+            "description": "Download one with .../messages/{message_id}/attachments/{index}"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -4964,6 +5574,15 @@
             "maxLength": 8000,
             "minLength": 1,
             "title": "Body"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentIn"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Attachments",
+            "description": "Files uploaded beforehand; at most ATTACHMENT_MAX_FILES"
           }
         },
         "additionalProperties": false,
@@ -5291,6 +5910,15 @@
               }
             ],
             "title": "Course Id"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentIn"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Attachments",
+            "description": "Files uploaded beforehand; at most ATTACHMENT_MAX_FILES"
           }
         },
         "additionalProperties": false,

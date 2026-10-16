@@ -24,7 +24,7 @@ from app.core.exceptions import ConflictError, NotFoundError
 from app.core.ids import new_public_id
 from app.core.security import AccessTokenClaims
 from app.core.time import utcnow
-from app.domain.enums import EventSource, SessionStatus, SnapshotKind
+from app.domain.enums import LIVENESS_POSES, EventSource, SessionStatus, SnapshotKind
 from app.models.session import Directive, ProctorEvent, ProctorSession, Snapshot, TestRef
 from app.risk import policy
 from app.schemas.proctoring import PrecheckIn
@@ -39,10 +39,14 @@ def ready_key(settings: Settings, user_id: int, test_id: int) -> str:
     return f"{settings.READY_KEY_PREFIX}:{user_id}:{test_id}"
 
 
-def needs_for(level: str) -> list[str]:
+def needs_for(level: str, screen_share: bool = False, liveness: bool = False) -> list[str]:
     needs = ["consent", "fullscreen"]
     if level == "strict":
         needs += ["camera", "microphone", "bandwidth", "id_photo", "face_enrolment"]
+        if liveness:
+            needs.append("liveness")
+        if screen_share:
+            needs.append("screen_share")
     return needs
 
 
@@ -93,7 +97,7 @@ class SessionService:
             return existing  # a second tab or a reload: the same pre-check
         session = ProctorSession(
             public_id=new_public_id(), test_id=test_id, user_id=auth.user_id, organization_id=auth.organization_id,
-            test_owner_id=ref.owner_organization_id, level=ref.proctoring_level, risk_breakdown={},
+            test_owner_id=ref.owner_organization_id, level=ref.proctoring_level, screen_share=ref.screen_share, risk_breakdown={},
             ip_address=ctx.ip_address, user_agent=ctx.user_agent,
         )
         session.id = uuid.uuid4()
@@ -119,6 +123,8 @@ class SessionService:
                 fail("CAMERA_REQUIRED", "A working camera is required.")
             if not data.microphone:
                 fail("MICROPHONE_REQUIRED", "A working microphone is required.")
+            if session.screen_share and not data.screen_share:
+                fail("SCREEN_SHARE_REQUIRED", "Share your entire screen to take this test.")
             if data.bandwidth_kbps < self.settings.MIN_BANDWIDTH_KBPS_STRICT:
                 fail("BANDWIDTH_TOO_LOW", f"At least {self.settings.MIN_BANDWIDTH_KBPS_STRICT} kbps is needed to upload snapshots.")
             kinds = set(
@@ -135,6 +141,18 @@ class SessionService:
                 fail("ID_PHOTO_REQUIRED", "Capture a photo of your ID.")
             if SnapshotKind.FACE_ENROL not in kinds:
                 fail("FACE_ENROLMENT_REQUIRED", "Capture a photo of your face for identity matching.")
+            if self.settings.LIVENESS_REQUIRED:
+                poses = set(
+                    (
+                        await self.db.execute(
+                            select(Snapshot.sequence).where(
+                                Snapshot.session_id == session.id, Snapshot.deleted_at.is_(None), Snapshot.kind == SnapshotKind.LIVENESS, Snapshot.sequence > 0
+                            )
+                        )
+                    ).scalars()
+                )
+                if len(poses) < len(LIVENESS_POSES):
+                    fail("LIVENESS_REQUIRED", "Turn your face left, right, up and down when asked, so we know it is really you.")
 
         session.precheck = {**data.model_dump(mode="json", exclude={"device_fingerprint"}), "checked_at": utcnow().isoformat(), "failures": [f["code"] for f in failures]}
         session.device_fingerprint = data.device_fingerprint or session.device_fingerprint
@@ -291,7 +309,7 @@ class SessionService:
             chosen = ProctorSession(
                 public_id=new_public_id(), test_id=test_id, user_id=user_id,
                 organization_id=int(payload["organization_id"]) if payload.get("organization_id") else None,
-                test_owner_id=ref.owner_organization_id if ref else None, level=level, risk_breakdown={},
+                test_owner_id=ref.owner_organization_id if ref else None, level=level, screen_share=bool(ref and ref.screen_share), risk_breakdown={},
             )
             chosen.id = uuid.uuid4()
             self.db.add(chosen)

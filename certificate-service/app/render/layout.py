@@ -23,7 +23,6 @@ DEFAULT_TEMPLATE: dict[str, Any] = {
     "title_text": "Certificate of Completion",
     "body_text": "This is to certify that\n{student_name}\nhas successfully completed the course\n{course_title}\nwith a score of {score_percent}% ({grade}).",
     "footer_text": "Issued by {issuer}. Verify this certificate by scanning the QR code.",
-    "accent_color": "#1F4E79",
     "signatories": [],
     "grade_bands": DEFAULT_GRADE_BANDS,
 }

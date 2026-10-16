@@ -16,6 +16,7 @@ from app.api.deps import (
 from app.api.responses import AUTHENTICATED, errors
 from app.core.config import Settings
 from app.core.time import utcnow
+from app.domain.enums import LIVENESS_POSES
 from app.models.case import IntegrityCase
 from app.models.session import ProctorSession
 from app.schemas.proctoring import (
@@ -50,9 +51,15 @@ router = APIRouter(tags=["Proctoring sessions"])
 
 def _requirements(session: ProctorSession, settings: Settings) -> Requirements:
     return Requirements(
-        level=session.level, consent_version=settings.CONSENT_VERSION, needs=needs_for(session.level),
+        level=session.level, consent_version=settings.CONSENT_VERSION, needs=needs_for(session.level, session.screen_share, settings.LIVENESS_REQUIRED),
         snapshot_interval_seconds=settings.SNAPSHOT_INTERVAL_SECONDS, heartbeat_interval_seconds=settings.HEARTBEAT_INTERVAL_SECONDS,
         min_bandwidth_kbps=settings.MIN_BANDWIDTH_KBPS_STRICT if session.level == "strict" else 0,
+        screen_share=session.level == "strict" and session.screen_share,
+        audio_interval_seconds=settings.AUDIO_INTERVAL_SECONDS if session.level == "strict" else 0,
+        audio_clip_seconds=settings.AUDIO_CLIP_SECONDS if session.level == "strict" else 0,
+        liveness_poses=list(LIVENESS_POSES) if session.level == "strict" and settings.LIVENESS_REQUIRED else [],
+        video_recording=session.level == "strict" and settings.VIDEO_RECORDING_ENABLED,
+        video_chunk_seconds=settings.VIDEO_CHUNK_SECONDS if session.level == "strict" and settings.VIDEO_RECORDING_ENABLED else 0,
     )
 
 
@@ -96,7 +103,7 @@ async def precheck(session_id: SessionIdParam, data: PrecheckIn, auth: RequireSt
     "/sessions/{session_id}/snapshots/upload-url",
     response_model=UploadResponse,
     dependencies=[SnapshotRateLimit],
-    summary="A presigned upload for an ID photo, face photo, periodic snapshot, screen capture or audio clip",
+    summary="A presigned upload for an ID photo, face photo, liveness frame, periodic snapshot, screen capture, audio clip or video chunk",
     description="Upload the file straight to `upload.url` with `upload.fields` (a multipart POST), then register it. Strict "
     "proctoring only. Identity photos before the test; periodic snapshots (about every `snapshot_interval_seconds`), "
     "screen captures and audio only while it runs.",
@@ -104,7 +111,7 @@ async def precheck(session_id: SessionIdParam, data: PrecheckIn, auth: RequireSt
 )
 async def snapshot_upload_url(session_id: SessionIdParam, data: SnapshotUploadIn, auth: RequireStudent, db: DbSession, settings: SettingsDep, redis: RedisDep) -> UploadResponse:
     session = await SessionService(db, settings, redis).get_owned(session_id, auth.user_id)
-    upload = await SnapshotService(db, settings).upload_url(session, data.kind, data.content_type)
+    upload = await SnapshotService(db, settings).upload_url(session, data.kind, data.content_type, pose=data.pose)
     return UploadResponse(message="Upload URL issued.", file=UploadOut(**upload))
 
 

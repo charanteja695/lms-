@@ -8,6 +8,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -22,6 +23,14 @@ LOCAL_UPSTREAMS: dict[str, str] = {
 }
 ROUTES_FILE = Path(__file__).resolve().parents[2] / "config" / "routes.json"
 
+
+
+def _private_or_https(url: str) -> bool:
+    """https anywhere; plain http only to a private-network host: localhost, a loopback address, or a single-label
+    container/service name such as ``user-management`` (resolvable only inside the deployment's own network)."""
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    return parsed.scheme == "https" or (parsed.scheme == "http" and (host in {"localhost", "127.0.0.1", "::1"} or "." not in host))
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -61,7 +70,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_USER_PER_MINUTE: int = Field(default=600, ge=1)
     RATE_LIMIT_ANONYMOUS_PER_MINUTE: int = Field(default=120, ge=1)
-    RATE_LIMIT_AUTH_PER_MINUTE: int = Field(default=20, ge=1, description="Per IP, for sign-in, token refresh and password-reset paths (/api/v1/auth)")
+    RATE_LIMIT_AUTH_PER_MINUTE: int = Field(default=600, ge=1, description="Per IP, for sign-in, token refresh and password-reset paths (/api/v1/auth); a school shares one IP")
 
     @property
     def is_production_like(self) -> bool:
@@ -82,7 +91,7 @@ class Settings(BaseSettings):
                 errors.append("TRUSTED_HOSTS must list explicit hosts outside local/test")
             if not self.CORS_ORIGINS:
                 errors.append("CORS_ORIGINS must name the frontend's origin outside local/test")
-            if self.USER_MANAGEMENT_JWKS_URL.startswith("http://") and "localhost" not in self.USER_MANAGEMENT_JWKS_URL:
+            if not _private_or_https(self.USER_MANAGEMENT_JWKS_URL):
                 errors.append("USER_MANAGEMENT_JWKS_URL must use https outside local/test")
         if self.UPSTREAM_URLS:
             try:

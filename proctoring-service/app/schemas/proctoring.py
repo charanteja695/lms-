@@ -33,7 +33,8 @@ class PrecheckIn(RequestSchema):
 
 class SnapshotUploadIn(RequestSchema):
     kind: SnapshotKind
-    content_type: Literal["image/jpeg", "image/png", "image/webp", "audio/webm", "audio/ogg", "audio/mpeg"] = "image/jpeg"
+    content_type: Literal["image/jpeg", "image/png", "image/webp", "audio/webm", "audio/ogg", "audio/mpeg", "video/webm", "video/mp4"] = "image/jpeg"
+    pose: Literal["left", "right", "up", "down"] | None = Field(default=None, description="Liveness frames only: which way the face is turned")
 
 
 class SnapshotRegisterIn(RequestSchema):
@@ -128,6 +129,12 @@ class Requirements(ResponseSchema):
     snapshot_interval_seconds: int
     heartbeat_interval_seconds: int
     min_bandwidth_kbps: int
+    screen_share: bool = Field(default=False, description="Strict: share the entire screen; a screen capture goes up with each periodic snapshot")
+    audio_interval_seconds: int = Field(default=0, description="Strict: record an audio clip this often (0 = never)")
+    audio_clip_seconds: int = 0
+    liveness_poses: list[str] = Field(default_factory=list, description="Strict: turn the face each way, one frame per pose, before the test")
+    video_recording: bool = Field(default=False, description="Strict: record the whole test (camera + microphone) in chunks")
+    video_chunk_seconds: int = 0
 
 
 class SessionResponse(SuccessResponse):

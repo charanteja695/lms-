@@ -186,6 +186,34 @@ class AttemptListResponse(SuccessResponse):
     page_context: PageContext
 
 
+class ResultsSummaryRequest(RequestSchema):
+    user_ids: list[id_field("user_id", "1755000000004001")] = Field(min_length=1, max_length=500, description="The students, e.g. one section's roster")  # type: ignore[valid-type]
+    test_id: id_field("test_id", "1755000000000555") | None = None  # type: ignore[valid-type]
+
+
+class ResultsTestOut(ResponseSchema):
+    test_id: PublicIdOut
+    title: str
+    kind: str
+    pass_mark_percent: int
+
+
+class ResultsRowOut(ResponseSchema):
+    user_id: PublicIdOut
+    test_id: PublicIdOut
+    attempts: int
+    best_percent: float | None
+    best_score: float | None
+    max_score: float | None
+    passed: bool
+    last_submitted_at: Timestamp | None
+
+
+class ResultsSummaryResponse(SuccessResponse):
+    tests: list[ResultsTestOut]
+    rows: list[ResultsRowOut] = Field(description="One row per student and test they attempted; a student with no attempts has none")
+
+
 class AttemptEventOut(ResponseSchema):
     event_type: str
     actor_user_id: PublicIdOut | None

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query
 from lms_common.envelopes import PageContext, SortOrder
 
 from app.api.deps import (
+    STUDY,
     BatchIdParam,
     CurrentAuth,
     DbSession,
@@ -12,13 +13,15 @@ from app.api.deps import (
     RequireBatchManager,
     SettingsDep,
     ensure_organization_visible,
+    institutions_in_care,
+    sees_all_institutions,
+    sees_own_batches,
 )
 from app.api.responses import errors
+from app.core.exceptions import PermissionDeniedError
 from app.core.ids import parse_public_id
 from app.core.security import AccessTokenClaims
 from app.models.enrollment import Enrollment
-from app.permissions.roles import Role
-from app.permissions.scopes import Scope
 from app.schemas.enrollment import (
     EnrollmentCreate,
     EnrollmentListQuery,
@@ -67,17 +70,20 @@ async def create_enrollment(
 async def list_enrollments(
     query: Annotated[EnrollmentListQuery, Query()], auth: CurrentAuth, db: DbSession, settings: SettingsDep
 ) -> EnrollmentListResponse:
-    if auth.has_scope(Scope.ACCOUNTS_MANAGE.value):
-        organization_id, student_user_id = None, None
-    elif auth.role == Role.INSTITUTION_HEAD:
-        organization_id, student_user_id = auth.organization_id, None
+    organization_ids: tuple[int, ...] | None
+    if sees_all_institutions(auth):
+        organization_ids, student_user_id = institutions_in_care(auth), None
+    elif sees_own_batches(auth):
+        organization_ids, student_user_id = (auth.organization_id or 0,), None
+    elif auth.has_scope(STUDY):
+        organization_ids, student_user_id = None, auth.user_id
     else:
-        organization_id, student_user_id = None, auth.user_id
+        raise PermissionDeniedError()
 
     enrollments, total, is_exact = await EnrollmentService(db, settings).list_enrollments(
         query,
         batch_id=parse_public_id(query.batch_id) if query.batch_id else None,
-        organization_id=organization_id,
+        organization_ids=organization_ids,
         student_user_id=student_user_id,
     )
     return EnrollmentListResponse(

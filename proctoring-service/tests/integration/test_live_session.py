@@ -5,7 +5,7 @@ from sqlalchemy import select, update
 from app.core.time import utcnow
 from app.models.session import ProctorEvent, ProctorSession, Snapshot
 from tests.conftest import ATTEMPT, STUDENT, TEST_BASIC, TEST_STRICT, outbox, started_payload
-from tests.integration.test_precheck_and_session import GOOD, upload
+from tests.integration.test_precheck_and_session import GOOD, liveness, upload
 
 
 async def go_live(client, who, tests_published, send_event, s3_bucket=None, settings=None, *, level="basic") -> str:
@@ -17,6 +17,7 @@ async def go_live(client, who, tests_published, send_event, s3_bucket=None, sett
     if level == "strict":
         await upload(client, s3_bucket, settings, session_id, "id_photo")
         await upload(client, s3_bucket, settings, session_id, "face_enrol")
+        await liveness(client, s3_bucket, settings, session_id)
     assert (await client.post(f"/api/v1/sessions/{session_id}/precheck", json=GOOD)).json()["ready"] is True
     await send_event("attempt.started", started_payload(test_id=test_id, level=level))
     who.student()

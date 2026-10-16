@@ -144,3 +144,19 @@ async def test_events_name_the_student_so_notification_service_can_address_them(
     assert events["course.eligible_for_final"]["version_id"] == str(TEST_VERSION_ID)
     assert events["enrollment.removed"]["student_user_id"] == str(STUDENT_ID)
     assert events["enrollment.removed"]["version_id"] == str(TEST_VERSION_ID)
+
+
+async def test_a_student_reads_only_the_batch_they_are_enrolled_in(
+    client: AsyncClient, as_institution_head, as_student, seed_institution, seed_course, seed_entitlement, mock_seats
+) -> None:
+    batch = await _batch(client, as_institution_head, seed_institution, seed_course, seed_entitlement)
+    other = (await client.post("/api/v1/batches", json={**BATCH_PAYLOAD, "name": "2026 Batch B"})).json()["batch"]
+    await client.post(f"/api/v1/batches/{batch['batch_id']}/enrollments", json={"student_user_id": str(STUDENT_ID)})
+
+    as_student(user_id=STUDENT_ID)
+    mine = await client.get(f"/api/v1/batches/{batch['batch_id']}")
+    assert mine.status_code == 200, mine.text
+    assert mine.json()["batch"]["title"]
+    assert (await client.get(f"/api/v1/batches/{other['batch_id']}")).status_code == 403
+    as_student(user_id=STUDENT_ID + 1)
+    assert (await client.get(f"/api/v1/batches/{batch['batch_id']}")).status_code == 403

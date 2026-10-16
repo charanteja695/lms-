@@ -89,6 +89,7 @@ class _Rules(RequestSchema):
     result_visibility: ResultVisibility = ResultVisibility.IMMEDIATE
     review_policy: ReviewPolicy = ReviewPolicy.NONE
     proctoring_level: ProctoringLevel = ProctoringLevel.NONE
+    proctoring_screen_share: bool = Field(default=False, description="Strict proctoring only: the student shares their screen for the whole test")
     requires_schedule: bool = False
 
 
@@ -125,6 +126,7 @@ class TestUpdate(RequestSchema):
     result_visibility: ResultVisibility | None = None
     review_policy: ReviewPolicy | None = None
     proctoring_level: ProctoringLevel | None = None
+    proctoring_screen_share: bool | None = None
     requires_schedule: bool | None = None
 
 
@@ -219,6 +221,7 @@ class TestOut(TestListItem):
     shuffle_options: bool
     result_visibility: str
     review_policy: str
+    proctoring_screen_share: bool
     requires_schedule: bool
     review_note: str | None
     created_by: PublicIdOut

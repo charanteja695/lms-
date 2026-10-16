@@ -73,6 +73,8 @@ class Settings(BaseSettings):
 
     # --- Access state shared with other services (see app/core/access_state.py) ---
     ACCESS_STATE_KEY_PREFIX: str = "lms:access"
+    # Other services call /internal with this shared secret (the same value in every service's settings).
+    INTERNAL_SERVICE_TOKEN: SecretStr = SecretStr(f"{DEV_SECRET_MARKER}-internal-service-token-change-me-0")
 
     # --- Hashing ---
     # Server-side pepper used to HMAC refresh tokens, OTPs and reset links at rest.
@@ -111,8 +113,9 @@ class Settings(BaseSettings):
 
     # --- Rate limiting (per client IP unless stated) ---
     RATE_LIMIT_ENABLED: bool = True
-    LOGIN_RATE_LIMIT_PER_MINUTE: int = 10
-    REFRESH_RATE_LIMIT_PER_MINUTE: int = 30
+    # per client IP: a school shares one IP, so sized for a classroom; brute force is stopped per account (lockout)
+    LOGIN_RATE_LIMIT_PER_MINUTE: int = 120
+    REFRESH_RATE_LIMIT_PER_MINUTE: int = 600
     FORGOT_PASSWORD_RATE_LIMIT_PER_HOUR: int = 20
     FORGOT_PASSWORD_IDENTIFIER_RATE_LIMIT_PER_HOUR: int = 5
     OTP_VERIFY_RATE_LIMIT_PER_MINUTE: int = 10
@@ -129,6 +132,9 @@ class Settings(BaseSettings):
 
     # --- Two-factor authentication (TOTP) ---
     MFA_ISSUER: str = "LMS"
+    # TEST SERVERS ONLY: a fixed 6-digit code accepted as the two-factor code (besides the app's real codes), so testers
+    # need no authenticator app. Refused outside local/test; leave unset everywhere else.
+    MFA_TEST_CODE: str | None = Field(default=None, pattern=r"^[0-9]{6}$")
     # Roles that must enrol before they can use the API (they may still reach /users/me, logout and MFA set-up).
     MFA_REQUIRED_ROLES: list[str] = Field(default_factory=lambda: ["super_admin", "admin"])
     # Fernet key (32 url-safe base64 bytes) used to encrypt TOTP secrets at rest. Required outside local/test.
@@ -187,6 +193,10 @@ class Settings(BaseSettings):
         jwt_secret = self.JWT_SECRET_KEY.get_secret_value()
         token_secret = self.TOKEN_HASH_SECRET.get_secret_value()
 
+        if self.JWT_ALGORITHM == "HS256" and self.ENVIRONMENT != "test":
+            # every other service verifies access tokens with the published public key (RS256 only), so a shared
+            # secret would lock the whole platform out of everything but user-management
+            errors.append("JWT_ALGORITHM must be RS256 except in tests (run scripts/generate_jwt_keys.py keys/)")
         if self.JWT_ALGORITHM == "HS256" and len(jwt_secret) < 32:
             errors.append("JWT_SECRET_KEY must be at least 32 characters")
         if self.JWT_ALGORITHM == "RS256" and not (self.JWT_PRIVATE_KEY_FILE and self.JWT_PUBLIC_KEY_FILE):
@@ -207,6 +217,10 @@ class Settings(BaseSettings):
                 errors.append("TOKEN_HASH_SECRET still uses the development default")
             if self.MFA_ENCRYPTION_KEY is None:
                 errors.append("MFA_ENCRYPTION_KEY must be set outside local/test")
+            if self.MFA_TEST_CODE:
+                errors.append("MFA_TEST_CODE (a fixed two-factor code for testing) must not be set outside local/test")
+            if DEV_SECRET_MARKER in self.INTERNAL_SERVICE_TOKEN.get_secret_value():
+                errors.append("INTERNAL_SERVICE_TOKEN still uses the development default")
             if self.JWT_ALGORITHM != "RS256":
                 errors.append(
                     "JWT_ALGORITHM must be RS256 outside local/test (other services verify tokens with the public key)"

@@ -33,6 +33,7 @@ async def _test_published(db: AsyncSession, settings: Settings, redis: Redis | N
         db.add(ref)
     ref.title, ref.kind = payload.get("title") or ref.title, payload.get("kind") or ref.kind
     ref.proctoring_level = payload.get("proctoring_level") or "none"
+    ref.screen_share = ref.proctoring_level == "strict" and bool(payload.get("proctoring_screen_share"))
     ref.owner_organization_id = int(payload["organization_id"]) if payload.get("organization_id") else None
     ref.retired = False
 

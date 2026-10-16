@@ -51,8 +51,8 @@ def _require_reader(auth: CurrentAuth) -> None:
     "`grade_bands` map a score to a label (the lowest band must start at 0).",
     responses=errors(*AUTHENTICATED),
 )
-async def create_template(data: TemplateCreate, auth: RequireTemplateAuthor, db: DbSession) -> TemplateResponse:
-    template = await TemplateService(db).create(data, auth)
+async def create_template(data: TemplateCreate, auth: RequireTemplateAuthor, db: DbSession, settings: SettingsDep) -> TemplateResponse:
+    template = await TemplateService(db).create(data, auth, settings.CERTIFICATE_DEFAULT_ACCENT_COLOR)
     return TemplateResponse(message="Template created successfully.", template=TemplateOut.model_validate(template))
 
 

@@ -65,7 +65,7 @@ Docker: `docker compose up analytics-service-migrate analytics-service analytics
 
 ## Verified
 
-`ruff` and `mypy --strict` clean; **26 tests**: unit (extraction for a direct organisation id, a null one, the
+`ruff` and `mypy --strict` clean; **28 tests**: unit (extraction for a direct organisation id, a null one, the
 `EnrollmentRef` backfill, an untracked event type being silently skipped, `ai.usage`'s two-field token sum, a missing
 dimension being the "none" sentinel; rollup summing correctly across organisations and dimensions, and re-running a day
 replacing rather than accumulating it) and integration over SQLite (an institution seeing only its own numbers and

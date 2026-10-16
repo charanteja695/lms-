@@ -102,16 +102,21 @@ class EnrollmentService:
             raise NotFoundError("Enrollment not found.", code="ENROLLMENT_NOT_FOUND")
         return enrollment
 
+    async def is_enrolled(self, batch: Batch, student_user_id: int) -> bool:
+        """Whether this student has (or had) an enrolment in the batch: they may read that batch."""
+        stmt = select(Enrollment.id).where(Enrollment.batch_id == batch.id, Enrollment.student_user_id == student_user_id).limit(1)
+        return (await self.db.execute(stmt)).first() is not None
+
     async def list_enrollments(
-        self, query: ListQuery, *, batch_id: int | None, organization_id: int | None, student_user_id: int | None
+        self, query: ListQuery, *, batch_id: int | None, organization_ids: tuple[int, ...] | None, student_user_id: int | None
     ) -> tuple[list[Enrollment], int, bool]:
         stmt = select(Enrollment)
-        if batch_id is not None or organization_id is not None:
+        if batch_id is not None or organization_ids is not None:
             stmt = stmt.join(Batch, Batch.id == Enrollment.batch_id)
             if batch_id is not None:
                 stmt = stmt.where(Batch.public_id == batch_id)
-            if organization_id is not None:
-                stmt = stmt.where(Batch.organization_id == organization_id)
+            if organization_ids is not None:
+                stmt = stmt.where(Batch.organization_id.in_(organization_ids))
         if student_user_id is not None:
             stmt = stmt.where(Enrollment.student_user_id == student_user_id)
         if query.status:

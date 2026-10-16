@@ -54,7 +54,12 @@ def _settings(**overrides: Any) -> Settings:
     return Settings(**values)
 
 
-def make_claims(*, user_id: int, role: str, organization_id: int | None, scopes: tuple[str, ...]) -> AccessTokenClaims:
+# What user-management puts in a token by default (its permission catalog), for the permissions this service checks.
+ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {"student": ("code.practice", "code.submissions"), "staff": ("code.practice",), "institution_head": ("code.practice",)}
+
+
+def make_claims(*, user_id: int, role: str, organization_id: int | None, scopes: tuple[str, ...], defaults: bool = True) -> AccessTokenClaims:
+    scopes = (*ROLE_PERMISSIONS.get(role, ()), *scopes) if defaults else scopes  # "defaults": the role's own
     now = datetime.now(UTC)
     return AccessTokenClaims(
         user_id=user_id,
@@ -131,8 +136,8 @@ async def client(app) -> AsyncIterator[AsyncClient]:
 def act_as(app) -> Callable[..., AccessTokenClaims]:
     """Sign the test client in as someone. Roles/scopes are exactly what user-management would put in a token."""
 
-    def _set(user_id: int, *, role: str = "student", organization_id: int | None = ORG_A, scopes: tuple[str, ...] = ()) -> AccessTokenClaims:
-        claims = make_claims(user_id=user_id, role=role, organization_id=organization_id, scopes=scopes)
+    def _set(user_id: int, *, role: str = "student", organization_id: int | None = ORG_A, scopes: tuple[str, ...] = (), defaults: bool = True) -> AccessTokenClaims:
+        claims = make_claims(user_id=user_id, role=role, organization_id=organization_id, scopes=scopes, defaults=defaults)
         app.dependency_overrides[_authenticate] = lambda: claims
         return claims
 

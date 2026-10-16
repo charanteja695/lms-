@@ -179,3 +179,14 @@ async def test_students_cannot_author_or_read_definitions(client, who, make_ques
     assert (await client.get(f"/api/v1/tests/{test_id}")).status_code == 404
     assert (await client.get(f"/api/v1/questions/{q1}")).status_code == 404
     assert (await client.get("/api/v1/questions")).status_code == 403
+
+
+async def test_screen_sharing_is_required_only_on_a_strictly_proctored_test(client, who, make_test, make_question, sessionmaker):
+    q1 = await make_question()
+    strict = await make_test([fixed(q1)], proctoring_level="strict", proctoring_screen_share=True)
+    basic = await make_test([fixed(q1)], proctoring_level="basic", proctoring_screen_share=True)  # meaningless without strict
+    who.author()
+    assert (await client.get(f"/api/v1/tests/{strict}")).json()["test"]["proctoring_screen_share"] is True
+    payloads = {p["test_id"]: p for p in await events(sessionmaker, "test.published")}
+    assert payloads[strict]["proctoring_screen_share"] is True  # proctoring-service reads it
+    assert payloads[basic]["proctoring_screen_share"] is False

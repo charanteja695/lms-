@@ -75,7 +75,7 @@ pytest -m postgres                        # 2 tests on a real embedded PostgreSQ
 
 ## Verification (2026-09-22)
 
-**96 tests** — 43 unit (redaction, moderation, tool allow-listing, prompt-template rendering, pricing, provider
+**98 tests** — 43 unit (redaction, moderation, tool allow-listing, prompt-template rendering, pricing, provider
 fallback, the Anthropic/Voyage HTTP clients against a mocked transport), 51 integration on SQLite, **2 on a real
 PostgreSQL** (migration up → down → up with `alembic check` finding no drift; concurrent quota reservations for one
 org never spend past the token limit; concurrent first-time reservations for the same org+period don't raise on

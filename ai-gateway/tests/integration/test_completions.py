@@ -26,7 +26,7 @@ def _body(**overrides):
 
 async def test_a_completion_calls_the_provider_and_returns_content(client, who, fake_chat):
     await _make_prompt(client, who)
-    fake_chat.queue_result(ChatResult(content="Recursion is when a function calls itself.", model="claude-sonnet-5", prompt_tokens=20, completion_tokens=10, stop_reason="end_turn"))
+    fake_chat.queue_result(ChatResult(content="Recursion is when a function calls itself.", model="claude-sonnet-5-5", prompt_tokens=20, completion_tokens=10, stop_reason="end_turn"))
 
     response = await client.post("/api/v1/internal/completions", json=_body(), headers={"X-Internal-Service-Token": "test-internal-service-token-0123456789"})
     assert response.status_code == 200

@@ -7,7 +7,15 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
-from app.api.deps import CurrentAuth, DbSession, IdempotencyKeyHeader, RateLimiterDep, RunIdParam, SettingsDep
+from app.api.deps import (
+    CurrentAuth,
+    DbSession,
+    IdempotencyKeyHeader,
+    RateLimiterDep,
+    RequirePractice,
+    RunIdParam,
+    SettingsDep,
+)
 from app.api.responses import errors
 from app.domain.enums import JobStatus
 from app.models.run import Run
@@ -27,7 +35,7 @@ router = APIRouter(prefix="/runs", tags=["Runs"])
     responses=errors(400, 401, 404, 422, 429),
 )
 async def create_run(
-    data: RunCreate, auth: CurrentAuth, db: DbSession, settings: SettingsDep, limiter: RateLimiterDep, key: IdempotencyKeyHeader
+    data: RunCreate, auth: RequirePractice, db: DbSession, settings: SettingsDep, limiter: RateLimiterDep, key: IdempotencyKeyHeader
 ) -> RunResponse:
     run = await RunService(db, settings, limiter).create(auth, data, key)
     return RunResponse(message="Run queued.", run=RunOut.model_validate(run))

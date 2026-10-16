@@ -72,7 +72,7 @@ class TemplateService:
             fields["signatories"] = [{"name": s["name"], "title": s.get("title", "")} for s in fields["signatories"]]
         return fields
 
-    async def create(self, data: TemplateCreate, auth: AccessTokenClaims) -> CertificateTemplate:
+    async def create(self, data: TemplateCreate, auth: AccessTokenClaims, default_accent: str) -> CertificateTemplate:
         fields = self._validated(data.model_dump(mode="json"))
         template = CertificateTemplate(
             public_id=new_public_id(),
@@ -81,7 +81,7 @@ class TemplateService:
             title_text=fields["title_text"],
             body_text=fields["body_text"] or DEFAULT_TEMPLATE["body_text"],
             footer_text=fields["footer_text"] if fields["footer_text"] is not None else DEFAULT_TEMPLATE["footer_text"],
-            accent_color=fields["accent_color"],
+            accent_color=fields["accent_color"] or default_accent,
             signatories=fields["signatories"],
             grade_bands=fields["grade_bands"] or DEFAULT_GRADE_BANDS,
             created_by=auth.user_id,
@@ -120,7 +120,7 @@ class TemplateService:
         await self.db.commit()
         return template
 
-    async def resolve(self, course_id: int) -> tuple[uuid.UUID | None, dict[str, Any]]:
+    async def resolve(self, course_id: int, default_accent: str) -> tuple[uuid.UUID | None, dict[str, Any]]:
         """The template a new certificate for ``course_id`` uses: the course's own, else the platform default, else the
         built-in one. Returns its id (None for the built-in) and a snapshot."""
         for scope in (CertificateTemplate.course_id == course_id, CertificateTemplate.course_id.is_(None)):
@@ -134,4 +134,4 @@ class TemplateService:
             ).scalar_one_or_none()
             if template is not None:
                 return template.id, snapshot_of(template)
-        return None, dict(DEFAULT_TEMPLATE)
+        return None, {**DEFAULT_TEMPLATE, "accent_color": default_accent}

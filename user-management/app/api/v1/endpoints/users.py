@@ -7,6 +7,7 @@ from app.api import examples
 from app.api.deps import (
     CurrentAuth,
     CurrentAuthAllowingPasswordChange,
+    DbSession,
     SettingsDep,
     UserIdParam,
     UserServiceDep,
@@ -40,6 +41,7 @@ from app.schemas.user import (
 )
 from app.services import export_service
 from app.services.import_service import ImportMode, ImportService, template_csv
+from app.services.permission_service import PermissionService
 from app.services.user_service import PreparedUser
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -64,10 +66,12 @@ async def get_me(auth: CurrentAuthAllowingPasswordChange, service: UserServiceDe
     "Clients show screens and buttons from this instead of re-implementing rules; every request is still checked.",
     responses=errors(401),
 )
-async def my_permissions(auth: CurrentAuth) -> PermissionsResponse:
+async def my_permissions(auth: CurrentAuth, db: DbSession) -> PermissionsResponse:
     return PermissionsResponse(
         message="Permissions retrieved successfully.",
-        permissions=PermissionsOut.model_validate(capabilities.my_permissions(auth.user)),
+        permissions=PermissionsOut.model_validate(
+            capabilities.my_permissions(auth.user, await PermissionService(db).effective_for(auth.user))
+        ),
     )
 
 

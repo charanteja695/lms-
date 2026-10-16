@@ -18,9 +18,9 @@ class PriceRate:
 _DEFAULT = PriceRate(prompt_cents_per_1k=0.3, completion_cents_per_1k=1.5)
 
 _CHAT_PRICES: dict[str, PriceRate] = {
-    "claude-haiku-4-5-20251001": PriceRate(prompt_cents_per_1k=0.1, completion_cents_per_1k=0.5),
-    "claude-sonnet-5": PriceRate(prompt_cents_per_1k=0.3, completion_cents_per_1k=1.5),
-    "claude-opus-5": PriceRate(prompt_cents_per_1k=1.5, completion_cents_per_1k=7.5),
+    "claude-haiku-5-5": PriceRate(prompt_cents_per_1k=0.1, completion_cents_per_1k=0.5),
+    "claude-sonnet-5-5": PriceRate(prompt_cents_per_1k=0.3, completion_cents_per_1k=1.5),
+    "claude-opus-5-5": PriceRate(prompt_cents_per_1k=1.5, completion_cents_per_1k=7.5),
 }
 _EMBEDDING_PRICES: dict[str, PriceRate] = {
     "voyage-3": PriceRate(prompt_cents_per_1k=0.002, completion_cents_per_1k=0.0),

@@ -22,6 +22,7 @@ class TestRef(TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(200))
     kind: Mapped[str] = mapped_column(String(10))
     proctoring_level: Mapped[str] = mapped_column(String(10))
+    screen_share: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")  # strict: the screen is shared throughout
     owner_organization_id: Mapped[int | None] = mapped_column(BigInteger)
     retired: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
@@ -38,6 +39,7 @@ class ProctorSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     test_owner_id: Mapped[int | None] = mapped_column(BigInteger)  # an employer's hiring assessment, else None
     attempt_id: Mapped[int | None] = mapped_column(BigInteger)  # assessment-service's attempt, once it starts
     level: Mapped[str] = mapped_column(String(10))
+    screen_share: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")  # copied from the test when the pre-check starts
     status: Mapped[str] = mapped_column(String(12), default=SessionStatus.PRECHECK, server_default=SessionStatus.PRECHECK)
 
     consent_at: Mapped[datetime | None]

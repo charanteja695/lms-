@@ -1,4 +1,10 @@
-"""Who may do what. One place, so the rules read the same everywhere they are applied."""
+"""Who may do what, as permissions from the access token (user-management's catalog; a super admin can grant or
+remove any of them per person). One place, so the rules read the same everywhere they are applied.
+
+  certificates.own        their own certificates (by default a student; never implied by being a super admin)
+  certificates.students   their own institution's students' certificates (staff, head)
+  content.author / content.review   certificate templates; exams.manage   every certificate, revoke, regenerate
+"""
 
 from app.core.security import AccessTokenClaims
 from app.permissions.roles import Role
@@ -10,24 +16,26 @@ def is_super_admin(auth: AccessTokenClaims) -> bool:
 
 
 def is_student(auth: AccessTokenClaims) -> bool:
-    return auth.role == Role.STUDENT
+    """Holds certificates of their own."""
+    return auth.has_scope("certificates.own")
 
 
 def is_institution_staff(auth: AccessTokenClaims) -> bool:
-    return auth.role in {Role.STAFF, Role.INSTITUTION_HEAD} and auth.organization_id is not None
+    """Sees their own institution's students' certificates."""
+    return auth.organization_id is not None and auth.has_scope("certificates.students")
 
 
 def can_author_templates(auth: AccessTokenClaims) -> bool:
-    return is_super_admin(auth) or auth.has_scope(Scope.CONTENT_AUTHOR.value)
+    return auth.can(Scope.CONTENT_AUTHOR.value)
 
 
 def can_publish_templates(auth: AccessTokenClaims) -> bool:
-    return is_super_admin(auth) or auth.has_scope(Scope.CONTENT_REVIEW.value)
+    return auth.can(Scope.CONTENT_REVIEW.value)
 
 
 def can_manage_certificates(auth: AccessTokenClaims) -> bool:
     """See every certificate, revoke one, regenerate a PDF."""
-    return is_super_admin(auth) or auth.has_scope(Scope.EXAMS_MANAGE.value)
+    return auth.can(Scope.EXAMS_MANAGE.value)
 
 
 def can_view_certificate(auth: AccessTokenClaims, *, student_user_id: int, organization_id: int | None) -> bool:

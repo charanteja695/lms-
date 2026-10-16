@@ -173,8 +173,10 @@ async def test_progress_can_be_streamed_as_server_sent_events(client: AsyncClien
     streamed, _ = await asyncio.gather(client.get(f"{V1}/runs/{rid}/stream"), worker_soon())
     assert streamed.headers["content-type"].startswith("text/event-stream")
     events = [block for block in streamed.text.split("\n\n") if block]
-    assert events[0].startswith("event: status") and '"status":"queued"' in events[0]
+    # Always ends with "done" carrying the result. Whether "status" events come first depends on how far the run got before
+    # the stream opened (a run that already finished sends only "done"), so only their order is checked, not their count.
     assert events[-1].startswith("event: done") and '"outcome":"ok"' in events[-1] and "streamed" in events[-1]
+    assert all(e.startswith("event: status") for e in events[:-1])
 
 
 async def test_a_run_is_never_executed_twice(client: AsyncClient, as_student, judge_with, scripted_engine, sessionmaker) -> None:
@@ -224,3 +226,15 @@ async def test_an_engine_that_recovers_gives_a_normal_result(client: AsyncClient
         await db.commit()
     await drain(judge)
     assert (await client.get(f"{V1}/runs/{rid}")).json()["run"]["stdout"] == "fine"
+
+
+async def test_coding_practice_follows_the_persons_permissions(client, act_as):
+    """A super admin can take coding practice away from one student."""
+    act_as(STUDENT, role="student", organization_id=ORG_A, defaults=False)
+    response = await client.post(f"{V1}/runs", json=run_body("print(1)"))
+    assert response.status_code == 403 and response.json()["code"] == "PRACTICE_NOT_ALLOWED"
+    assert (await client.get(f"{V1}/submissions")).status_code == 403
+    # practice kept, history removed: can still run code, but has no "My submissions"
+    act_as(STUDENT, role="student", organization_id=ORG_A, scopes=("code.practice",), defaults=False)
+    assert (await client.post(f"{V1}/runs", json=run_body("print(1)"))).status_code == 202
+    assert (await client.get(f"{V1}/submissions")).status_code == 403

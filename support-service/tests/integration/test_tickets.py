@@ -442,3 +442,32 @@ async def test_the_tutors_exact_handoff_payload_is_accepted(client, internal_hea
     del payload["reason"]
     payload["unexpected"] = 1
     assert (await client.post(f"{API}/internal/tickets", json=payload, headers=internal_headers)).status_code == 422
+
+
+async def test_support_follows_the_persons_permissions(client, act_as):
+    """A super admin can stop one student opening tickets, or take one staff member off the queue."""
+    act_as(STUDENT, role="student", organization_id=ORG_A, defaults=False)
+    body = {"subject": "Cannot open the lab", "description": "It says access denied", "category": "technical"}
+    assert (await client.post(f"{API}/tickets", json=body)).status_code == 403
+    act_as(STAFF_A, role="staff", organization_id=ORG_A, defaults=False)
+    assert (await client.get(f"{API}/agent/tickets")).status_code == 403
+    act_as(STAFF_A, role="staff", organization_id=ORG_A)
+    assert (await client.get(f"{API}/agent/tickets")).status_code == 200
+
+
+async def test_only_people_who_still_hold_the_permission_can_be_assigned(client, who, send_event, people):
+    for user, role, org in ((STAFF_A, "staff", ORG_A), (STAFF_A2, "staff", ORG_A)):
+        await send_event("user.created", {"user_id": str(user), "first_name": "P", "last_name": str(user), "role": role, "status": "active", "organization_id": str(org)})
+    who.student()
+    learning = (await open_ticket(client, category="learning"))["ticket_id"]
+    people.removed.add((STAFF_A2, "support.agent"))  # a super admin took support away from this one staff member
+    who.head()
+    listed = (await client.get(f"{API}/agent/tickets/{learning}/assignees")).json()["assignees"]
+    assert [p["user_id"] for p in listed] == [str(STAFF_A)]
+    refused = await client.post(f"{API}/agent/tickets/{learning}/assign", json={"assignee_user_id": str(STAFF_A2)})
+    assert refused.status_code == 422 and refused.json()["code"] == "ASSIGNEE_NOT_ELIGIBLE"
+    assert people.calls[-1] == {"permission": "support.agent", "user_ids": [str(STAFF_A2)]}
+
+    people.down = True  # never assign on a guess
+    unavailable = await client.post(f"{API}/agent/tickets/{learning}/assign", json={"assignee_user_id": str(STAFF_A)})
+    assert unavailable.status_code == 502

@@ -73,3 +73,13 @@ async def test_adding_the_same_course_twice_is_a_conflict(client: AsyncClient, a
     await client.post(f"/api/v1/learning-paths/{path['learning_path_id']}/courses", json={"course_id": course_a})
     response = await client.post(f"/api/v1/learning-paths/{path['learning_path_id']}/courses", json={"course_id": course_a})
     assert response.status_code == 409
+
+
+async def test_draft_learning_paths_are_hidden_from_readers(client: AsyncClient, authed) -> None:
+    authed(scopes=AUTHOR)
+    draft = (await client.post("/api/v1/learning-paths", json={"title": "Data Analyst Path", "slug": "data-analyst", "description": "From spreadsheets to dashboards, step by step."})).json()["learning_path"]
+    authed(role="student", scopes=("catalog.read",))
+    assert draft["learning_path_id"] not in {p["learning_path_id"] for p in (await client.get("/api/v1/learning-paths")).json()["learning_paths"]}
+    assert (await client.get(f"/api/v1/learning-paths/{draft['learning_path_id']}")).status_code == 404
+    authed(scopes=AUTHOR)
+    assert (await client.get(f"/api/v1/learning-paths/{draft['learning_path_id']}")).status_code == 200

@@ -21,6 +21,11 @@ class SnapshotKind(StrEnum):
     PERIODIC = "periodic"
     SCREEN = "screen"
     AUDIO = "audio"
+    LIVENESS = "liveness"  # before the test: the face turned left, right, up and down on request (one frame per pose)
+    VIDEO = "video"  # during the test: a chunk of the continuous camera + microphone recording
+
+
+LIVENESS_POSES = ("left", "right", "up", "down")
 
 
 class AnalysisStatus(StrEnum):

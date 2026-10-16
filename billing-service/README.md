@@ -61,7 +61,7 @@ Docker: `docker compose up billing-service-migrate billing-service billing-servi
 
 ## Verified
 
-`ruff` and `mypy --strict` clean; **56 tests**: unit (financial year boundaries, pro-rating, the GST split and its odd paisa, "the parts always add up",
+`ruff` and `mypy --strict` clean; **59 tests**: unit (financial year boundaries, pro-rating, the GST split and its odd paisa, "the parts always add up",
 state comparison, discount clamping, GSTIN shape) and integration over SQLite (profiles and who may set whose, the price list, quotes with GST by state,
 discounts, accept-once, expiry; drafting from `subscription.activated`, idempotency, an accepted quote's price and discount carrying over after the list
 price changed, an unpriced course, drafts hidden from customers, numbered issue, IGST for out-of-state, profile required, sequential numbers, issued

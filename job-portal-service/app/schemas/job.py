@@ -67,6 +67,8 @@ class JobFields(RequestSchema):
     ctc_min: int | None = Field(default=None, ge=0)
     ctc_max: int | None = Field(default=None, ge=0)
     currency: str = Field(default="INR", pattern=r"^[A-Z]{3}$")
+    stipend_per_month: int | None = Field(default=None, ge=0, description="Internships: monthly stipend, in `currency`")
+    duration_months: int | None = Field(default=None, ge=1, le=36, description="Internships: how many months it runs")
     required_skills: SkillList = Field(default_factory=list)
     preferred_skills: SkillList = Field(default_factory=list)
     openings: int = Field(default=1, ge=1, le=10_000)
@@ -86,7 +88,9 @@ class JobFields(RequestSchema):
 
 
 class JobCreate(JobFields):
-    pass
+    employer_org_id: int | None = Field(
+        default=None, ge=1, description="The company the job is for. Required for a careers manager; a company's own team always posts for their company."
+    )
 
 
 class JobUpdate(RequestSchema):
@@ -102,6 +106,8 @@ class JobUpdate(RequestSchema):
     ctc_min: int | None = Field(default=None, ge=0)
     ctc_max: int | None = Field(default=None, ge=0)
     currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
+    stipend_per_month: int | None = Field(default=None, ge=0)
+    duration_months: int | None = Field(default=None, ge=1, le=36)
     required_skills: SkillList | None = None
     preferred_skills: SkillList | None = None
     openings: int | None = Field(default=None, ge=1, le=10_000)
@@ -145,6 +151,8 @@ class JobOut(ResponseSchema):
     experience_max_months: int | None
     ctc_min: int | None
     ctc_max: int | None
+    stipend_per_month: int | None = None
+    duration_months: int | None = None
     currency: str
     required_skills: list[str]
     preferred_skills: list[str]

@@ -61,6 +61,9 @@ class AuditAction(StrEnum):
     EMPLOYER_ACCESS_REVOKED = "employer.access_revoked"
     EMPLOYERS_EXPORTED = "employer.exported"
 
+    ROLE_PERMISSIONS_CHANGED = "permission.role_changed"
+    USER_PERMISSIONS_CHANGED = "permission.user_changed"
+
 
 class AuditService:
     """Writes audit records and outbox events into the caller's transaction."""

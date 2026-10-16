@@ -1,28 +1,35 @@
-"""Who may do what (docs/PRODUCT.md §5.10).
+"""Who may do what (docs/PRODUCT.md §5.10), as permissions from the access token (user-management's catalog).
 
-  institution head / employer admin   their own organisation's billing profile, quotes, invoices and payments; an employer admin also buys plans
-  billing.manage                      every organisation's: prices, quotes (discounts), invoices (edit drafts, issue, void), manual payments, credit notes
-  super admin                         everything
-Staff, recruiters and students see no billing.
+  billing.contact     their own organisation's billing profile, quotes, invoices and payments
+                      (by default an institution head or an employer admin; a super admin may grant or remove it per person)
+  billing.plans.buy   buy hiring plans for their own company (by default an employer admin)
+  billing.manage      every organisation's: prices, quotes (discounts), invoices (edit drafts, issue, void), manual payments, credit notes
+  super admin         everything
+Whose data: a contact acts for their own organisation only; billing.manage for any.
 """
 
 from enum import StrEnum
 
 from app.core.security import AccessTokenClaims
-from app.permissions.roles import Role
 
 
-class Scope(StrEnum):
-    BILLING_MANAGE = "billing.manage"  # mirrors user-management's AdminScope
+class Permission(StrEnum):
+    BILLING_MANAGE = "billing.manage"
+    BILLING_CONTACT = "billing.contact"
+    PLANS_BUY = "billing.plans.buy"
 
 
 def can_manage_billing(auth: AccessTokenClaims) -> bool:
-    return auth.role == Role.SUPER_ADMIN or auth.has_scope(Scope.BILLING_MANAGE.value)
+    return auth.can(Permission.BILLING_MANAGE)
 
 
 def is_billing_contact(auth: AccessTokenClaims) -> bool:
-    """The person who deals with billing for an organisation: an institution's head or an employer's admin."""
-    return auth.role in {Role.INSTITUTION_HEAD, Role.EMPLOYER_ADMIN} and auth.organization_id is not None
+    """Deals with billing for their own organisation."""
+    return auth.organization_id is not None and auth.can(Permission.BILLING_CONTACT)
+
+
+def can_buy_plans(auth: AccessTokenClaims) -> bool:
+    return auth.organization_id is not None and auth.can(Permission.PLANS_BUY)
 
 
 def owns(auth: AccessTokenClaims, org_id: int) -> bool:

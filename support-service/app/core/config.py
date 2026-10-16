@@ -7,6 +7,7 @@ refuses to start staging/production with any of them.
 
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,6 +19,14 @@ DEV_SECRET_MARKER = "insecure-dev"
 DEFAULT_FIRST_RESPONSE_MINUTES = {"urgent": 30, "high": 120, "normal": 480, "low": 1_440}
 DEFAULT_RESOLUTION_MINUTES = {"urgent": 240, "high": 1_440, "normal": 4_320, "low": 10_080}
 
+
+
+def _private_or_https(url: str) -> bool:
+    """https anywhere; plain http only to a private-network host: localhost, a loopback address, or a single-label
+    container/service name such as ``user-management`` (resolvable only inside the deployment's own network)."""
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    return parsed.scheme == "https" or (parsed.scheme == "http" and (host in {"localhost", "127.0.0.1", "::1"} or "." not in host))
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -59,6 +68,9 @@ class Settings(BaseSettings):
 
     # --- ai-tutor-service: the conversation behind a tutor hand-off, read with the internal token ---
     AI_TUTOR_SERVICE_URL: str = "http://localhost:8011"
+    # Asked who holds a permission before a ticket is assigned to them (POST /internal/permission-holders).
+    USER_MANAGEMENT_URL: str = "http://localhost:8001"
+    USER_MANAGEMENT_TIMEOUT_SECONDS: float = Field(default=5.0, gt=0)
     AI_TUTOR_TIMEOUT_SECONDS: float = Field(default=5.0, gt=0)
 
     # --- Rate limits ---
@@ -88,6 +100,22 @@ class Settings(BaseSettings):
     SLA_SWEEP_BATCH: int = Field(default=500, ge=1)
     SLA_SWEEP_SECONDS: float = Field(default=30.0, gt=0)
 
+    # --- Attachments (screenshots, logs, documents on a message; uploaded straight to S3 with a presigned POST) ---
+    AWS_REGION: str = "ap-south-1"
+    AWS_ACCESS_KEY_ID: SecretStr | None = None
+    AWS_SECRET_ACCESS_KEY: SecretStr | None = None
+    S3_BUCKET: str = "lms-support-dev"
+    # Set only for local testing against a non-AWS S3-compatible endpoint; unset in staging/production.
+    S3_ENDPOINT_URL: str | None = None
+    S3_UPLOAD_URL_EXPIRES_SECONDS: int = Field(default=900, ge=60, le=3_600)
+    S3_DOWNLOAD_URL_EXPIRES_SECONDS: int = Field(default=300, ge=30, le=3_600)
+    ATTACHMENT_MAX_MB: int = Field(default=10, ge=1, le=100)
+    ATTACHMENT_MAX_FILES: int = Field(default=5, ge=1, le=20)
+    ATTACHMENT_ALLOWED_EXTENSIONS: list[str] = Field(
+        default_factory=lambda: ["png", "jpg", "jpeg", "gif", "webp", "pdf", "txt", "log", "csv", "doc", "docx", "xls", "xlsx", "zip"]
+    )
+    ATTACHMENT_URL_RATE_LIMIT_PER_USER_PER_MINUTE: int = Field(default=30, ge=1)
+
     @property
     def is_production_like(self) -> bool:
         return self.ENVIRONMENT in {"staging", "production"}
@@ -99,10 +127,14 @@ class Settings(BaseSettings):
                 errors.append("DEBUG must be false outside local/test")
             if "*" in self.TRUSTED_HOSTS:
                 errors.append("TRUSTED_HOSTS must list explicit hosts outside local/test")
-            if self.USER_MANAGEMENT_JWKS_URL.startswith("http://") and "localhost" not in self.USER_MANAGEMENT_JWKS_URL:
+            if not _private_or_https(self.USER_MANAGEMENT_JWKS_URL):
                 errors.append("USER_MANAGEMENT_JWKS_URL must use https outside local/test")
             if DEV_SECRET_MARKER in self.INTERNAL_SERVICE_TOKEN.get_secret_value():
                 errors.append("INTERNAL_SERVICE_TOKEN still uses the development default")
+            if self.S3_ENDPOINT_URL is not None and not self.S3_ENDPOINT_URL.startswith("https://"):
+                errors.append("S3_ENDPOINT_URL must be unset (AWS S3) or an https URL (S3-compatible storage) outside local/test")
+            if self.S3_BUCKET == "lms-support-dev":
+                errors.append("S3_BUCKET still uses the development default")
         if errors:
             raise ValueError("; ".join(errors))
 

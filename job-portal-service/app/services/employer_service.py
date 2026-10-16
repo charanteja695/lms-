@@ -81,6 +81,27 @@ class EmployerService:
         await self.db.commit()
         return profile
 
+    async def manage(self, organization_id: int, fields: dict[str, Any], manager_user_id: int) -> EmployerProfile:
+        """The super admin keeps the profile of a company they run: saving it complete verifies it (no one else to ask)."""
+        profile = await self.get_or_create(organization_id)
+        if profile.status == EmployerStatus.SUSPENDED:
+            raise ConflictError("This company is suspended. Reinstate it first.", code="EMPLOYER_SUSPENDED")
+        for name, value in fields.items():
+            setattr(profile, name, value)
+        profile.revision += 1
+        missing = [name for name in _REQUIRED_FOR_SUBMISSION if not getattr(profile, name)]
+        if missing:
+            raise ValidationFailedError(details=[{"field": name, "code": "REQUIRED", "message": "Needed before the company's jobs can go live"} for name in missing])
+        if profile.status != EmployerStatus.VERIFIED:
+            profile.status, profile.submitted_at, profile.suspension_source = EmployerStatus.VERIFIED, profile.submitted_at or utcnow(), None
+            profile.reviewed_by, profile.reviewed_at, profile.review_note = manager_user_id, utcnow(), None
+            write_event(
+                self.db, event_type="employer_profile.verified", aggregate_type="employer_profile", aggregate_id=profile.id,
+                payload={"organization_id": str(organization_id), "reviewed_by": str(manager_user_id), "note": None, "occurred_at": _iso(utcnow())},
+            )
+        await self.db.commit()
+        return profile
+
     # ------------------------------------------------------------------ the platform's review
     async def review(self, organization_id: int, reviewer_user_id: int, *, approve: bool, note: str | None) -> EmployerProfile:
         profile = await self._locked(organization_id)

@@ -1,7 +1,7 @@
 from sqlalchemy import select
 
 from app.models.session import MediaAccess, ProctorEvent, ProctorSession
-from tests.conftest import ATTEMPT, EMPLOYER, EXAM_MANAGER, STAFF_B, STUDENT, TEST_BASIC, outbox
+from tests.conftest import ATTEMPT, EMPLOYER, EXAM_MANAGER, ORG_A, STAFF_A, STAFF_B, STUDENT, TEST_BASIC, outbox
 from tests.integration.test_live_session import event, go_live
 from tests.integration.test_precheck_and_session import upload
 
@@ -89,8 +89,8 @@ async def test_every_view_of_a_snapshot_is_logged_and_the_report_says_when_nothi
     case, snapshot = await _risky_case(client, who, tests_published, send_event, work, s3_bucket, settings)
     detail = (await client.get(f"/api/v1/cases/{case['case_id']}")).json()["case"]
     assert detail["report"]["ai_analysis"] == "unavailable"  # no analyzer: never "looked and found nothing"
-    assert detail["report"]["snapshots"]["skipped"] == 3
-    assert {s["kind"] for s in detail["snapshots"]} == {"id_photo", "face_enrol", "periodic"}
+    assert detail["report"]["snapshots"]["skipped"] == 7  # identity photos, four face-movement frames, one periodic
+    assert {s["kind"] for s in detail["snapshots"]} == {"id_photo", "face_enrol", "liveness", "periodic"}
 
     link = await client.get(f"/api/v1/cases/{case['case_id']}/snapshots/{snapshot['snapshot_id']}/url")
     assert link.status_code == 200 and link.json()["url"].startswith("http") and link.json()["expires_in"] == 120
@@ -129,3 +129,11 @@ async def test_a_purged_snapshot_can_no_longer_be_fetched(client, who, tests_pub
     gone = await client.get(f"/api/v1/cases/{case['case_id']}/snapshots/{snapshot['snapshot_id']}/url")
     assert gone.status_code == 404 and gone.json()["code"] == "MEDIA_DELETED"
     assert (await client.get(f"/api/v1/cases/{case['case_id']}")).status_code == 200  # the case and its timeline outlive the media
+
+
+async def test_monitoring_follows_the_persons_permission(client, act_as):
+    """A super admin can take live monitoring away from one staff member."""
+    act_as(STAFF_A, role="staff", organization_id=ORG_A, defaults=False)
+    assert (await client.get("/api/v1/monitor/sessions")).status_code == 403
+    act_as(STAFF_A, role="staff", organization_id=ORG_A)
+    assert (await client.get("/api/v1/monitor/sessions")).status_code == 200

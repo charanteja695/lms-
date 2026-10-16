@@ -23,7 +23,7 @@ from app.core.crypto import SecretCipher
 from app.core.exceptions import AuthenticationError, NotFoundError, PermissionDeniedError, ValidationFailedError
 from app.core.ids import parse_public_id
 from app.core.security import AccessTokenClaims, TokenError, get_verifier
-from app.permissions.policy import can_author, can_review, is_super_admin
+from app.permissions.policy import can_author, can_list_own_submissions, can_practice, can_review, is_super_admin
 from app.services.rate_limiter import RateLimiter
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -154,7 +154,7 @@ async def _authenticate(
         user_id=str(claims.user_id),
         organization_id=str(claims.organization_id) if claims.organization_id else None,
         token_version=claims.token_version,
-        issued_at=claims.issued_at,
+        issued_at=claims.issued_at, role=claims.role,
     )
     if await is_token_revoked(request.app.state.redis, identity, key_prefix=settings.ACCESS_STATE_KEY_PREFIX):
         raise AuthenticationError("Your access has been revoked. Please log in again.", code="TOKEN_REVOKED")
@@ -182,7 +182,21 @@ def require_reviewer(auth: CurrentAuth) -> AccessTokenClaims:
     return auth
 
 
+def require_practice(auth: CurrentAuth) -> AccessTokenClaims:
+    if not can_practice(auth):
+        raise PermissionDeniedError("You don't have access to coding practice.", code="PRACTICE_NOT_ALLOWED")
+    return auth
+
+
+def require_own_submissions(auth: CurrentAuth) -> AccessTokenClaims:
+    if not can_list_own_submissions(auth):
+        raise PermissionDeniedError()
+    return auth
+
+
 RequireSuperAdmin = Annotated[AccessTokenClaims, Depends(require_super_admin)]
+RequirePractice = Annotated[AccessTokenClaims, Depends(require_practice)]
+RequireOwnSubmissions = Annotated[AccessTokenClaims, Depends(require_own_submissions)]
 RequireAuthor = Annotated[AccessTokenClaims, Depends(require_author)]
 RequireReviewer = Annotated[AccessTokenClaims, Depends(require_reviewer)]
 

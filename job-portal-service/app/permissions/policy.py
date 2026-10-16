@@ -1,10 +1,12 @@
-"""Who may do what.
+"""Who may do what, as permissions from the access token (user-management's catalog; a super admin can grant or
+remove any of them per person). The defaults are what each role gets:
 
-  student                    browse and search jobs, see matches, apply, follow and withdraw, answer offers, set preferences
-  recruiter                  their employer's jobs (draft, submit, pause, close) and those jobs' applications: screen, shortlist,
+  jobs.apply (student)                    browse and search jobs, see matches, apply, follow and withdraw, answer offers, set preferences
+  jobs.hire (recruiter)      their employer's jobs (draft, submit, pause, close) and those jobs' applications: screen, shortlist,
                              reject (a confirmed batch), move through the pipeline, extend offers, place
-  employer admin             everything a recruiter does, plus the company profile (submit for verification)
-  institution staff / head   their institution's students' applications and placements; a head also proposes placement drives
+  jobs.company.manage        (employer admin) the company profile, accepting or ending placement drives
+  jobs.placements            (staff, head) their institution's students' applications and placements
+  jobs.drives.propose        (head) proposing placement drives
   careers.manage             verify employers, approve jobs, see everything
   super admin                everything
 """
@@ -23,28 +25,37 @@ def is_super_admin(auth: AccessTokenClaims) -> bool:
     return auth.role == Role.SUPER_ADMIN
 
 
+def _member_may(auth: AccessTokenClaims, kind: str, permission: str) -> bool:
+    return auth.organization_id is not None and auth.organization_type == kind and auth.has_scope(permission)
+
+
 def is_student(auth: AccessTokenClaims) -> bool:
-    return auth.role == Role.STUDENT
+    """Searches and applies for jobs (a person's own; never implied by being a super admin)."""
+    return auth.has_scope("jobs.apply")
 
 
 def is_employer_member(auth: AccessTokenClaims) -> bool:
-    return auth.role in {Role.EMPLOYER_ADMIN, Role.RECRUITER} and auth.organization_id is not None
+    """Hires for their own company."""
+    return _member_may(auth, "employer", "jobs.hire")
 
 
 def is_employer_admin(auth: AccessTokenClaims) -> bool:
-    return auth.role == Role.EMPLOYER_ADMIN and auth.organization_id is not None
+    """Runs their own company's profile and its placement drives."""
+    return _member_may(auth, "employer", "jobs.company.manage")
 
 
 def is_institution_staff(auth: AccessTokenClaims) -> bool:
-    return auth.role in {Role.STAFF, Role.INSTITUTION_HEAD} and auth.organization_id is not None
+    """Follows their own institution's students' applications and placements."""
+    return _member_may(auth, "institution", "jobs.placements")
 
 
 def is_institution_head(auth: AccessTokenClaims) -> bool:
-    return auth.role == Role.INSTITUTION_HEAD and auth.organization_id is not None
+    """Proposes placement drives for their own institution."""
+    return _member_may(auth, "institution", "jobs.drives.propose")
 
 
 def can_manage_careers(auth: AccessTokenClaims) -> bool:
-    return is_super_admin(auth) or bool(auth.has_scope(Scope.CAREERS_MANAGE.value))
+    return auth.can(Scope.CAREERS_MANAGE.value)
 
 
 def owns_employer(auth: AccessTokenClaims, employer_org_id: int) -> bool:

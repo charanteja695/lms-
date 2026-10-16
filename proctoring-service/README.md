@@ -73,13 +73,13 @@ python -m venv .venv && .venv/Scripts/python -m pip install -r requirements-dev.
 cp .env.example .env && alembic upgrade head
 uvicorn app.main:app --port 8008          # API
 python -m app.worker                      # outbox relay, event consumer, analysis, decisions, retention
-pytest -m "not postgres"                  # 59 tests (SQLite, fakeredis, moto)
+pytest -m "not postgres"                  # 61 tests (SQLite, fakeredis, moto)
 pytest -m postgres                        # 4 tests on a real embedded PostgreSQL (pip install pgserver)
 ```
 
 ## Verification (2026-09-21)
 
-**63 tests** — 8 unit (risk policy), 51 integration on SQLite, 4 on a **real PostgreSQL** (migration up → down → up with
+**66 tests** — 8 unit (risk policy), 53 integration on SQLite, 4 on a **real PostgreSQL** (migration up → down → up with
 `alembic check` finding no drift; one session per attempt however many deliveries race; one decision per session however many
 workers race; concurrent analysers never share a snapshot). ruff and `mypy --strict` clean. Also verified against
 assessment-service: its `attempt.started` / `test.published` payload keys are the ones consumed here, and its new
