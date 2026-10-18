@@ -88,6 +88,12 @@ class Settings(BaseSettings):
     # --- Authoring limits ---
     MAX_SECTIONS_PER_TEST: int = Field(default=20, ge=1)
     MAX_QUESTIONS_PER_TEST: int = Field(default=300, ge=1)
+    # What a course test must hold before it can be published (0 turns a rule off). Multiple choice = single or
+    # multi answer; a program = a coding question judged against test cases.
+    TOPIC_TEST_MIN_MCQ: int = Field(default=5, ge=0)
+    TOPIC_TEST_MIN_PROGRAMS: int = Field(default=1, ge=0)
+    FINAL_TEST_MIN_MCQ: int = Field(default=10, ge=0)
+    FINAL_TEST_MIN_PROGRAMS: int = Field(default=2, ge=0)
     MAX_OPTIONS_PER_QUESTION: int = Field(default=12, ge=2)
     MAX_TEXT_BYTES: int = Field(default=20_000, ge=1_000)
     BULK_IMPORT_MAX_QUESTIONS: int = Field(default=200, ge=1)

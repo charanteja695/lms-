@@ -19,6 +19,7 @@ class ContentStatus(StrEnum):
 
 class ItemType(StrEnum):
     VIDEO = "video"
+    PDF = "pdf"  # a document from media-service, read in the player
     NOTES = "notes"
     PRACTICE = "practice"
     QUIZ = "quiz"  # topic test; the question bank itself lives in assessment-service

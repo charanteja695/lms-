@@ -30,7 +30,7 @@ async def _run_worker_transcode(app, asset_public_id: str) -> None:
 async def test_reject_unsupported_content_type(client: AsyncClient, authed) -> None:
     authed(scopes=AUTHOR)
     response = await client.post(
-        "/api/v1/media/uploads", json={"original_filename": "doc.pdf", "content_type": "application/pdf", "byte_size": 10}
+        "/api/v1/media/uploads", json={"original_filename": "setup.exe", "content_type": "application/x-msdownload", "byte_size": 10}
     )
     assert response.status_code == 400
     assert response.json()["code"] == "UNSUPPORTED_CONTENT_TYPE"
@@ -165,3 +165,55 @@ async def test_archiving_an_asset_stops_new_playback_tokens(client: AsyncClient,
     response = await client.post(f"/api/v1/media/{asset_id}/playback-tokens")
     assert response.status_code == 400
     assert response.json()["code"] == "MEDIA_ASSET_NOT_READY"
+
+
+# ---------------------------------------------------------------- PDF lessons
+
+PDF_PAYLOAD = {"original_filename": "Loop patterns.pdf", "content_type": "application/pdf", "byte_size": 2048}
+
+
+async def _upload_pdf(client: AsyncClient, authed, body_bytes: bytes) -> tuple[dict, AsyncClient]:
+    authed(scopes=AUTHOR)
+    response = await client.post("/api/v1/media/uploads", json=PDF_PAYLOAD)
+    assert response.status_code == 201, response.text
+    body = response.json()
+    boto3.client("s3", region_name="us-east-1").put_object(
+        Bucket=TEST_BUCKET, Key=body["upload"]["fields"]["key"], Body=body_bytes, ContentType="application/pdf"
+    )
+    authed(scopes=AUTHOR)
+    return body, await client.post(f"/api/v1/media/{body['asset']['asset_id']}/complete")
+
+
+async def test_pdf_is_ready_on_upload_and_opens_inline(client: AsyncClient, authed) -> None:
+    body, response = await _upload_pdf(client, authed, b"%PDF-1.7\nfake pdf body")
+    assert response.status_code == 200, response.text
+    asset = response.json()["asset"]
+    assert asset["kind"] == "document"
+    assert asset["status"] == "ready"
+
+    authed(scopes=())
+    response = await client.post(f"/api/v1/media/{asset['asset_id']}/playback-tokens")
+    assert response.status_code == 201
+    token = response.json()["playback"]["token"]
+    response = await client.get(f"/api/v1/playback/{token}", follow_redirects=False)
+    location = response.headers["location"]
+    assert "response-content-type=application%2Fpdf" in location
+    assert "inline" in location
+
+
+async def test_a_file_that_is_not_really_a_pdf_is_rejected_and_removed(client: AsyncClient, authed) -> None:
+    body, response = await _upload_pdf(client, authed, b"MZ\x90\x00 not a pdf")
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_PDF"
+    authed(scopes=AUTHOR)
+    asset = (await client.get(f"/api/v1/media/{body['asset']['asset_id']}")).json()["asset"]
+    assert asset["status"] == "failed"
+    objects = boto3.client("s3", region_name="us-east-1").list_objects_v2(Bucket=TEST_BUCKET).get("Contents", [])
+    assert body["upload"]["fields"]["key"] not in [o["Key"] for o in objects]
+
+
+async def test_pdfs_have_their_own_smaller_size_limit(client: AsyncClient, authed) -> None:
+    authed(scopes=AUTHOR)
+    response = await client.post("/api/v1/media/uploads", json={**PDF_PAYLOAD, "byte_size": 60 * 1024 * 1024})
+    assert response.status_code == 400
+    assert response.json()["code"] == "FILE_TOO_LARGE"

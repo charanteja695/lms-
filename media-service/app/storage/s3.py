@@ -58,14 +58,18 @@ async def presign_upload(
     return await to_thread.run_sync(_presign)
 
 
-async def presign_get(settings: Settings, key: str, *, expires_seconds: int) -> str:
+async def presign_get(
+    settings: Settings, key: str, *, expires_seconds: int, content_type: str | None = None, disposition: str | None = None
+) -> str:
+    """``content_type``/``disposition`` override what the browser is told, e.g. to show a PDF inline."""
+    params: dict[str, str] = {"Bucket": settings.S3_BUCKET, "Key": key}
+    if content_type:
+        params["ResponseContentType"] = content_type
+    if disposition:
+        params["ResponseContentDisposition"] = disposition
+
     def _presign() -> str:
-        return cast(
-            str,
-            _client(settings).generate_presigned_url(
-                "get_object", Params={"Bucket": settings.S3_BUCKET, "Key": key}, ExpiresIn=expires_seconds
-            ),
-        )
+        return cast(str, _client(settings).generate_presigned_url("get_object", Params=params, ExpiresIn=expires_seconds))
 
     return await to_thread.run_sync(_presign)
 
@@ -80,6 +84,16 @@ async def head_object(settings: Settings, key: str) -> dict[str, Any]:
             raise
 
     return await to_thread.run_sync(_head)
+
+
+async def read_prefix(settings: Settings, key: str, length: int) -> bytes:
+    """The first ``length`` bytes of an object (a ranged GET), e.g. to check a file's signature."""
+
+    def _read() -> bytes:
+        response = _client(settings).get_object(Bucket=settings.S3_BUCKET, Key=key, Range=f"bytes=0-{length - 1}")
+        return cast(bytes, response["Body"].read())
+
+    return await to_thread.run_sync(_read)
 
 
 async def delete_object(settings: Settings, key: str) -> None:

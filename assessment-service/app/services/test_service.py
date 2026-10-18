@@ -23,6 +23,7 @@ from app.db.session import flush_or_conflict
 from app.domain.enums import (
     IdempotentScope,
     QuestionStatus,
+    QuestionType,
     SlotType,
     TargetType,
     TestKind,
@@ -90,6 +91,9 @@ def definition_event_payload(test: Test) -> dict[str, Any]:
 
 
 
+_MCQ_TYPES = frozenset({QuestionType.MCQ_SINGLE, QuestionType.MCQ_MULTI})
+_PROGRAM_TYPES = frozenset({QuestionType.CODING})
+
 class TestService:
     __test__ = False
 
@@ -145,6 +149,8 @@ class TestService:
             stmt = stmt.where(Test.status == query.status)
         if query.target_id:
             stmt = stmt.where(Test.target_id == query.target_id)
+        if query.target_ids:
+            stmt = stmt.where(Test.target_id.in_([int(part) for part in query.target_ids.split(",")]))
         if query.search:
             stmt = stmt.where(Test.title.ilike(contains_pattern(query.search), escape="\\"))
         stmt = stmt.order_by(Test.created_at.asc() if query.sort_order == "asc" else Test.created_at.desc(), Test.id)
@@ -339,6 +345,21 @@ class TestService:
 
     async def validate(self, test: Test) -> tuple[list[dict[str, Any]], float | None, int | None]:
         """Everything that must hold before a test may be published. Returns (issues, total marks, question count)."""
+        issues, total, count, _ = await self.validate_with_composition(test)
+        return issues, total, count
+
+    def composition_rule(self, test: Test) -> tuple[int, int] | None:
+        """(multiple-choice, programs) a course test must hold at least; None when its kind has no such rule."""
+        if test.kind == TestKind.TOPIC:
+            return self.settings.TOPIC_TEST_MIN_MCQ, self.settings.TOPIC_TEST_MIN_PROGRAMS
+        if test.kind == TestKind.FINAL:
+            return self.settings.FINAL_TEST_MIN_MCQ, self.settings.FINAL_TEST_MIN_PROGRAMS
+        return None
+
+    async def validate_with_composition(
+        self, test: Test
+    ) -> tuple[list[dict[str, Any]], float | None, int | None, dict[str, int]]:
+        """``validate`` plus how many multiple-choice questions and programs the paper holds (for the builder)."""
         issues: list[dict[str, Any]] = []
 
         def issue(field: str, code: str, message: str) -> None:
@@ -368,6 +389,8 @@ class TestService:
         seen_fixed: set[uuid.UUID] = set()
         total_marks = 0.0
         question_count = 0
+        mcq_count = 0
+        program_count = 0
         for section in sections:
             for slot in section.slots:
                 where = f"sections[{section.position}].slots[{slot.position}]"
@@ -381,19 +404,38 @@ class TestService:
                         issue(where, "DUPLICATE_QUESTION", f"Question {question.public_id} is used twice")
                     if slot.question_id is not None:
                         seen_fixed.add(slot.question_id)
+                    if question is not None:
+                        mcq_count += question.question_type in _MCQ_TYPES
+                        program_count += question.question_type in _PROGRAM_TYPES
                     question_count += 1
                     total_marks += slot.marks
                 else:
                     available = [c for c in await pools.eligible(test.organization_id, slot.criteria or {}) if c[0] not in fixed_ids]
                     if len(available) < slot.count:
                         issue(where, "POOL_TOO_SMALL", f"The pool has {len(available)} eligible questions but draws {slot.count}")
+                    # a pool counts towards a kind only when it can draw nothing else
+                    types = set((slot.criteria or {}).get("types") or [])
+                    if types and types <= _MCQ_TYPES:
+                        mcq_count += slot.count
+                    elif types and types <= _PROGRAM_TYPES:
+                        program_count += slot.count
                     question_count += slot.count
                     total_marks += slot.marks * slot.count
         if question_count > self.settings.MAX_QUESTIONS_PER_TEST:
             issue("sections", "TOO_MANY_QUESTIONS", f"A paper can hold at most {self.settings.MAX_QUESTIONS_PER_TEST} questions")
         if sections and total_marks <= 0:
             issue("sections", "NO_MARKS", "The test has no marks to earn")
-        return issues, (round(total_marks, 4) if sections else None), (question_count if sections else None)
+        rule = self.composition_rule(test)
+        composition = {"multiple_choice": mcq_count, "programs": program_count, "required_multiple_choice": 0, "required_programs": 0}
+        if rule is not None:
+            min_mcq, min_programs = rule
+            composition.update(required_multiple_choice=min_mcq, required_programs=min_programs)
+            label = "A topic test" if test.kind == TestKind.TOPIC else "The final test"
+            if mcq_count < min_mcq:
+                issue("sections", "TOO_FEW_MCQ", f"{label} needs at least {min_mcq} multiple-choice questions; it has {mcq_count}")
+            if program_count < min_programs:
+                issue("sections", "TOO_FEW_PROGRAMS", f"{label} needs at least {min_programs} programs; it has {program_count}")
+        return issues, (round(total_marks, 4) if sections else None), (question_count if sections else None), composition
 
     # ------------------------------------------------------------------ lifecycle
 

@@ -250,6 +250,31 @@ class TestListResponse(SuccessResponse):
     page_context: PageContext
 
 
+class TestComposition(ResponseSchema):
+    """What the paper holds against what a course test of its kind needs (0 required = no rule)."""
+
+    multiple_choice: int
+    programs: int
+    required_multiple_choice: int
+    required_programs: int
+
+
+class CompositionRequest(RequestSchema):
+    test_ids: list[id_field("test_id", "1755000000000555")] = Field(min_length=1, max_length=100)  # type: ignore[valid-type]
+
+
+class TestCompositionItem(TestComposition):
+    __test__ = False
+
+    test_id: str
+    valid: bool
+    issue_count: int
+
+
+class CompositionResponse(SuccessResponse):
+    compositions: list[TestCompositionItem]
+
+
 class TestValidationResponse(SuccessResponse):
     __test__ = False
 
@@ -257,6 +282,7 @@ class TestValidationResponse(SuccessResponse):
     issues: list[TestIssue]
     total_marks: float | None
     question_count: int | None
+    composition: TestComposition
 
 
 class ScheduleOut(ResponseSchema):

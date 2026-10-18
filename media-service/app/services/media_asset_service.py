@@ -20,6 +20,8 @@ from app.services.outbox import write_event
 from app.storage import s3
 from app.storage.keys import original_object_key
 
+_PDF_SIGNATURE = b"%PDF-"
+
 _LOAD_DETAIL = (
     selectinload(MediaAsset.renditions),
     selectinload(MediaAsset.captions),
@@ -32,6 +34,8 @@ def _kind_for(content_type: str, settings: Settings) -> AssetKind:
         return AssetKind.VIDEO
     if content_type in settings.ALLOWED_IMAGE_CONTENT_TYPES:
         return AssetKind.IMAGE
+    if content_type in settings.ALLOWED_DOCUMENT_CONTENT_TYPES:
+        return AssetKind.DOCUMENT
     raise BadRequestError(f"'{content_type}' is not an accepted upload type.", code="UNSUPPORTED_CONTENT_TYPE")
 
 
@@ -41,11 +45,10 @@ class MediaAssetService:
         self.settings = settings
 
     async def request_upload(self, actor_user_id: int, data: UploadRequest) -> tuple[MediaAsset, dict[str, Any]]:
-        if data.byte_size > self.settings.MAX_UPLOAD_BYTES:
-            raise BadRequestError(
-                f"Files larger than {self.settings.MAX_UPLOAD_BYTES:,} bytes are not accepted.", code="FILE_TOO_LARGE"
-            )
         kind = _kind_for(data.content_type, self.settings)
+        limit = self.settings.MAX_DOCUMENT_UPLOAD_BYTES if kind == AssetKind.DOCUMENT else self.settings.MAX_UPLOAD_BYTES
+        if data.byte_size > limit:
+            raise BadRequestError(f"Files larger than {limit:,} bytes are not accepted.", code="FILE_TOO_LARGE")
 
         asset = MediaAsset(
             public_id=new_public_id(),
@@ -66,7 +69,7 @@ class MediaAssetService:
             self.settings,
             asset.storage_key,
             content_type=data.content_type,
-            max_bytes=self.settings.MAX_UPLOAD_BYTES,
+            max_bytes=limit,
             expires_seconds=self.settings.S3_UPLOAD_URL_EXPIRES_SECONDS,
         )
         upload_fields["expires_at"] = utcnow() + timedelta(seconds=self.settings.S3_UPLOAD_URL_EXPIRES_SECONDS)
@@ -75,7 +78,8 @@ class MediaAssetService:
     async def complete_upload(self, asset: MediaAsset) -> MediaAsset:
         """Confirms the object exists in storage. Video assets then wait for the worker's
         transcoder (triggered by ``media.uploaded``, see app/pipeline/transcoder.py) before
-        they're playable; image assets need no encoding, so they're marked ready immediately."""
+        they're playable; images and PDFs need no encoding, so they're marked ready immediately
+        (a PDF only after its first bytes prove it is one)."""
         if asset.status != AssetStatus.UPLOADING:
             raise BadRequestError("This upload was already completed.", code="UPLOAD_ALREADY_COMPLETED")
 
@@ -87,11 +91,19 @@ class MediaAssetService:
             ) from exc
 
         asset.byte_size = int(head["ContentLength"])
-        if asset.kind == AssetKind.IMAGE:
+        if asset.kind == AssetKind.DOCUMENT and (await s3.read_prefix(self.settings, asset.storage_key, 5)) != _PDF_SIGNATURE:
+            # the declared type is only a claim: the bytes must really be a PDF
+            await s3.delete_object(self.settings, asset.storage_key)
+            await self.mark_failed(asset, "The file is not a PDF.")
+            raise BadRequestError("The file is not a valid PDF.", code="INVALID_PDF")
+        if asset.kind in (AssetKind.IMAGE, AssetKind.DOCUMENT):
             asset.status = AssetStatus.READY
             self.db.add(Rendition(media_asset_id=asset.id, label="source", storage_key=asset.storage_key, byte_size=asset.byte_size))
             write_event(
-                self.db, event_type="media.ready", aggregate_id=asset.id, payload={"media_asset_id": str(asset.public_id)}
+                self.db,
+                event_type="media.ready",
+                aggregate_id=asset.id,
+                payload={"media_asset_id": str(asset.public_id), "kind": asset.kind},
             )
         else:
             asset.status = AssetStatus.UPLOADED
@@ -115,7 +127,10 @@ class MediaAssetService:
             self.db.add(Rendition(media_asset_id=asset.id, label=label, storage_key=storage_key, byte_size=byte_size))
         asset.status = AssetStatus.READY
         write_event(
-            self.db, event_type="media.ready", aggregate_id=asset.id, payload={"media_asset_id": str(asset.public_id)}
+            self.db,
+            event_type="media.ready",
+            aggregate_id=asset.id,
+            payload={"media_asset_id": str(asset.public_id), "kind": asset.kind, "duration_seconds": duration_seconds},
         )
         await self.db.commit()
         await s3.delete_object(self.settings, asset.storage_key)

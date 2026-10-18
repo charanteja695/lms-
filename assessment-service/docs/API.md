@@ -75,6 +75,12 @@ review_policy, proctoring_level, proctoring_screen_share (strict only: the stude
   active and published. A pool never repeats a question already on the paper.
 - Lifecycle `draft → in_review → published → retired`; publishing runs the full validation (`GET /tests/{id}/validation`)
   and freezes the test (`total_marks`, `question_count`). One published test per (kind, target). `clone` starts a new draft.
+- **Course tests** have a minimum make-up, checked by validation (settings `TOPIC_TEST_MIN_MCQ`/`_PROGRAMS`, default 5 and 1;
+  `FINAL_TEST_MIN_MCQ`/`_PROGRAMS`, default 10 and 2): issues `TOO_FEW_MCQ`, `TOO_FEW_PROGRAMS`. Multiple choice =
+  `mcq_single`/`mcq_multi`; a program = `coding`; a pool counts only when its `types` draw nothing else. The validation
+  response carries `composition {multiple_choice, programs, required_multiple_choice, required_programs}`.
+- **For a course builder:** `GET /tests?kind=topic&target_ids=1,2,3` (up to 200 targets) finds every topic's test in one
+  call, and `POST /tests/compositions {test_ids:[…≤100]}` returns each one's composition, `valid` and `issue_count`.
 - **Schedules** (`/tests/{id}/schedules`, `exams.manage`): `{starts_at, ends_at, organization_id?, enforce_end,
   results_release_at?}`. A test with `requires_schedule` can only be started inside a window for the student's institution.
 

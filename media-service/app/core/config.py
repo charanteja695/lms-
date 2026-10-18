@@ -99,6 +99,8 @@ class Settings(BaseSettings):
         default_factory=lambda: ["video/mp4", "video/quicktime", "video/webm", "video/x-matroska"]
     )
     ALLOWED_IMAGE_CONTENT_TYPES: list[str] = Field(default_factory=lambda: ["image/jpeg", "image/png", "image/webp"])
+    ALLOWED_DOCUMENT_CONTENT_TYPES: list[str] = Field(default_factory=lambda: ["application/pdf"])
+    MAX_DOCUMENT_UPLOAD_BYTES: int = Field(default=50 * 1024 * 1024, ge=1024)  # 50 MiB per PDF
 
     # --- Playback ---
     PLAYBACK_TOKEN_EXPIRE_MINUTES: int = Field(default=240, ge=1, le=1_440)

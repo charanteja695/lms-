@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     # A version goes to review only when every topic ends with its published topic test (course -> modules -> topics
     # -> lessons -> topic test). Turn off only for content that deliberately has no tests.
     REQUIRE_TOPIC_TESTS: bool = True
+    # ...and when the course has its final test (the one that earns the certificate) chosen on its rules.
+    REQUIRE_FINAL_TEST: bool = True
 
     # --- Rate limiting (per client IP unless stated) ---
     RATE_LIMIT_ENABLED: bool = True

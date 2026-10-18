@@ -20,8 +20,8 @@ class TopicItemCreate(RequestSchema):
 
     @model_validator(mode="after")
     def _matches_item_type(self) -> Self:
-        if self.item_type == ItemType.VIDEO and self.media_id is None:
-            raise ValueError("media_id is required for a video item")
+        if self.item_type in {ItemType.VIDEO, ItemType.PDF} and self.media_id is None:
+            raise ValueError(f"media_id is required for a {self.item_type.value} item")
         if self.item_type in {ItemType.NOTES, ItemType.PRACTICE} and self.content_text is None:
             raise ValueError(f"content_text is required for a {self.item_type.value} item")
         return self

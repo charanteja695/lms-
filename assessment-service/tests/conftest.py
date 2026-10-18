@@ -62,6 +62,11 @@ def _settings(**overrides: Any) -> Settings:
         "AWS_SECRET_ACCESS_KEY": "testing",
         "POOL_CACHE_SECONDS": 0,
         "PROCTORING_PRECHECK_REQUIRED": False,  # most tests are not about proctoring; tests/integration/test_proctoring_gate.py is
+        # most tests publish tiny papers; tests/integration/test_course_test_composition.py covers these rules
+        "TOPIC_TEST_MIN_MCQ": 0,
+        "TOPIC_TEST_MIN_PROGRAMS": 0,
+        "FINAL_TEST_MIN_MCQ": 0,
+        "FINAL_TEST_MIN_PROGRAMS": 0,
         "CODE_EXECUTION_URL": "http://code-execution.test",
     }
     values.update(overrides)

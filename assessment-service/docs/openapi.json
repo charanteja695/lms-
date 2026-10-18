@@ -2323,6 +2323,26 @@
             }
           },
           {
+            "name": "target_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 4000,
+                  "pattern": "^\\d{1,19}(,\\d{1,19})*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Several targets at once, comma separated (up to 200): e.g. every topic of one course",
+              "title": "Target Ids"
+            },
+            "description": "Several targets at once, comma separated (up to 200): e.g. every topic of one course"
+          },
+          {
             "name": "search",
             "in": "query",
             "required": false,
@@ -2446,6 +2466,134 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/tests/compositions": {
+      "post": {
+        "tags": [
+          "Tests"
+        ],
+        "summary": "What several tests hold (multiple choice, programs) against what they need",
+        "description": "For a course builder: one call for every topic test of a course. Only tests the caller may read.",
+        "operationId": "test_compositions_api_v1_tests_compositions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompositionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompositionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "COURSE_NOT_FOUND",
+                  "message": "Course not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/tests/{test_id}": {
@@ -7288,6 +7436,117 @@
         }
       }
     },
+    "/api/v1/results/summary": {
+      "post": {
+        "tags": [
+          "Attempts"
+        ],
+        "summary": "Marks and results for a group of students",
+        "description": "Per student and test: attempts, best score and whether they passed. Institution staff and heads see their own students (platform tests); exam managers see anyone. Send a section's roster as `user_ids`.",
+        "operationId": "results_summary_api_v1_results_summary_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResultsSummaryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultsSummaryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/attempts/{attempt_id}/events": {
       "get": {
         "tags": [
@@ -10088,6 +10347,65 @@
         ],
         "title": "Bloom"
       },
+      "CompositionRequest": {
+        "properties": {
+          "test_ids": {
+            "items": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{9,18}$",
+              "examples": [
+                "1755000000000555"
+              ]
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Test Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "test_ids"
+        ],
+        "title": "CompositionRequest"
+      },
+      "CompositionResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "compositions": {
+            "items": {
+              "$ref": "#/components/schemas/TestCompositionItem"
+            },
+            "type": "array",
+            "title": "Compositions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "compositions"
+        ],
+        "title": "CompositionResponse"
+      },
       "ErrorDetail": {
         "properties": {
           "field": {
@@ -12613,6 +12931,198 @@
         ],
         "title": "ResultVisibility"
       },
+      "ResultsRowOut": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "test_id": {
+            "type": "string",
+            "title": "Test Id"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "best_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Percent"
+          },
+          "best_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Score"
+          },
+          "max_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Score"
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "last_submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-09-16T10:30:00Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Submitted At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "test_id",
+          "attempts",
+          "best_percent",
+          "best_score",
+          "max_score",
+          "passed",
+          "last_submitted_at"
+        ],
+        "title": "ResultsRowOut"
+      },
+      "ResultsSummaryRequest": {
+        "properties": {
+          "user_ids": {
+            "items": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{9,18}$",
+              "examples": [
+                "1755000000004001"
+              ]
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "User Ids",
+            "description": "The students, e.g. one section's roster"
+          },
+          "test_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{9,18}$",
+                "examples": [
+                  "1755000000000555"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_ids"
+        ],
+        "title": "ResultsSummaryRequest"
+      },
+      "ResultsSummaryResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "tests": {
+            "items": {
+              "$ref": "#/components/schemas/ResultsTestOut"
+            },
+            "type": "array",
+            "title": "Tests"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ResultsRowOut"
+            },
+            "type": "array",
+            "title": "Rows",
+            "description": "One row per student and test they attempted; a student with no attempts has none"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "tests",
+          "rows"
+        ],
+        "title": "ResultsSummaryResponse"
+      },
+      "ResultsTestOut": {
+        "properties": {
+          "test_id": {
+            "type": "string",
+            "title": "Test Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "pass_mark_percent": {
+            "type": "integer",
+            "title": "Pass Mark Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "test_id",
+          "title",
+          "kind",
+          "pass_mark_percent"
+        ],
+        "title": "ResultsTestOut"
+      },
       "ReviewNote": {
         "properties": {
           "note": {
@@ -13636,6 +14146,78 @@
         ],
         "title": "TestAnalyticsResponse"
       },
+      "TestComposition": {
+        "properties": {
+          "multiple_choice": {
+            "type": "integer",
+            "title": "Multiple Choice"
+          },
+          "programs": {
+            "type": "integer",
+            "title": "Programs"
+          },
+          "required_multiple_choice": {
+            "type": "integer",
+            "title": "Required Multiple Choice"
+          },
+          "required_programs": {
+            "type": "integer",
+            "title": "Required Programs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "multiple_choice",
+          "programs",
+          "required_multiple_choice",
+          "required_programs"
+        ],
+        "title": "TestComposition",
+        "description": "What the paper holds against what a course test of its kind needs (0 required = no rule)."
+      },
+      "TestCompositionItem": {
+        "properties": {
+          "multiple_choice": {
+            "type": "integer",
+            "title": "Multiple Choice"
+          },
+          "programs": {
+            "type": "integer",
+            "title": "Programs"
+          },
+          "required_multiple_choice": {
+            "type": "integer",
+            "title": "Required Multiple Choice"
+          },
+          "required_programs": {
+            "type": "integer",
+            "title": "Required Programs"
+          },
+          "test_id": {
+            "type": "string",
+            "title": "Test Id"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "issue_count": {
+            "type": "integer",
+            "title": "Issue Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "multiple_choice",
+          "programs",
+          "required_multiple_choice",
+          "required_programs",
+          "test_id",
+          "valid",
+          "issue_count"
+        ],
+        "title": "TestCompositionItem"
+      },
       "TestCreate": {
         "properties": {
           "time_mode": {
@@ -14593,6 +15175,9 @@
               }
             ],
             "title": "Question Count"
+          },
+          "composition": {
+            "$ref": "#/components/schemas/TestComposition"
           }
         },
         "type": "object",
@@ -14601,7 +15186,8 @@
           "valid",
           "issues",
           "total_marks",
-          "question_count"
+          "question_count",
+          "composition"
         ],
         "title": "TestValidationResponse"
       },

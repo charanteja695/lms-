@@ -135,6 +135,7 @@
       "/api/v1/questions/{question_id}/versions",
       "/api/v1/results/summary",
       "/api/v1/tests",
+      "/api/v1/tests/compositions",
       "/api/v1/tests/{test_id}",
       "/api/v1/tests/{test_id}/analytics",
       "/api/v1/tests/{test_id}/approve",

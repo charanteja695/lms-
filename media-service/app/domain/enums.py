@@ -6,6 +6,7 @@ from enum import StrEnum
 class AssetKind(StrEnum):
     VIDEO = "video"
     IMAGE = "image"  # thumbnails, cover images
+    DOCUMENT = "document"  # PDF lessons: ready on upload, read in the browser
 
 
 class AssetStatus(StrEnum):

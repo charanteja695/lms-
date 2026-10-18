@@ -33,12 +33,16 @@ from app.schemas.attempt import (
 from app.schemas.common import AttemptQuery, TestQuery
 from app.schemas.question import RejectNote, ReviewNote
 from app.schemas.test import (
+    CompositionRequest,
+    CompositionResponse,
     ScheduleCreate,
     ScheduleListResponse,
     ScheduleOut,
     ScheduleResponse,
     ScheduleUpdate,
     SectionsReplace,
+    TestComposition,
+    TestCompositionItem,
     TestCreate,
     TestIssue,
     TestListItem,
@@ -105,6 +109,22 @@ async def list_tests(query: Annotated[TestQuery, Query()], auth: CurrentAuth, db
     )
 
 
+@router.post(
+    "/compositions",
+    response_model=CompositionResponse,
+    summary="What several tests hold (multiple choice, programs) against what they need",
+    description="For a course builder: one call for every topic test of a course. Only tests the caller may read.",
+    responses=errors(*AUTHENTICATED, 404, 422),
+)
+async def test_compositions(data: CompositionRequest, auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> CompositionResponse:
+    service = TestService(db, settings)
+    items: list[TestCompositionItem] = []
+    for test_id in dict.fromkeys(data.test_ids):  # keep order, drop repeats
+        issues, _total, _count, composition = await service.validate_with_composition(await service.get(test_id, auth))
+        items.append(TestCompositionItem(test_id=str(test_id), valid=not issues, issue_count=len(issues), **composition))
+    return CompositionResponse(message="Compositions retrieved successfully.", compositions=items)
+
+
 @router.get("/{test_id}", response_model=TestResponse, summary="Get a test definition", responses=errors(*AUTHENTICATED, 404))
 async def get_test(test_id: TestIdParam, auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> TestResponse:
     service = TestService(db, settings)
@@ -149,9 +169,14 @@ async def delete_test(test_id: TestIdParam, auth: CurrentAuth, db: DbSession, se
 )
 async def validate_test(test_id: TestIdParam, auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> TestValidationResponse:
     service = TestService(db, settings)
-    issues, total, count = await service.validate(await service.get(test_id, auth))
+    issues, total, count, composition = await service.validate_with_composition(await service.get(test_id, auth))
     return TestValidationResponse(
-        message="Test is ready." if not issues else "Test has issues.", valid=not issues, issues=[TestIssue(**issue) for issue in issues], total_marks=total, question_count=count
+        message="Test is ready." if not issues else "Test has issues.",
+        valid=not issues,
+        issues=[TestIssue(**issue) for issue in issues],
+        total_marks=total,
+        question_count=count,
+        composition=TestComposition(**composition),
     )
 
 

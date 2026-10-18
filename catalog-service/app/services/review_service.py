@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.core.config import get_settings
 from app.core.exceptions import BadRequestError
 from app.core.time import utcnow
-from app.domain.enums import ContentStatus, ReviewAction
+from app.domain.enums import ContentStatus, ItemType, ReviewAction
 from app.models.course import Course
 from app.models.course_rule import CourseRule
 from app.models.course_version import CourseVersion
@@ -229,4 +229,35 @@ class ReviewService:
                 raise BadRequestError(
                     f'"{untested}" has no topic test yet. Every topic ends with a published topic test.',
                     code="TOPIC_TEST_MISSING",
+                )
+
+        # Videos and PDFs must be playable: a lesson whose upload is still processing (or failed) would be a dead end.
+        not_ready = (
+            await self.db.execute(
+                select(TopicItem.title)
+                .join(Topic, Topic.id == TopicItem.topic_id)
+                .join(Module, Module.id == Topic.module_id)
+                .where(
+                    Module.course_version_id == version.id,
+                    TopicItem.item_type.in_((ItemType.VIDEO, ItemType.PDF)),
+                    TopicItem.media_ready.is_(False),
+                )
+                .order_by(Module.position, Topic.position, TopicItem.position)
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if not_ready is not None:
+            raise BadRequestError(
+                f'"{not_ready}" is not ready yet. Wait for its upload to finish processing, or replace it.',
+                code="MEDIA_NOT_READY",
+            )
+
+        if get_settings().REQUIRE_FINAL_TEST:
+            final_test_id = (
+                await self.db.execute(select(CourseRule.final_test_id).where(CourseRule.course_version_id == version.id))
+            ).scalar_one_or_none()
+            if final_test_id is None:
+                raise BadRequestError(
+                    "Choose the course's final test first. Passing it is what earns the certificate.",
+                    code="FINAL_TEST_MISSING",
                 )

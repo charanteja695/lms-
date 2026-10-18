@@ -18,7 +18,13 @@ async def _course_and_version(client: AsyncClient, authed, *, slug: str = "mern-
 
 
 async def _add_full_module(
-    client: AsyncClient, authed, course_id: str, version_id: str, *, topic_test_id: str | None = "1755000000000333"
+    client: AsyncClient,
+    authed,
+    course_id: str,
+    version_id: str,
+    *,
+    topic_test_id: str | None = "1755000000000333",
+    final_test_id: str | None = "1755000000000555",
 ) -> None:
     authed(scopes=AUTHOR)
     base = f"/api/v1/courses/{course_id}/versions/{version_id}"
@@ -31,6 +37,8 @@ async def _add_full_module(
         f"{base}/modules/{module['module_id']}/topics/{topic['topic_id']}/items",
         json={"item_type": "notes", "title": "Reading: var, let and const", "content_text": "Notes go here."},
     )
+    if final_test_id:
+        await client.patch(f"{base}/rules", json={"final_test_id": final_test_id})
 
 
 async def test_submit_fails_when_course_has_no_modules(client: AsyncClient, authed) -> None:
@@ -49,6 +57,68 @@ async def test_submit_fails_while_a_topic_has_no_topic_test(client: AsyncClient,
     assert response.status_code == 400
     assert response.json()["code"] == "TOPIC_TEST_MISSING"
     assert "Variables & Types" in response.json()["message"]
+
+
+async def test_submit_fails_without_a_final_test(client: AsyncClient, authed) -> None:
+    course_id, version_id = await _course_and_version(client, authed)
+    await _add_full_module(client, authed, course_id, version_id, final_test_id=None)
+    authed(scopes=AUTHOR)
+    response = await client.post(f"/api/v1/courses/{course_id}/versions/{version_id}/submit")
+    assert response.status_code == 400
+    assert response.json()["code"] == "FINAL_TEST_MISSING"
+
+
+async def test_submit_waits_for_videos_and_pdfs_to_be_ready(client: AsyncClient, authed, app) -> None:
+    from datetime import UTC, datetime
+
+    from lms_common.events import Event
+
+    from app.events.consumers.media_events import dispatch
+
+    course_id, version_id = await _course_and_version(client, authed)
+    await _add_full_module(client, authed, course_id, version_id)
+    base = f"/api/v1/courses/{course_id}/versions/{version_id}"
+    authed(scopes=AUTHOR)
+    module = (await client.get(base)).json()["version"]["modules"][0]
+    topic = module["topics"][0]
+    items = f"{base}/modules/{module['module_id']}/topics/{topic['topic_id']}/items"
+    authed(scopes=AUTHOR)
+    response = await client.post(items, json={"item_type": "pdf", "title": "Cheat sheet", "media_id": "1755000000000777"})
+    assert response.status_code == 201, response.text
+    assert response.json()["topic_item"]["media_ready"] is False
+
+    authed(scopes=AUTHOR)
+    response = await client.post(f"{base}/submit")
+    assert response.status_code == 400
+    assert response.json()["code"] == "MEDIA_NOT_READY"
+    assert "Cheat sheet" in response.json()["message"]
+
+    # media-service announces the asset by its own id once the PDF is uploaded and checked
+    async with app.state.sessionmaker() as db:
+        event = Event(
+            event_id="evt-pdf",
+            event_type="media.ready",
+            aggregate_type="media_asset",
+            occurred_time=datetime.now(UTC),
+            payload={"media_asset_id": "1755000000000777", "kind": "document"},
+        )
+        await dispatch(db, event)
+        await db.commit()
+    authed(scopes=AUTHOR)
+    response = await client.post(f"{base}/submit")
+    assert response.status_code == 200, response.text
+
+
+async def test_a_pdf_lesson_needs_its_media(client: AsyncClient, authed) -> None:
+    course_id, version_id = await _course_and_version(client, authed)
+    await _add_full_module(client, authed, course_id, version_id)
+    base = f"/api/v1/courses/{course_id}/versions/{version_id}"
+    authed(scopes=AUTHOR)
+    module = (await client.get(base)).json()["version"]["modules"][0]
+    items = f"{base}/modules/{module['module_id']}/topics/{module['topics'][0]['topic_id']}/items"
+    authed(scopes=AUTHOR)
+    response = await client.post(items, json={"item_type": "pdf", "title": "Cheat sheet"})
+    assert response.status_code == 422
 
 
 async def test_full_lifecycle_draft_to_published_to_retired(client: AsyncClient, authed) -> None:

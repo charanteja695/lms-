@@ -3,7 +3,9 @@ and catalog-service/README.md "Consumes events"). Each handler is idempotent (a 
 of already-known-good values), so at-least-once redelivery from the consumer group is safe.
 
 Payload contracts (owned jointly with the emitting service until it exists):
-  media.ready       {"topic_item_id": "<public id>", "duration_seconds": int}
+  media.ready       {"media_asset_id": "<public id>", "kind": "video" | "image" | "document", "duration_seconds": int?}
+                    (media-service's payload; every item using that asset becomes ready. The older
+                    {"topic_item_id": ...} shape is still accepted.)
   transcript.ready  {"topic_item_id": "<public id>"}
   test.published    {"target_type": "module" | "topic" | "course" | null, "target_id": "<public id>", "test_id": "<public id>", ...}
                     (only module and topic targets are attached; assessment-service's payload carries more fields)
@@ -24,13 +26,20 @@ logger = logging.getLogger(__name__)
 
 
 async def handle_media_ready(db: AsyncSession, payload: dict[str, Any]) -> None:
-    topic_item_id = int(payload["topic_item_id"])
-    item = (await db.execute(select(TopicItem).where(TopicItem.public_id == topic_item_id))).scalar_one_or_none()
-    if item is None:
-        logger.warning("media.ready for an unknown topic item", extra={"extra_fields": {"topic_item_id": topic_item_id}})
+    if payload.get("media_asset_id"):
+        # Lessons are created with the asset's id before its upload completes, so they exist by the time it's ready.
+        media_id = int(payload["media_asset_id"])
+        items = (await db.execute(select(TopicItem).where(TopicItem.media_id == media_id))).scalars().all()
+    else:
+        topic_item_id = int(payload["topic_item_id"])
+        items = (await db.execute(select(TopicItem).where(TopicItem.public_id == topic_item_id))).scalars().all()
+    if not items:
+        logger.info("media.ready for media no lesson uses", extra={"extra_fields": {"payload": payload}})
         return
-    item.media_ready = True
-    item.duration_seconds = payload.get("duration_seconds")
+    for item in items:
+        item.media_ready = True
+        if payload.get("duration_seconds") is not None:
+            item.duration_seconds = int(payload["duration_seconds"])
 
 
 async def handle_transcript_ready(db: AsyncSession, payload: dict[str, Any]) -> None:

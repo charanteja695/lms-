@@ -2,7 +2,7 @@
 the response envelope shapes themselves (SuccessResponse, PageContext, ...) come from lms_common."""
 
 from lms_common.envelopes import SortOrder
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.domain.enums import (
     AttemptResult,
@@ -50,8 +50,21 @@ class TestQuery(_PagedQuery):
     kind: TestKind | None = None
     status: TestStatus | None = None
     target_id: id_field("target_id", "1755000000000333") | None = None  # type: ignore[valid-type]
+    target_ids: str | None = Field(
+        default=None,
+        max_length=4000,
+        pattern=r"^\d{1,19}(,\d{1,19})*$",
+        description="Several targets at once, comma separated (up to 200): e.g. every topic of one course",
+    )
     search: str | None = Field(default=None, max_length=100)
     organization_id: id_field("organization_id", "1755000000004003") | None = None  # type: ignore[valid-type]
+
+    @field_validator("target_ids")
+    @classmethod
+    def _at_most_200(cls, value: str | None) -> str | None:
+        if value is not None and value.count(",") >= 200:
+            raise ValueError("at most 200 target ids")
+        return value
 
 
 class MyTestsQuery(_PagedQuery):

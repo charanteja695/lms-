@@ -10,7 +10,7 @@ from app.core.ids import new_public_id
 from app.core.time import utcnow
 from app.core.tokens import generate_secure_token, hash_token
 from app.db.session import commit_or_conflict
-from app.domain.enums import AssetStatus
+from app.domain.enums import AssetKind, AssetStatus
 from app.models.media_asset import MediaAsset
 from app.models.playback_token import PlaybackToken
 from app.models.rendition import Rendition
@@ -71,6 +71,16 @@ class PlaybackService:
         rendition = _best_rendition(asset.renditions)
         if rendition is None:
             raise NotFoundError("This media is no longer available.", code="MEDIA_ASSET_NOT_READY")
+        if asset.kind == AssetKind.DOCUMENT:
+            # shown inside the course player, not downloaded
+            safe_name = "".join(c for c in asset.original_filename if c.isalnum() or c in " ._-")[:120] or "document.pdf"
+            return await s3.presign_get(
+                self.settings,
+                rendition.storage_key,
+                expires_seconds=self.settings.S3_PLAYBACK_URL_EXPIRES_SECONDS,
+                content_type="application/pdf",
+                disposition=f'inline; filename="{safe_name}"',
+            )
         return await s3.presign_get(
             self.settings, rendition.storage_key, expires_seconds=self.settings.S3_PLAYBACK_URL_EXPIRES_SECONDS
         )
