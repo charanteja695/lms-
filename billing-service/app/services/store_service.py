@@ -9,6 +9,7 @@ The webhook captures the same payment if the browser never comes back; capturing
 from dataclasses import dataclass
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.billing import tax
@@ -134,7 +135,11 @@ class StoreService:
         except (Unavailable, Rejected) as exc:
             raise UpstreamUnavailableError("The payment provider could not start the payment. Please try again.", code="PAYMENT_GATEWAY_UNAVAILABLE") from exc
         self.db.add(Payment(public_id=new_public_id(), invoice_id=invoice.id, method=PaymentMethod.GATEWAY, status=PaymentStatus.PENDING, amount=amount, gateway_order_id=order.order_id))
-        await self.db.commit()
+        try:
+            await self.db.commit()
+        except IntegrityError as exc:  # the provider handed back an order id already used: never two payments on one order
+            await self.db.rollback()
+            raise UpstreamUnavailableError("The payment provider could not start the payment. Please try again.", code="PAYMENT_GATEWAY_UNAVAILABLE") from exc
         return Checkout(
             provider=self.settings.PAYMENT_PROVIDER, key_id=self.gateway.public_key, order_id=order.order_id, amount=order.amount, currency=order.currency,
             seller_name=self.settings.SELLER_DISPLAY_NAME,

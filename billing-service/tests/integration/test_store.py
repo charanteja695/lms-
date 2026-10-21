@@ -158,3 +158,14 @@ async def test_buying_is_closed_while_razorpay_keys_are_missing(app, client, who
     assert (await client.get(f"{API}/store/offers")).json()["payments_available"] is False
     response = await client.post(f"{API}/store/courses/{COURSE_PY}/buy", json={"name": "Kiran Rao"})
     assert response.status_code == 503 and response.json()["code"] == "PAYMENT_GATEWAY_NOT_CONFIGURED"
+
+
+async def test_a_provider_order_id_seen_before_is_a_clean_503_not_a_crash(client, who, act_as, provider):
+    """Razorpay never repeats an order id, but if one came back twice the second purchase must fail cleanly."""
+    await add_price(client, who)
+    await add_price(client, who, code="1755000000211002", name="SQL")
+    learner(act_as)
+    assert (await client.post(f"{API}/store/courses/{COURSE_PY}/buy", json={"name": "Kiran Rao"})).status_code == 201
+    provider.orders.clear()  # the next order the provider makes is "order_rzp1" again
+    again = await client.post(f"{API}/store/courses/1755000000211002/buy", json={"name": "Kiran Rao"})
+    assert again.status_code == 503 and again.json()["code"] == "PAYMENT_GATEWAY_UNAVAILABLE"
