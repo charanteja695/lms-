@@ -17,20 +17,26 @@ class Permission(StrEnum):
     BILLING_MANAGE = "billing.manage"
     BILLING_CONTACT = "billing.contact"
     PLANS_BUY = "billing.plans.buy"
+    STORE_BUY = "store.buy"  # a self-registered learner buying courses for themselves (never a super admin's power)
 
 
 def can_manage_billing(auth: AccessTokenClaims) -> bool:
     return auth.can(Permission.BILLING_MANAGE)
 
 
-def is_billing_contact(auth: AccessTokenClaims) -> bool:
-    """Deals with billing for their own organisation."""
-    return auth.organization_id is not None and auth.can(Permission.BILLING_CONTACT)
+def is_billing_contact(auth: AccessTokenClaims, action: str = "view") -> bool:
+    """Deals with billing for their own organisation (the Billing page's cells): ``view`` invoices and quotes,
+    ``update`` the billing profile, ask for and accept quotes, and pay."""
+    return auth.organization_id is not None and auth.can_act(f"billing.{action}", Permission.BILLING_CONTACT)
 
 
 def can_buy_plans(auth: AccessTokenClaims) -> bool:
     return auth.organization_id is not None and auth.can(Permission.PLANS_BUY)
 
 
-def owns(auth: AccessTokenClaims, org_id: int) -> bool:
-    return can_manage_billing(auth) or (is_billing_contact(auth) and auth.organization_id == org_id)
+def can_buy_courses(auth: AccessTokenClaims) -> bool:
+    return auth.organization_id is not None and auth.has_scope(Permission.STORE_BUY)
+
+
+def owns(auth: AccessTokenClaims, org_id: int, action: str = "view") -> bool:
+    return can_manage_billing(auth) or (is_billing_contact(auth, action) and auth.organization_id == org_id)

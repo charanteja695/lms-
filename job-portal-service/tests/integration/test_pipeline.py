@@ -227,6 +227,9 @@ async def test_an_offer_accepted_and_the_candidate_placed(client, who, send_even
     who.student()
     mine = (await client.get(f"{API}/applications/{aid}")).json()["application"]
     assert mine["status"] == "offered" and mine["offer"]["ctc"] == 900_000 and mine["offer"]["joining_date"] == "2026-11-15"
+    assert mine["next_action"]["kind"] == "offer" and mine["next_action"]["due_at"] and mine["progress"][-1] == {"key": "offer", "label": "Offer", "state": "current"}
+    listed = (await client.get(f"{API}/applications", params={"active": True})).json()["applications"]
+    assert [a["next_action"]["kind"] for a in listed] == ["offer"] and (await client.get(f"{API}/applications", params={"active": False})).json()["applications"] == []
     who.student(STUDENT_3)
     assert (await client.post(f"{API}/applications/{aid}/offer/respond", json={"accept": True})).status_code == 404
     who.student()
@@ -258,6 +261,9 @@ async def test_a_declined_offer_and_a_withdrawal_during_an_offer(client, who, se
     who.student(STUDENT_3)
     withdrawn = (await client.post(f"{API}/applications/{a3['application_id']}/withdraw", json={"note": "Joined elsewhere"})).json()["application"]
     assert withdrawn["status"] == "withdrawn" and withdrawn["offer"]["status"] == "declined"
+    assert withdrawn["next_action"] is None and withdrawn["progress"][-1]["state"] == "stopped"
+    closed = (await client.get(f"{API}/applications", params={"active": False})).json()["applications"]
+    assert [a["status"] for a in closed] == ["withdrawn"] and closed[0]["progress"][-1]["state"] == "stopped"
 
 
 async def test_an_unanswered_offer_expires(client, who, send_event, work, career, sessionmaker, settings):

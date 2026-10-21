@@ -32,6 +32,15 @@ class VersionSource(StrEnum):
     RESTORE = "restore"
 
 
+class ExperienceLevel(StrEnum):
+    """How much work experience the resume's owner has; it decides the section order and the length a resume should be."""
+
+    FRESHER = "fresher"  # students and graduates: internships count as experience
+    JUNIOR = "junior"  # 1–3 years
+    MID = "mid"  # 3–8 years
+    SENIOR = "senior"  # 8+ years
+
+
 class SectionKey(StrEnum):
     SUMMARY = "summary"
     EXPERIENCE = "experience"

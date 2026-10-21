@@ -10,6 +10,8 @@ from app.schemas.media_asset import (
     MediaAssetListResponse,
     MediaAssetOut,
     MediaAssetResponse,
+    MediaSummaryOut,
+    MediaSummaryResponse,
     UploadFields,
     UploadRequest,
     UploadResponse,
@@ -53,6 +55,31 @@ async def complete_upload(asset_id: AssetIdParam, auth: RequireAuthor, db: DbSes
     asset = await service.get(asset_id)
     asset = await service.complete_upload(asset)
     return MediaAssetResponse(message="Upload completed.", asset=MediaAssetOut.model_validate(asset))
+
+
+@router.get(
+    "/summary",
+    response_model=MediaSummaryResponse,
+    summary="How many videos and PDFs there are, and their size",
+    description="Requires content.author.",
+    responses=errors(401, 403),
+)
+async def summary(auth: RequireAuthor, db: DbSession, settings: SettingsDep) -> MediaSummaryResponse:
+    data = await MediaAssetService(db, settings).summary()
+    return MediaSummaryResponse(message="Media summary retrieved successfully.", summary=MediaSummaryOut(**data))
+
+
+@router.post(
+    "/{asset_id}/restore",
+    response_model=MediaAssetResponse,
+    summary="Bring an archived media asset back",
+    description="Requires content.author.",
+    responses=errors(401, 403, 404),
+)
+async def restore_asset(asset_id: AssetIdParam, auth: RequireAuthor, db: DbSession, settings: SettingsDep) -> MediaAssetResponse:
+    service = MediaAssetService(db, settings)
+    asset = await service.restore(await service.get(asset_id))
+    return MediaAssetResponse(message="Media asset restored.", asset=MediaAssetOut.model_validate(asset))
 
 
 @router.get("/{asset_id}", response_model=MediaAssetResponse, summary="Get a media asset", responses=errors(401, 404))

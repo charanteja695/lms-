@@ -37,7 +37,14 @@ def _settings() -> Settings:
 
 
 # What user-management puts in a token by default (its permission catalog), for the permissions this service checks.
-ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {"student": ("learning.study",), "staff": ("learning.batches.view",), "institution_head": ("learning.batches.view", "learning.batches.manage")}
+# What user-management's token carries by default: the permission-matrix cells plus the feature keys they imply.
+ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
+    "student": ("my_learning.view", "learning.study"),
+    "staff": ("batches.view", "learning.batches.view"),
+    "institution_head": (
+        "batches.view", "batches.create", "batches.update", "batches.delete", "batches.revoke", "learning.batches.view", "learning.batches.manage",
+    ),
+}
 
 
 def make_claims(

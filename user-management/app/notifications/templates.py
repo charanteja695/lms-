@@ -27,6 +27,16 @@ def password_reset_email(*, to: str, name: str, otp: str, reset_link: str, expir
     )
 
 
+def signup_code_email(*, to: str, name: str, otp: str, expires_minutes: int) -> EmailMessage:
+    lines = [
+        f"Hello {name},",
+        "Welcome to LMS. Enter this code to confirm your email and finish creating your account:",
+        f"Your one-time code is: {otp}",
+        f"It expires in {expires_minutes} minutes. If you did not sign up, you can ignore this email.",
+    ]
+    return EmailMessage(to=to, subject="Your LMS sign-up code", text_body="\n\n".join(lines), html_body=_html(lines))
+
+
 def account_setup_email(*, to: str, name: str, username: str, setup_link: str, expires_hours: int) -> EmailMessage:
     lines = [
         f"Hello {name},",

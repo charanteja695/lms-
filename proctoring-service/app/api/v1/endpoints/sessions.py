@@ -15,10 +15,12 @@ from app.api.deps import (
 )
 from app.api.responses import AUTHENTICATED, errors
 from app.core.config import Settings
+from app.core.exceptions import PermissionDeniedError
 from app.core.time import utcnow
 from app.domain.enums import LIVENESS_POSES
 from app.models.case import IntegrityCase
-from app.models.session import ProctorSession
+from app.models.session import ProctorSession, TestRef
+from app.permissions.policy import can_appeal
 from app.schemas.proctoring import (
     AppealIn,
     DirectiveOut,
@@ -166,9 +168,10 @@ async def report_events(session_id: SessionIdParam, data: EventsIn, auth: Requir
     return EventsResponse(message="Events recorded.", accepted=accepted, rejected=rejected, risk_score=session.risk_score)
 
 
-def _student_case(case: IntegrityCase, service: CaseService) -> StudentCaseOut:
+def _student_case(case: IntegrityCase, service: CaseService, titles: dict[int, str] | None = None) -> StudentCaseOut:
     out = StudentCaseOut.model_validate(case)
     out.can_appeal = service.can_appeal(case)
+    out.test_title = (titles or {}).get(case.test_id)
     return out
 
 
@@ -181,8 +184,9 @@ def _student_case(case: IntegrityCase, service: CaseService) -> StudentCaseOut:
 )
 async def my_cases(auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> StudentCasesResponse:
     service = CaseService(db, settings)
-    rows = (await db.execute(select(IntegrityCase).where(IntegrityCase.user_id == auth.user_id).order_by(IntegrityCase.created_at.desc()).limit(100))).scalars()
-    return StudentCasesResponse(message="Cases retrieved successfully.", cases=[_student_case(c, service) for c in rows])
+    rows = list((await db.execute(select(IntegrityCase).where(IntegrityCase.user_id == auth.user_id).order_by(IntegrityCase.created_at.desc()).limit(100))).scalars())
+    titles = dict((await db.execute(select(TestRef.test_id, TestRef.title).where(TestRef.test_id.in_({c.test_id for c in rows})))).tuples().all()) if rows else {}
+    return StudentCasesResponse(message="Cases retrieved successfully.", cases=[_student_case(c, service, titles) for c in rows])
 
 
 @router.post(
@@ -193,6 +197,8 @@ async def my_cases(auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> S
     responses=errors(*AUTHENTICATED, 404, 409),
 )
 async def appeal_case(case_id: CaseIdParam, data: AppealIn, auth: RequireStudent, db: DbSession, settings: SettingsDep) -> StudentCaseResponse:
+    if not can_appeal(auth):
+        raise PermissionDeniedError("Appeals are turned off for your account.", code="APPEAL_NOT_PERMITTED")
     service = CaseService(db, settings)
     case = await service.appeal(await service.get(case_id), auth, data.reason)
     return StudentCaseResponse(message="Your appeal has been recorded.", case=_student_case(case, service))

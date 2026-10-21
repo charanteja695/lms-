@@ -42,3 +42,18 @@ async def test_batches_follow_the_persons_permissions(client, authed):
     assert (await client.get("/api/v1/batches")).status_code == 403
     authed(role="student", organization_id=TEST_ORG_ID, defaults=False)
     assert (await client.get("/api/v1/enrollments")).status_code == 403
+
+
+async def test_a_removed_matrix_cell_stops_that_one_action(client, authed, seed_institution, seed_course, seed_entitlement):
+    """A head the super admin left View + Revoke on Batches (but not Create): listing works, creating is refused,
+    although the coarse learning.batches.manage key is still in the token."""
+    await seed_institution()
+    await seed_course()
+    await seed_entitlement()
+    authed(role="institution_head", organization_id=TEST_ORG_ID, defaults=False,
+           scopes=("batches.view", "batches.revoke", "learning.batches.view", "learning.batches.manage"))
+    assert (await client.get("/api/v1/batches")).status_code == 200
+    refused = await client.post("/api/v1/batches", json={"course_id": str(TEST_COURSE_ID), "name": "Morning batch"})
+    assert refused.status_code == 403
+    authed(role="institution_head", organization_id=TEST_ORG_ID)
+    assert (await client.post("/api/v1/batches", json={"course_id": str(TEST_COURSE_ID), "name": "Morning batch"})).status_code == 201

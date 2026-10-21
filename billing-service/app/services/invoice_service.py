@@ -14,8 +14,8 @@ from app.core.exceptions import ConflictError, NotFoundError, ValidationFailedEr
 from app.core.ids import new_public_id
 from app.core.security import AccessTokenClaims
 from app.core.time import utcnow
-from app.domain.enums import InvoiceKind, InvoiceStatus, PlanStatus
-from app.models.billing import BillingProfile, CreditNote, Invoice, InvoiceLine, NumberCounter, OrgPlan
+from app.domain.enums import InvoiceKind, InvoiceStatus, PlanStatus, PurchaseStatus
+from app.models.billing import BillingProfile, CoursePurchase, CreditNote, Invoice, InvoiceLine, NumberCounter, OrgPlan
 from app.permissions.policy import can_manage_billing, owns
 from app.services.outbox import write_event
 
@@ -134,22 +134,28 @@ class InvoiceService:
         return counter.last_number
 
     # ------------------------------------------------------------------ issuing
-    async def issue(self, invoice: Invoice) -> Invoice:
+    async def issue(self, invoice: Invoice, *, person: dict[str, Any] | None = None) -> Invoice:
+        """``person``: a private buyer ({name, email}) instead of the organisation's billing profile — billed in the seller's state."""
         invoice = await self.locked(invoice)
         if invoice.status != InvoiceStatus.DRAFT:
             raise ConflictError(f"This invoice is {invoice.status}.", code="INVOICE_NOT_DRAFT")
-        profile = await self.profile(invoice.org_id)
-        if profile is None:
+        profile = None if person else await self.profile(invoice.org_id)
+        if person is None and profile is None:
             raise ConflictError("The organisation has no billing profile: its legal name and state are needed on a GST invoice.", code="BILLING_PROFILE_MISSING")
+        state = profile.state if profile else self.settings.SELLER_STATE
         lines = await self.lines(invoice)
-        self._recalculate(invoice, lines, profile.state)
+        self._recalculate(invoice, lines, state)
         if not lines or invoice.total <= 0:
             raise ConflictError("An invoice needs at least one priced line before it is issued.", code="INVOICE_EMPTY")
         today = utcnow().date()
         invoice.number = f"INV/{tax.financial_year(today)}/{await self.next_number(f'INV/{tax.financial_year(today)}'):06d}"
         invoice.issue_date, invoice.due_date, invoice.status = today, today + timedelta(days=self.settings.INVOICE_DUE_DAYS), InvoiceStatus.ISSUED
-        invoice.customer = {"legal_name": profile.legal_name, "gstin": profile.gstin, "state": profile.state, "address": profile.address, "email": profile.email}
-        invoice.place_of_supply = profile.state
+        invoice.customer = (
+            {"legal_name": profile.legal_name, "gstin": profile.gstin, "state": profile.state, "address": profile.address, "email": profile.email}
+            if profile
+            else {"legal_name": (person or {}).get("name", ""), "gstin": None, "state": state, "address": "", "email": (person or {}).get("email")}
+        )
+        invoice.place_of_supply = state
         self._event("invoice.issued", invoice, total_amount=invoice.total, due_date=invoice.due_date.isoformat())
         await self.db.commit()
         return invoice
@@ -171,6 +177,8 @@ class InvoiceService:
         invoice.status, invoice.void_reason = InvoiceStatus.VOID, reason
         for plan in (await self.db.execute(select(OrgPlan).where(OrgPlan.invoice_id == invoice.id, OrgPlan.status == PlanStatus.PENDING))).scalars():
             plan.status = PlanStatus.CANCELLED
+        for purchase in (await self.db.execute(select(CoursePurchase).where(CoursePurchase.invoice_id == invoice.id, CoursePurchase.status == PurchaseStatus.PENDING))).scalars():
+            purchase.status = PurchaseStatus.CANCELLED
         if invoice.number:
             self._event("invoice.voided", invoice, reason=reason)
         await self.db.commit()
@@ -221,6 +229,22 @@ class InvoiceService:
             invoice.status = InvoiceStatus.PAID
             self._event("invoice.paid", invoice, total_amount=invoice.amount_paid)
             await self._activate_plan(invoice)
+            await self._grant_purchase(invoice)
+
+    async def _grant_purchase(self, invoice: Invoice) -> None:
+        """A learner's course invoice is paid: announce it; subscription-service grants or extends their access."""
+        purchase = (await self.db.execute(select(CoursePurchase).where(CoursePurchase.invoice_id == invoice.id, CoursePurchase.status == PurchaseStatus.PENDING))).scalar_one_or_none()
+        if purchase is None:
+            return
+        now = utcnow()
+        purchase.status, purchase.paid_at = PurchaseStatus.PAID, now
+        write_event(
+            self.db, event_type="course.purchased", aggregate_type="course_purchase", aggregate_id=purchase.id,
+            payload={
+                "purchase_id": str(purchase.public_id), "organization_id": str(purchase.org_id), "user_id": str(purchase.user_id), "course_id": str(purchase.course_id),
+                "valid_days": purchase.valid_days, "amount": purchase.amount, "occurred_at": _iso(now),
+            },
+        )
 
     async def _activate_plan(self, invoice: Invoice) -> None:
         plan = (await self.db.execute(select(OrgPlan).where(OrgPlan.invoice_id == invoice.id, OrgPlan.status == PlanStatus.PENDING))).scalar_one_or_none()

@@ -31,6 +31,7 @@ async def sit(client, who, tests_published, send_event, events: list[dict] | Non
 async def only_case(client, who) -> dict:
     who.exam_manager()
     (case,) = (await client.get("/api/v1/cases")).json()["cases"]
+    assert case["test_title"] == f"Test {case['test_id']}"
     return case
 
 
@@ -116,6 +117,7 @@ async def test_the_student_sees_the_outcome_and_appeals_an_invalidation_once(cli
     who.student()
     (mine,) = (await client.get("/api/v1/my/cases")).json()["cases"]
     assert mine["decision"] == "invalidated" and mine["can_appeal"] is True and "reasons" not in mine and "assigned_to" not in mine
+    assert mine["test_title"] == f"Test {mine['test_id']}"
     assert (await client.post(f"/api/v1/cases/{case['case_id']}/appeal", json={"reason": "My connection dropped and the tab lost focus"})).status_code == 200
     again = await client.post(f"/api/v1/cases/{case['case_id']}/appeal", json={"reason": "Please look again"})
     assert again.status_code == 409 and again.json()["code"] == "APPEAL_NOT_ALLOWED"

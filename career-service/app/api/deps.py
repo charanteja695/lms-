@@ -86,9 +86,27 @@ async def _authenticate(request: Request, settings: SettingsDep, credentials: An
 CurrentAuth = Annotated[AccessTokenClaims, Depends(_authenticate)]
 
 
-def require_student(auth: CurrentAuth) -> AccessTokenClaims:
+# A request's method is the action it takes on the student's own profile and resumes (the matrix cells), except
+# POSTs that only read (scores and checks) or that change what exists (AI suggestions for a resume, restoring a version).
+_ACTION_OF = {"GET": "view", "HEAD": "view", "POST": "create", "PUT": "update", "PATCH": "update", "DELETE": "delete"}
+_READS = ("/ats", "/keyword-gap", "/grammar")
+_EDITS = ("/restore", "/ai/summary", "/ai/rewrite", "/ai/polish", "/ai/tailor", "/reorder")
+
+
+def _action(request: Request) -> str:
+    path = request.url.path
+    if request.method == "POST" and path.endswith(_READS):
+        return "view"
+    if request.method == "POST" and path.endswith(_EDITS):
+        return "update"
+    return _ACTION_OF.get(request.method, "update")
+
+
+def require_student(request: Request, auth: CurrentAuth) -> AccessTokenClaims:
     if not is_student(auth):
         raise PermissionDeniedError("The resume builder is for students.", code="STUDENTS_ONLY")
+    if not is_student(auth, _action(request)):
+        raise PermissionDeniedError("This action on your profile and resumes is turned off for your account.", code="ACTION_NOT_PERMITTED")
     return auth
 
 

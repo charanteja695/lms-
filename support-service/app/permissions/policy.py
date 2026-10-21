@@ -17,7 +17,7 @@ from app.permissions.scopes import Scope
 
 # What a person needs to handle (and so be assigned) a ticket of each queue; mirrors ``can_handle``.
 HANDLER_PERMISSIONS: dict[Queue, tuple[str, ...]] = {
-    Queue.BATCH_STAFF: ("support.agent",),
+    Queue.BATCH_STAFF: ("support_queue.update",),  # whoever may answer that queue (a matrix cell)
     Queue.EXAM_TEAM: (Scope.EXAMS_MANAGE.value, Scope.SUPPORT_MANAGE.value),
     Queue.PLATFORM_SUPPORT: (Scope.SUPPORT_MANAGE.value,),
 }
@@ -27,14 +27,15 @@ def is_super_admin(auth: AccessTokenClaims) -> bool:
     return auth.role == Role.SUPER_ADMIN
 
 
-def is_student(auth: AccessTokenClaims) -> bool:
-    """Opens tickets of their own."""
-    return auth.has_scope("support.ask")
+def is_student(auth: AccessTokenClaims, action: str = "view") -> bool:
+    """Their own tickets (the Help page's cells): ``view`` read and follow them, ``create`` open one."""
+    return auth.role != Role.SUPER_ADMIN and auth.can_act(f"support.{action}", "support.ask")
 
 
-def is_institution_staff(auth: AccessTokenClaims) -> bool:
-    """Answers their own institution's batch-staff queue."""
-    return auth.organization_id is not None and auth.has_scope("support.agent")
+def is_institution_staff(auth: AccessTokenClaims, action: str = "view") -> bool:
+    """Their own institution's batch-staff queue (the Support queue page's cells): ``view`` read, ``update`` answer
+    and change tickets."""
+    return auth.organization_id is not None and auth.can_act(f"support_queue.{action}", "support.agent")
 
 
 def is_manager(auth: AccessTokenClaims) -> bool:
@@ -53,14 +54,14 @@ def is_exam_team(auth: AccessTokenClaims) -> bool:
     return bool(auth.has_scope(Scope.EXAMS_MANAGE.value))
 
 
-def can_handle(auth: AccessTokenClaims, ticket: Ticket) -> bool:
-    """May act on ``ticket`` as an agent (read it with its internal notes, reply, change it)."""
+def can_handle(auth: AccessTokenClaims, ticket: Ticket, action: str = "view") -> bool:
+    """May read ``ticket`` with its internal notes (``view``) or reply and change it (``update``) as an agent."""
     if manages_ticket(auth, ticket):
         return True
     if ticket.queue == Queue.EXAM_TEAM:
         return is_exam_team(auth)
     if ticket.queue == Queue.BATCH_STAFF:
-        return is_institution_staff(auth) and auth.organization_id == ticket.organization_id
+        return is_institution_staff(auth, action) and auth.organization_id == ticket.organization_id
     return False
 
 
@@ -71,7 +72,7 @@ def can_view(auth: AccessTokenClaims, ticket: Ticket) -> bool:
 def can_assign_others(auth: AccessTokenClaims, ticket: Ticket) -> bool:
     if manages_ticket(auth, ticket):
         return True
-    return auth.has_scope("support.assign") and ticket.queue == Queue.BATCH_STAFF and auth.organization_id == ticket.organization_id
+    return auth.can_act("support_queue.approve", "support.assign") and ticket.queue == Queue.BATCH_STAFF and auth.organization_id == ticket.organization_id
 
 
 def is_agent(auth: AccessTokenClaims) -> bool:

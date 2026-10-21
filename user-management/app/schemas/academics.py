@@ -98,7 +98,8 @@ class DepartmentOut(ResponseSchema):
 
 class AcademicStructure(ResponseSchema):
     organization_id: PublicIdOut
-    can_manage: bool
+    can_manage: bool = Field(description="May change anything at all (any of rights)")
+    rights: dict[str, bool] = Field(description="create, update (also placing students), delete")
     departments: list[DepartmentOut]
     totals: dict[str, int] = Field(description="departments, programs, sections, placed_students")
 

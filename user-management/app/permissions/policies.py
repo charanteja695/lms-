@@ -4,15 +4,18 @@ This module is the single source of truth for "who may do what to whom". It is p
 (no I/O) so every rule is unit-testable. Services load the data, then ask these
 functions; they never re-implement a rule inline.
 
-Checks happen in two layers:
-  1. Role permission   - may this role perform ``action`` on users of ``target_role``?
-  2. Resource scope    - is the target inside the actor's part of the hierarchy?
+Checks happen in three layers:
+  1. Role ceiling      - may this role ever perform ``action`` on users of ``target_role``? (``USER_PERMISSIONS``)
+  2. Permission matrix - does this person hold the cell for it (``students.delete``)? A super admin ticks cells
+                         per role and per person; see ``pages``.
+  3. Resource scope    - is the target inside the actor's part of the hierarchy?
 """
 
 from enum import StrEnum
 
 from app.models.institution import Institution
 from app.models.user import User
+from app.permissions.pages import PEOPLE_PAGE
 from app.permissions.roles import (
     ADMIN_SCOPES,
     ORGANIZATION_SCOPED_ROLES,
@@ -33,13 +36,27 @@ class Action(StrEnum):
     CHANGE_STATUS = "change_status"
     DELETE = "delete"
     REVOKE = "revoke"
+    EXPORT = "export"
+
+
+# Which matrix action each user action needs (suspending or reactivating someone is the Revoke cell).
+_CELL_ACTION: dict[Action, str] = {
+    Action.VIEW: "view",
+    Action.CREATE: "create",
+    Action.UPDATE: "update",
+    Action.CHANGE_STATUS: "revoke",
+    Action.DELETE: "delete",
+    Action.REVOKE: "revoke",
+    Action.EXPORT: "export",
+}
 
 
 def _all_actions(*roles: Role) -> dict[Action, frozenset[Role]]:
     return {action: frozenset(roles) for action in Action}
 
 
-# actor role -> action -> target roles the actor may perform the action on.
+# actor role -> action -> target roles the actor may ever perform the action on (the ceiling); within it, the
+# person's matrix cells decide.
 USER_PERMISSIONS: dict[Role, dict[Action, frozenset[Role]]] = {
     Role.SUPER_ADMIN: {
         **_all_actions(
@@ -62,11 +79,8 @@ USER_PERMISSIONS: dict[Role, dict[Action, frozenset[Role]]] = {
     # Admins reach only members of organisations they own (see is_user_in_scope).
     Role.ADMIN: _all_actions(Role.INSTITUTION_HEAD, Role.STAFF, Role.STUDENT),
     Role.INSTITUTION_HEAD: _all_actions(Role.STAFF, Role.STUDENT),
-    Role.STAFF: {
-        Action.VIEW: frozenset({Role.STUDENT}),
-        Action.CREATE: frozenset({Role.STUDENT}),
-        Action.UPDATE: frozenset({Role.STUDENT}),
-    },
+    # What staff do to students by default is their matrix cells (view, create, update); more can be ticked.
+    Role.STAFF: _all_actions(Role.STUDENT),
     Role.STUDENT: {},
     Role.EMPLOYER_ADMIN: {},
     Role.RECRUITER: {},
@@ -76,16 +90,29 @@ USER_PERMISSIONS: dict[Role, dict[Action, frozenset[Role]]] = {
 # ------------------------------------------------------------------ role permission
 
 
-def allowed_target_roles(actor_role: str, action: Action) -> frozenset[Role]:
-    role = parse_role(actor_role)
+def holds(actor: User, cell: str) -> bool:
+    """Whether ``actor`` holds a matrix cell (``staff.create``). A super admin holds everything."""
+    return actor.role == Role.SUPER_ADMIN or cell in actor.granted
+
+
+def _cell_allows(actor: User, action: Action, target: Role) -> bool:
+    page = PEOPLE_PAGE.get(target)
+    if actor.role == Role.SUPER_ADMIN or page is None:
+        return True  # only the super admin reaches roles without a matrix page (admins, company logins)
+    return holds(actor, f"{page}.{_CELL_ACTION[action]}")
+
+
+def allowed_target_roles(actor: User, action: Action) -> frozenset[Role]:
+    role = parse_role(actor.role)
     if role is None:
         return frozenset()
-    return USER_PERMISSIONS.get(role, {}).get(action, frozenset())
+    ceiling = USER_PERMISSIONS.get(role, {}).get(action, frozenset())
+    return frozenset(target for target in ceiling if _cell_allows(actor, action, target))
 
 
-def can_act_on_role(actor_role: str, action: Action, target_role: str) -> bool:
+def can_act_on_role(actor: User, action: Action, target_role: str) -> bool:
     target = parse_role(target_role)
-    return target is not None and target in allowed_target_roles(actor_role, action)
+    return target is not None and target in allowed_target_roles(actor, action)
 
 
 def is_organization_scoped(role: str) -> bool:
@@ -135,19 +162,59 @@ def can_access_institution(actor: User, institution: Institution) -> bool:
     return actor.institution_id is not None and actor.institution_id == institution.id
 
 
+def _kind(institution: Institution) -> OrganizationType:
+    return (
+        OrganizationType.EMPLOYER if institution.org_type == OrganizationType.EMPLOYER else OrganizationType.INSTITUTION
+    )
+
+
+def _institution_cell(actor: User, org_type: OrganizationType, action: str) -> bool:
+    """An admin's institutions are on the matrix (members see their own institution regardless); companies belong
+    to the super admin alone."""
+    return (
+        actor.role != Role.ADMIN or org_type != OrganizationType.INSTITUTION or holds(actor, f"institutions.{action}")
+    )
+
+
 def can_create_organization(actor: User, org_type: OrganizationType) -> bool:
-    return actor.role in (Role.SUPER_ADMIN, Role.ADMIN) and has_scope(actor, SCOPE_FOR_ORGANIZATION[org_type])
+    return (
+        actor.role in (Role.SUPER_ADMIN, Role.ADMIN)
+        and has_scope(actor, SCOPE_FOR_ORGANIZATION[org_type])
+        and _institution_cell(actor, org_type, "create")
+    )
 
 
 def can_create_institution(actor: User) -> bool:
     return can_create_organization(actor, OrganizationType.INSTITUTION)
 
 
-def can_manage_institution(actor: User, institution: Institution) -> bool:
-    """Update, suspend, delete or revoke an institution."""
+def owns_institution(actor: User, institution: Institution) -> bool:
+    """The super admin, or the admin who owns it (and so keeps its academic structure)."""
     if actor.role == Role.SUPER_ADMIN:
         return True
     return actor.role == Role.ADMIN and institution.deleted_at is None and institution.admin_id == actor.id
+
+
+def can_manage_institution(actor: User, institution: Institution, action: str = "update") -> bool:
+    """Update, suspend/reactivate/sign out (``revoke``) or delete an institution: its owner, holding that cell."""
+    return owns_institution(actor, institution) and _institution_cell(actor, _kind(institution), action)
+
+
+def can_see_organizations(actor: User, org_type: OrganizationType) -> bool:
+    return (
+        actor.role in (Role.SUPER_ADMIN, Role.ADMIN)
+        and has_scope(actor, SCOPE_FOR_ORGANIZATION[org_type])
+        and _institution_cell(actor, org_type, "view")
+    )
+
+
+def can_list_organizations(actor: User, org_type: OrganizationType, action: str = "view") -> bool:
+    """See (or, with ``export``, download) the institution list; an admin needs those cells."""
+    return _institution_cell(actor, org_type, "view") and _institution_cell(actor, org_type, action)
+
+
+def can_export_organizations(actor: User, org_type: OrganizationType) -> bool:
+    return can_see_organizations(actor, org_type) and _institution_cell(actor, org_type, "export")
 
 
 def can_reassign_institution_admin(actor: User) -> bool:

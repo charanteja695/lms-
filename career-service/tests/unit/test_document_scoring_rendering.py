@@ -36,7 +36,7 @@ def test_dates():
 
 def test_default_draft_orders_sections_and_hides_redundant_courses():
     draft = default_draft(VIEWS)
-    assert [s["key"] for s in draft["sections"]] == ["education", "projects", "experience", "skills", "certificates", "skill_scores", "courses"]
+    assert [s["key"] for s in draft["sections"]] == ["skills", "projects", "experience", "education", "certificates", "skill_scores", "courses"]
     assert {s["key"]: s["visible"] for s in draft["sections"]}["courses"] is False
     assert default_draft([])["sections"] == []
 

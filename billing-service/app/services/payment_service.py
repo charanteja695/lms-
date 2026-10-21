@@ -2,9 +2,6 @@
 organisation pays through the payment gateway — a contract only (D13), so `503 PAYMENT_GATEWAY_NOT_CONFIGURED` until one is wired. A partial
 payment is allowed; an invoice is paid once payments cover what remains after credit notes."""
 
-import json
-from typing import Any
-
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +13,7 @@ from app.core.security import AccessTokenClaims
 from app.core.time import utcnow
 from app.domain.enums import InvoiceStatus, PaymentMethod, PaymentStatus
 from app.gateways.errors import Rejected, Unavailable
-from app.gateways.payment import PaymentGateway, PaymentGatewayNotConfigured, signature_valid
+from app.gateways.payment import PaymentGateway, PaymentGatewayNotConfigured
 from app.models.billing import GatewayEvent, Invoice, Payment
 from app.services.invoice_service import InvoiceService
 
@@ -80,46 +77,66 @@ class PaymentService:
         await self.db.commit()
         return payment, order.order_id
 
-    async def handle_webhook(self, body: bytes, signature: str | None) -> str:
+    async def handle_webhook(self, body: bytes, headers: dict[str, str]) -> str:
         """The gateway's callback. Verified, de-duplicated by its event id, then applied under the invoice's lock. Returns what was done."""
-        if not signature_valid(body, signature, self.settings.PAYMENT_WEBHOOK_SECRET.get_secret_value()):
-            raise WebhookRejected
         try:
-            event: dict[str, Any] = json.loads(body)
-            event_id, kind, order_id = str(event["event_id"]), str(event["type"]), str(event["order_id"])
+            event = self.gateway.read_webhook(body, headers)
         except (ValueError, KeyError, TypeError) as exc:
-            raise ValidationFailedError(details=[{"field": "body", "code": "INVALID_EVENT", "message": "event_id, type and order_id are required"}]) from exc
-        self.db.add(GatewayEvent(event_id=event_id, received_at=utcnow()))
+            raise ValidationFailedError(details=[{"field": "body", "code": "INVALID_EVENT", "message": "The event is missing its order or type"}]) from exc
+        if event is None:
+            raise WebhookRejected
+        self.db.add(GatewayEvent(event_id=event.event_id[:80], received_at=utcnow()))
         try:
             await self.db.flush()
         except IntegrityError:
             await self.db.rollback()
             return "duplicate"
+        if event.kind == "payment.captured":
+            return await self.capture(event.order_id, event.payment_id, event.amount)
+        if event.kind == "payment.failed":
+            return await self.fail(event.order_id)
+        await self.db.commit()
+        return "ignored"
+
+    async def _pending_payment(self, order_id: str) -> tuple[Payment, Invoice] | None:
         payment = (await self.db.execute(select(Payment).where(Payment.gateway_order_id == order_id))).scalar_one_or_none()
         if payment is None:
-            await self.db.commit()
-            return "ignored"
+            return None
         invoice = await self.invoices.locked(await self._invoice_of(payment))
         payment = (await self.db.execute(select(Payment).where(Payment.id == payment.id).with_for_update().execution_options(populate_existing=True))).scalar_one()
+        return payment, invoice
+
+    async def capture(self, order_id: str, payment_id: str | None, amount: int | None) -> str:
+        """Money for this order arrived (from the webhook or a verified checkout). Idempotent: a second report changes nothing."""
+        found = await self._pending_payment(order_id)
+        if found is None:
+            await self.db.commit()
+            return "ignored"
+        payment, invoice = found
         if payment.status != PaymentStatus.PENDING:
             await self.db.commit()
             return "ignored"
-        if kind == "payment.captured":
-            if int(event.get("amount", payment.amount)) != payment.amount or invoice.status not in _PAYABLE or payment.amount > self.invoices.owed(invoice):
-                payment.status = PaymentStatus.FAILED
-                await self.db.commit()
-                return "rejected"
-            payment.status, payment.paid_at = PaymentStatus.SUCCEEDED, utcnow()
-            payment.gateway_payment_id = str(event["payment_id"]) if event.get("payment_id") else None
-            await self._apply(invoice, payment.amount)
-            await self.db.commit()
-            return "paid"
-        if kind == "payment.failed":
+        reused = payment_id is not None and (
+            await self.db.execute(select(Payment.id).where(Payment.gateway_payment_id == payment_id, Payment.id != payment.id))
+        ).first() is not None  # one provider payment settles one order, never two
+        if reused or (amount is not None and amount != payment.amount) or invoice.status not in _PAYABLE or payment.amount > self.invoices.owed(invoice):
             payment.status = PaymentStatus.FAILED
             await self.db.commit()
-            return "failed"
+            return "rejected"
+        payment.status, payment.paid_at = PaymentStatus.SUCCEEDED, utcnow()
+        payment.gateway_payment_id = payment_id
+        await self._apply(invoice, payment.amount)
         await self.db.commit()
-        return "ignored"
+        return "paid"
+
+    async def fail(self, order_id: str) -> str:
+        found = await self._pending_payment(order_id)
+        if found is None or found[0].status != PaymentStatus.PENDING:
+            await self.db.commit()
+            return "ignored"
+        found[0].status = PaymentStatus.FAILED
+        await self.db.commit()
+        return "failed"
 
     async def _invoice_of(self, payment: Payment) -> Invoice:
         return (await self.db.execute(select(Invoice).where(Invoice.id == payment.invoice_id))).scalar_one()

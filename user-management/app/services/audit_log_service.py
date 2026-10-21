@@ -49,6 +49,8 @@ class AuditLogService:
         elif actor.role == Role.INSTITUTION_HEAD:
             conditions.append(AuditLog.institution_id == actor.institution_id if actor.institution_id else false())
 
+        # older rows from when every token refresh was logged: routine noise, never shown
+        conditions.append(AuditLog.action != "auth.token_refreshed")
         if query.category:
             conditions.append(AuditLog.action.like(contains_pattern(f"{query.category}.")[1:]))
         if query.action:

@@ -27,9 +27,10 @@ def is_super_admin(auth: AccessTokenClaims) -> bool:
     return auth.role == Role.SUPER_ADMIN
 
 
-def is_student(auth: AccessTokenClaims) -> bool:
-    """Takes interviews as a candidate (held, not implied by being a super admin)."""
-    return auth.has_scope(PRACTICE)
+def is_student(auth: AccessTokenClaims, action: str = "view") -> bool:
+    """Their own interviews (the AI interview page's cells): ``view`` take the ones they have and read reports,
+    ``create`` start a new practice interview or a retake. Never implied by being a super admin."""
+    return auth.role != "super_admin" and auth.can_act(f"ai_interview.{action}", PRACTICE)
 
 
 def is_employer_member(auth: AccessTokenClaims) -> bool:

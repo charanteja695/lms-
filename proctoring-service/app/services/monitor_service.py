@@ -55,9 +55,9 @@ class MonitorService:
         stmt = stmt.order_by(ProctorSession.risk_score.desc(), ProctorSession.created_at.desc(), ProctorSession.id)
         return await paginate(self.db, stmt, page, per_page)
 
-    async def get(self, public_id: int, auth: AccessTokenClaims) -> ProctorSession:
+    async def get(self, public_id: int, auth: AccessTokenClaims, action: str = "view") -> ProctorSession:
         session = await self.sessions.get(public_id)
-        if not can_monitor(auth, student_organization_id=session.organization_id, test_owner_id=session.test_owner_id):
+        if not can_monitor(auth, student_organization_id=session.organization_id, test_owner_id=session.test_owner_id, action=action):
             raise NotFoundError("Session not found.", code="SESSION_NOT_FOUND")
         return session
 

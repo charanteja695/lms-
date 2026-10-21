@@ -80,7 +80,9 @@ class SessionService:
             admin_orgs = list(
                 (
                     await self.db.execute(
-                        select(Institution.public_id).where(Institution.admin_id == user.id, Institution.deleted_at.is_(None))
+                        select(Institution.public_id).where(
+                            Institution.admin_id == user.id, Institution.deleted_at.is_(None)
+                        )
                     )
                 ).scalars()
             )

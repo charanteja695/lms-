@@ -162,19 +162,24 @@ def require_scope(scope: Scope) -> Callable[[AccessTokenClaims], AccessTokenClai
 RequireAccountsManage = Annotated[AccessTokenClaims, Depends(require_scope(Scope.ACCOUNTS_MANAGE))]
 
 
+REQUEST = "subscriptions.request"  # the coarse key; heads are set per action on the Course requests page's cells
+
+
 def require_institution_head(auth: CurrentAuth) -> AccessTokenClaims:
-    # ``subscriptions.request`` (by default the institution head; a super admin can grant or remove it per person)
-    if auth.organization_id is None or not auth.has_scope("subscriptions.request"):
+    """Submit a course request for their own institution: the ``course_requests.create`` cell (by default the head)."""
+    if auth.organization_id is None or not auth.can_act("course_requests.create", REQUEST):
         raise PermissionDeniedError()
     return auth
 
 
 def institutions_listed(auth: AccessTokenClaims) -> tuple[int, ...] | None:
     """Whose records a list shows: ``None`` = every institution (the super admin), an admin's own institutions, or a
-    member's own institution."""
+    member's own institution if they may see its requests and subscriptions (``course_requests.view``)."""
     if auth.can(Scope.ACCOUNTS_MANAGE.value):
         return auth.organizations_in_care()
-    return (auth.organization_id or 0,)
+    if auth.organization_id is None or not auth.can_act("course_requests.view", REQUEST):
+        raise PermissionDeniedError()
+    return (auth.organization_id,)
 
 
 def ensure_organization_visible(auth: AccessTokenClaims, organization_id: int) -> None:

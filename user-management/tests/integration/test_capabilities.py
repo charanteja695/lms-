@@ -21,8 +21,12 @@ async def test_my_permissions_follow_the_hierarchy(client: AsyncClient, hierarch
     staff = (await client.get(f"{API}/users/me/permissions", headers=hierarchy.staff)).json()["permissions"]
     assert staff["users"]["view_roles"] == ["student"] and staff["users"]["create_roles"] == ["student"]
     assert "audit_logs" not in staff["sections"]
-    assert {"catalog", "learning", "analytics", "proctoring"} <= set(staff["sections"]) and "subscriptions" not in staff["sections"]
-    assert "subscriptions" in head["sections"] and "billing" in head["sections"]  # the head requests courses and sees institution billing; staff do neither
+    assert {"catalog", "learning", "analytics", "proctoring"} <= set(
+        staff["sections"]
+    ) and "subscriptions" not in staff["sections"]
+    assert (
+        "subscriptions" in head["sections"] and "billing" in head["sections"]
+    )  # the head requests courses and sees institution billing; staff do neither
 
     # An admin with the default accounts.manage scope approves course requests and manages
     # batches across every institution (subscription-service and learning-service).
@@ -33,10 +37,28 @@ async def test_my_permissions_follow_the_hierarchy(client: AsyncClient, hierarch
 
     student = (await client.get(f"{API}/users/me/permissions", headers=hierarchy.student)).json()["permissions"]
     assert student["sections"] == [
-        "dashboard", "my_organization", "catalog", "learning", "code_execution", "assessments", "proctoring", "certificates", "ai_tutor", "support", "career", "job_portal", "ai_interview", "notifications",
-        "profile", "security",
+        "dashboard",
+        "my_organization",
+        "catalog",
+        "learning",
+        "code_execution",
+        "assessments",
+        "proctoring",
+        "certificates",
+        "ai_tutor",
+        "support",
+        "career",
+        "job_portal",
+        "ai_interview",
+        "notifications",
+        "profile",
+        "security",
     ]
-    assert "billing" not in student["sections"] and "analytics" not in student["sections"] and "subscriptions" not in student["sections"]
+    assert (
+        "billing" not in student["sections"]
+        and "analytics" not in student["sections"]
+        and "subscriptions" not in student["sections"]
+    )
 
 
 async def test_records_carry_the_actions_the_viewer_may_take(client: AsyncClient, hierarchy: Hierarchy) -> None:
@@ -108,7 +130,6 @@ async def test_user_form_options_describe_the_form_for_each_role(client: AsyncCl
     assert hidden.status_code == 404
 
 
-
 async def test_the_menu_shows_each_role_its_own_screens(client, hierarchy) -> None:
     async def menu(headers: dict[str, str]) -> list[str]:
         response = await client.get(f"{API}/users/me/permissions", headers=headers)
@@ -136,13 +157,19 @@ async def test_the_menu_shows_each_role_its_own_screens(client, hierarchy) -> No
     assert not {"my_learning", "my_tests", "my_submissions", "my_integrity_cases"} & set(root)
 
 
-async def test_ai_settings_reach_the_super_admin_and_their_own_institutions_usage_only(client: AsyncClient, hierarchy: Hierarchy) -> None:
+async def test_ai_settings_reach_the_super_admin_and_their_own_institutions_usage_only(
+    client: AsyncClient, hierarchy: Hierarchy
+) -> None:
     head, student = await _perms(client, hierarchy.head), await _perms(client, hierarchy.student)
-    assert "ai_settings" in head["menu"] and "ai_gateway" in head["sections"]  # their own institution's usage (ai.usage.own)
+    assert (
+        "ai_settings" in head["menu"] and "ai_gateway" in head["sections"]
+    )  # their own institution's usage (ai.usage.own)
     assert "ai_settings" not in student["menu"] and "ai_gateway" not in student["sections"]
     root = await _perms(client, hierarchy.root)
     assert "ai_settings" in root["menu"] and "ai_gateway" in root["sections"]
-    refused = await client.put(f"{API}/users/{hierarchy.admin_id}/permissions", json={"changes": {"ai.manage": True}}, headers=hierarchy.root)
+    refused = await client.put(
+        f"{API}/users/{hierarchy.admin_id}/permissions", json={"changes": {"ai.manage": True}}, headers=hierarchy.root
+    )
     assert refused.status_code == 422  # AI settings are the super admin's alone
     admin = await _perms(client, hierarchy.admin)
     assert "ai_settings" not in admin["menu"]

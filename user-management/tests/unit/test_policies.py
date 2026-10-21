@@ -31,7 +31,7 @@ def _institution(admin_id: uuid.UUID) -> Institution:
     ],
 )
 def test_create_permissions(actor: Role, target: Role, allowed: bool) -> None:
-    assert policies.can_act_on_role(actor, Action.CREATE, target) is allowed
+    assert policies.can_act_on_role(_user(actor), Action.CREATE, target) is allowed
 
 
 def test_no_role_can_act_on_its_own_level_or_above() -> None:
@@ -47,12 +47,29 @@ def test_no_role_can_act_on_its_own_level_or_above() -> None:
 
 def test_staff_has_limited_actions() -> None:
     for action in (Action.DELETE, Action.CHANGE_STATUS, Action.REVOKE):
-        assert not policies.can_act_on_role(Role.STAFF, action, Role.STUDENT)
+        assert not policies.can_act_on_role(_user(Role.STAFF), action, Role.STUDENT)
 
 
 def test_unknown_roles_get_nothing() -> None:
-    assert policies.allowed_target_roles("janitor", Action.VIEW) == frozenset()
-    assert not policies.can_act_on_role(Role.SUPER_ADMIN, Action.VIEW, "janitor")
+    assert policies.allowed_target_roles(User(id=uuid.uuid4(), role="janitor"), Action.VIEW) == frozenset()
+    assert not policies.can_act_on_role(_user(Role.SUPER_ADMIN), Action.VIEW, "janitor")
+
+
+def test_the_matrix_cell_is_needed_on_top_of_the_role() -> None:
+    head = _user(Role.INSTITUTION_HEAD)
+    assert policies.can_act_on_role(head, Action.DELETE, Role.STUDENT)
+    head.grant(["students.view", "students.create"])
+    assert policies.can_act_on_role(head, Action.CREATE, Role.STUDENT)
+    assert not policies.can_act_on_role(head, Action.DELETE, Role.STUDENT)
+    assert not policies.can_act_on_role(head, Action.CHANGE_STATUS, Role.STUDENT)  # suspending is the Revoke cell
+    assert not policies.can_act_on_role(head, Action.VIEW, Role.STAFF)
+
+    staff = _user(Role.STAFF)
+    staff.grant(["students.view", "students.delete"])  # a ticked cell goes beyond the role's default
+    assert policies.can_act_on_role(staff, Action.DELETE, Role.STUDENT)
+    assert not policies.can_act_on_role(staff, Action.CREATE, Role.STUDENT)
+    staff.grant(["staff.view"])  # never past the role's ceiling: staff never manage staff
+    assert not policies.can_act_on_role(staff, Action.VIEW, Role.STAFF)
 
 
 def test_institution_scope() -> None:

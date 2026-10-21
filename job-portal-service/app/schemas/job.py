@@ -171,6 +171,7 @@ class EmployerJobOut(JobOut):
     eligibility: dict[str, Any]
     institution_ids: list[str] = Field(default_factory=list)
     pipeline: dict[str, Any]
+    steps: list[dict[str, str]] = Field(default_factory=list, description="The hiring steps the pipeline makes, in order ({key, label})")
     review_note: str | None = None
     closed_reason: str | None = None
     applications: int = 0
@@ -185,6 +186,7 @@ class CandidateJobOut(JobOut):
     match: MatchOut | None = None
     applied: bool = False
     application_id: PublicIdOut | None = None
+    steps: list[dict[str, str]] = Field(default_factory=list, description="The hiring steps this job uses, in order ({key, label})")
 
 
 class EmployerJobResponse(SuccessResponse):

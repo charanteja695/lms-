@@ -37,6 +37,7 @@ class InstitutionType(StrEnum):
     UNIVERSITY = "university"
     COACHING_CENTER = "coaching_center"
     TRAINING_INSTITUTE = "training_institute"
+    INDIVIDUAL = "individual"  # the platform's own home for self-registered learners (one, created on first sign-up)
     OTHER = "other"
 
 

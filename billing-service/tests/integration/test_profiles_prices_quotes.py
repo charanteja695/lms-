@@ -173,11 +173,15 @@ async def test_an_expired_quote_cannot_be_accepted_and_the_sweep_expires_stale_o
 
 
 async def test_billing_follows_the_persons_permissions_not_their_role(client, who, send_event):
-    """A super admin can make a staff member the billing contact, or take billing away from a head."""
+    """The Billing page's cells decide, one action at a time: staff never reach it; a head left only View reads the
+    profile but can't change it (although the coarse billing.contact key is still in the token); without View, nothing."""
     await seed_orgs(send_event)
     who.staff()
     assert (await client.get(f"{API}/billing-profile")).status_code == 403
-    who.staff(granted=("billing.contact",))
+    who.head()
     assert (await client.put(f"{API}/billing-profile", json=PROFILE)).status_code == 200  # their own institution's
-    who.head_without("billing.contact")
-    assert (await client.get(f"{API}/billing-profile")).status_code == 403
+    who.head_without("billing.update")
+    assert (await client.get(f"{API}/billing-profile")).status_code == 200
+    assert (await client.put(f"{API}/billing-profile", json=PROFILE)).status_code in (403, 404)
+    who.head_without("billing.view", "billing.update")
+    assert (await client.get(f"{API}/billing-profile")).status_code in (403, 404)

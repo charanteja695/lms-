@@ -241,7 +241,7 @@ class TicketService:
 
     # ------------------------------------------------------------------ agents
     def _require_handler(self, auth: AccessTokenClaims, ticket: Ticket) -> None:
-        if not policy.can_handle(auth, ticket):
+        if not policy.can_handle(auth, ticket, "update"):
             raise PermissionDeniedError("You do not handle this ticket's queue.", code="NOT_YOUR_QUEUE")
 
     async def reply_as_agent(

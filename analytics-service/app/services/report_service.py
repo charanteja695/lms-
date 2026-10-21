@@ -73,13 +73,13 @@ def render_csv(data: dict[str, Any]) -> bytes:
     return buffer.getvalue().encode("utf-8")
 
 
-def check_dashboard_access(auth: AccessTokenClaims, dashboard: str, *, organization_id: int | None, employer_id: int | None) -> None:
+def check_dashboard_access(auth: AccessTokenClaims, dashboard: str, *, organization_id: int | None, employer_id: int | None, action: str = "view") -> None:
     """Raises if ``auth`` may not read this dashboard with these filters. Institution/hiring/support dashboards
     scoped to one's own organisation are always allowed; anything platform-wide needs that domain's scope."""
     if is_super_admin(auth):
         return
     if dashboard == Dashboard.INSTITUTION:
-        if organization_id == auth.organization_id and is_institution_member(auth):
+        if organization_id == auth.organization_id and is_institution_member(auth, action):
             return
         if can_view_platform(auth):
             return
@@ -89,7 +89,7 @@ def check_dashboard_access(auth: AccessTokenClaims, dashboard: str, *, organizat
             return
     if dashboard == Dashboard.HIRING and employer_id is None and organization_id is not None:
         # an institution's own students' hiring outcomes, for that institution's own head and staff
-        if organization_id == auth.organization_id and is_institution_member(auth):
+        if organization_id == auth.organization_id and is_institution_member(auth, action):
             return
     if not can_view_platform(auth, *_DASHBOARD_SCOPE.get(Dashboard(dashboard), ())):
         raise PermissionDeniedError("You do not have permission to view this dashboard.", code="PERMISSION_DENIED")
@@ -116,7 +116,7 @@ class ReportService:
         org, employer = _opt_int(filters.get("organization_id")), _opt_int(filters.get("employer_id"))
         if dashboard == Dashboard.INSTITUTION and org is None:
             raise ValidationFailedError(details=[{"field": "filters.organization_id", "code": "REQUIRED", "message": "The institution dashboard needs an organization_id"}])
-        check_dashboard_access(auth, dashboard, organization_id=org, employer_id=employer)
+        check_dashboard_access(auth, dashboard, organization_id=org, employer_id=employer, action="export")  # a scheduled report is a download
         definition = ReportDefinition(
             public_id=new_public_id(), owner_user_id=auth.user_id, organization_id=org, name=name, dashboard=dashboard, filters=filters, format=report_format,
             frequency=frequency, next_run_at=utcnow() + timedelta(days=_FREQUENCY_DAYS[ReportFrequency(frequency)]),

@@ -21,14 +21,15 @@ def is_super_admin(auth: AccessTokenClaims) -> bool:
     return auth.role == Role.SUPER_ADMIN
 
 
-def is_student(auth: AccessTokenClaims) -> bool:
-    """Keeps their own career profile and resumes."""
-    return auth.has_scope("career.profile")
+def is_student(auth: AccessTokenClaims, action: str = "view") -> bool:
+    """Keeps their own career profile and resumes, one action at a time (the Resumes & profile page's cells:
+    view, create, update, delete)."""
+    return auth.can_act(f"my_career.{action}", "career.profile")
 
 
-def is_institution_staff(auth: AccessTokenClaims) -> bool:
-    """Reads their own institution's students' profiles."""
-    return auth.organization_id is not None and auth.has_scope("career.students")
+def is_institution_staff(auth: AccessTokenClaims, action: str = "view") -> bool:
+    """Reads (``view``) or downloads (``export``) their own institution's students' profiles and resumes."""
+    return auth.organization_id is not None and auth.can_act(f"student_profiles.{action}", "career.students")
 
 
 def can_manage_careers(auth: AccessTokenClaims) -> bool:

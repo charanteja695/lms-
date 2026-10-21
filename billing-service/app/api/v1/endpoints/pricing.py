@@ -41,7 +41,10 @@ async def list_all_prices(
 
 @admin.post("", response_model=PriceResponse, status_code=201, summary="Add a price", responses=errors(*AUTHENTICATED, 409), dependencies=[WriteRateLimit])
 async def create_price(body: PriceCreate, auth: RequireBillingAdmin, db: DbSession) -> PriceResponse:
-    meta = {"job_posts": body.job_posts, "valid_days": body.valid_days} if body.kind == PriceKind.EMPLOYER_PLAN else {}
+    if body.kind == PriceKind.EMPLOYER_PLAN:
+        meta: dict[str, int | None] = {"job_posts": body.job_posts, "valid_days": body.valid_days}
+    else:
+        meta = {"valid_days": body.valid_days} if body.valid_days else {}
     item = await PriceService(db).create({"kind": body.kind.value, "code": body.code, "name": body.name, "unit_amount": body.unit_amount, "meta": meta})
     return PriceResponse(message="Price added.", price=PriceOut.model_validate(item))
 
@@ -50,5 +53,10 @@ async def create_price(body: PriceCreate, auth: RequireBillingAdmin, db: DbSessi
              description="Invoices and quotes already made keep the amount they used.")
 async def update_price(price_id: PriceIdParam, body: PriceUpdate, auth: RequireBillingAdmin, db: DbSession) -> PriceResponse:
     service = PriceService(db)
-    item = await service.update(await service.get(price_id), body.model_dump(exclude_unset=True))
+    item = await service.get(price_id)
+    fields = body.model_dump(exclude_unset=True)
+    if "valid_days" in fields:  # kept in meta: a plan's days, or a course's learner access days
+        days = fields.pop("valid_days")
+        fields["meta"] = {**(item.meta or {}), "valid_days": days} if days else {k: v for k, v in (item.meta or {}).items() if k != "valid_days"}
+    item = await service.update(item, fields)
     return PriceResponse(message="Saved.", price=PriceOut.model_validate(item))

@@ -32,7 +32,7 @@ from app.schemas.academics import (
     SectionStudentsResponse,
     SectionUpdate,
 )
-from app.services.academic_service import AcademicService, Tree
+from app.services.academic_service import AcademicService, Access, Tree
 
 router = APIRouter(
     prefix="/institutions/{organization_id}", tags=["Academic structure"], responses=errors(401, 403, 404)
@@ -70,7 +70,7 @@ def _section_out(section: ClassSection, program: Program, department: Department
     )
 
 
-def _structure(organization_id: int, can_manage: bool, tree: Tree) -> AcademicStructure:
+def _structure(organization_id: int, access: Access, tree: Tree) -> AcademicStructure:
     departments: list[DepartmentOut] = []
     for department in tree.departments:
         programs = [
@@ -95,7 +95,8 @@ def _structure(organization_id: int, can_manage: bool, tree: Tree) -> AcademicSt
         )
     return AcademicStructure(
         organization_id=organization_id,
-        can_manage=can_manage,
+        can_manage=access.can_manage,
+        rights=access.rights,
         departments=departments,
         totals={
             "departments": len(tree.departments),
@@ -112,7 +113,7 @@ async def _respond(
     access = await service.access(auth.user, organization_id)
     return AcademicStructureResponse(
         message=message,
-        academics=_structure(organization_id, access.can_manage, await service.tree(access.institution)),
+        academics=_structure(organization_id, access, await service.tree(access.institution)),
     )
 
 
@@ -139,7 +140,7 @@ async def create_department(
     organization_id: OrganizationIdParam, body: DepartmentCreate, auth: CurrentAuth, db: DbSession, ctx: RequestCtx
 ) -> AcademicStructureResponse:
     service = AcademicService(db, ctx)
-    access = await service.access(auth.user, organization_id, manage=True)
+    access = await service.access(auth.user, organization_id, manage="create")
     await service.create_department(auth.user, access.institution, body.model_dump())
     return await _respond(service, auth, organization_id, "Department added.")
 
@@ -159,7 +160,7 @@ async def update_department(
     ctx: RequestCtx,
 ) -> AcademicStructureResponse:
     service = AcademicService(db, ctx)
-    access = await service.access(auth.user, organization_id, manage=True)
+    access = await service.access(auth.user, organization_id, manage="update")
     await service.update_department(auth.user, access.institution, item_id, body.model_dump(exclude_unset=True))
     return await _respond(service, auth, organization_id, "Department saved.")
 
@@ -174,7 +175,7 @@ async def delete_department(
     organization_id: OrganizationIdParam, item_id: DepartmentIdParam, auth: CurrentAuth, db: DbSession, ctx: RequestCtx
 ) -> AcademicStructureResponse:
     service = AcademicService(db, ctx)
-    access = await service.access(auth.user, organization_id, manage=True)
+    access = await service.access(auth.user, organization_id, manage="delete")
     await service.delete_department(auth.user, access.institution, item_id)
     return await _respond(service, auth, organization_id, "Department removed.")
 
@@ -191,7 +192,7 @@ async def create_program(
     organization_id: OrganizationIdParam, body: ProgramCreate, auth: CurrentAuth, db: DbSession, ctx: RequestCtx
 ) -> AcademicStructureResponse:
     service = AcademicService(db, ctx)
-    access = await service.access(auth.user, organization_id, manage=True)
+    access = await service.access(auth.user, organization_id, manage="create")
     await service.create_program(auth.user, access.institution, body.model_dump())
     return await _respond(service, auth, organization_id, "Program added.")
 
@@ -211,7 +212,7 @@ async def update_program(
     ctx: RequestCtx,
 ) -> AcademicStructureResponse:
     service = AcademicService(db, ctx)
-    access = await service.access(auth.user, organization_id, manage=True)
+    access = await service.access(auth.user, organization_id, manage="update")
     await service.update_program(auth.user, access.institution, item_id, body.model_dump(exclude_unset=True))
     return await _respond(service, auth, organization_id, "Program saved.")
 
@@ -226,7 +227,7 @@ async def delete_program(
     organization_id: OrganizationIdParam, item_id: ProgramIdParam, auth: CurrentAuth, db: DbSession, ctx: RequestCtx
 ) -> AcademicStructureResponse:
     service = AcademicService(db, ctx)
-    access = await service.access(auth.user, organization_id, manage=True)
+    access = await service.access(auth.user, organization_id, manage="delete")
     await service.delete_program(auth.user, access.institution, item_id)
     return await _respond(service, auth, organization_id, "Program removed.")
 
@@ -243,7 +244,7 @@ async def create_section(
     organization_id: OrganizationIdParam, body: SectionCreate, auth: CurrentAuth, db: DbSession, ctx: RequestCtx
 ) -> AcademicStructureResponse:
     service = AcademicService(db, ctx)
-    access = await service.access(auth.user, organization_id, manage=True)
+    access = await service.access(auth.user, organization_id, manage="create")
     await service.create_section(auth.user, access.institution, body.model_dump())
     return await _respond(service, auth, organization_id, "Section added.")
 
@@ -263,7 +264,7 @@ async def update_section(
     ctx: RequestCtx,
 ) -> AcademicStructureResponse:
     service = AcademicService(db, ctx)
-    access = await service.access(auth.user, organization_id, manage=True)
+    access = await service.access(auth.user, organization_id, manage="update")
     await service.update_section(auth.user, access.institution, item_id, body.model_dump(exclude_unset=True))
     return await _respond(service, auth, organization_id, "Section saved.")
 
@@ -278,7 +279,7 @@ async def delete_section(
     organization_id: OrganizationIdParam, item_id: SectionIdParam, auth: CurrentAuth, db: DbSession, ctx: RequestCtx
 ) -> AcademicStructureResponse:
     service = AcademicService(db, ctx)
-    access = await service.access(auth.user, organization_id, manage=True)
+    access = await service.access(auth.user, organization_id, manage="delete")
     await service.delete_section(auth.user, access.institution, item_id)
     return await _respond(service, auth, organization_id, "Section removed.")
 
@@ -323,6 +324,6 @@ async def place_students(
     ctx: RequestCtx,
 ) -> PlacedResponse:
     service = AcademicService(db, ctx)
-    access = await service.access(auth.user, organization_id, manage=True)
+    access = await service.access(auth.user, organization_id, manage="update")
     changed = await service.place_students(auth.user, access.institution, item_id, body.add, body.remove)
     return PlacedResponse(message=f"{changed} student{'s' if changed != 1 else ''} updated.", changed=changed)

@@ -28,9 +28,9 @@ def is_student(auth: AccessTokenClaims) -> bool:
     return auth.has_scope(CHAT)
 
 
-def is_institution_staff(auth: AccessTokenClaims) -> bool:
-    """Manages their own institution's FAQ."""
-    return auth.organization_id is not None and auth.has_scope(FAQ_MANAGE)
+def is_institution_staff(auth: AccessTokenClaims, action: str = "view") -> bool:
+    """Their own institution's FAQ, one action at a time (the Tutor FAQ page's cells: view, create, update, delete)."""
+    return auth.organization_id is not None and auth.can_act(f"tutor_faq.{action}", FAQ_MANAGE)
 
 
 def can_manage_support(auth: AccessTokenClaims) -> bool:
@@ -47,16 +47,17 @@ def can_manage_index(auth: AccessTokenClaims) -> bool:
     return auth.can(Scope.AI_MANAGE.value)
 
 
-def can_manage_faq(auth: AccessTokenClaims, scope: str, *, organization_id: int | None) -> bool:
+def can_manage_faq(auth: AccessTokenClaims, scope: str, *, organization_id: int | None, action: str = "update") -> bool:
+    """``action``: create, update (edit or publish) or delete (archive) — checked per cell for an institution's FAQ."""
     if can_manage_support(auth):
         return True
     if scope == FaqScope.COURSE:
         return can_author(auth)
     if scope == FaqScope.ORGANIZATION:
-        return is_institution_staff(auth) and auth.organization_id == organization_id
+        return is_institution_staff(auth, action) and auth.organization_id == organization_id
     return False
 
 
 def can_view_conversation(auth: AccessTokenClaims, *, organization_id: int | None) -> bool:
     """A support manager, or the staff/head of the student's own institution (to promote a good answer to the FAQ)."""
-    return can_manage_support(auth) or (organization_id is not None and auth.organization_id == organization_id and auth.has_scope(CONVERSATIONS_VIEW))
+    return can_manage_support(auth) or (organization_id is not None and auth.organization_id == organization_id and auth.can_act("tutor_chats.view", CONVERSATIONS_VIEW))

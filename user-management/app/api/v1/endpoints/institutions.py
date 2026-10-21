@@ -86,7 +86,7 @@ async def create_institution_export_job(
     service: InstitutionServiceDep,
     jobs: JobServiceDep,
 ) -> JobResponse:
-    await service.filter_conditions(auth.user, query)
+    await service.filter_conditions(auth.user, query, action="export")
     job = await jobs.create_export_job(auth.user, JobType.INSTITUTION_EXPORT, query)
     return JobResponse(message="Export queued. You will be emailed when it is ready.", job=JobOut.from_model(job))
 

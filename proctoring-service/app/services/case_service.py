@@ -171,7 +171,9 @@ class CaseService:
         if lock:
             stmt = stmt.with_for_update().execution_options(populate_existing=True)
         case = (await self.db.execute(stmt)).scalar_one_or_none()
-        if case is None or not can_monitor(auth, student_organization_id=case.organization_id, test_owner_id=case.test_owner_id):
+        # reading a case is View; claiming or deciding it (taken under a lock) is Update
+        action = "update" if lock else "view"
+        if case is None or not can_monitor(auth, student_organization_id=case.organization_id, test_owner_id=case.test_owner_id, action=action):
             raise NotFoundError("Case not found.", code="CASE_NOT_FOUND")  # another owner's case is not confirmable by id
         return case
 

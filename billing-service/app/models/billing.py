@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, TimestampMixin, UUIDPrimaryKeyMixin
 from app.db.types import JSONType, NullableJSONType
-from app.domain.enums import InvoiceStatus, PaymentStatus, PlanStatus, QuoteStatus
+from app.domain.enums import InvoiceStatus, PaymentStatus, PlanStatus, PurchaseStatus, QuoteStatus
 
 
 class PriceItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -184,3 +184,23 @@ class OrgPlan(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     __table_args__ = (Index("ix_org_plans_org_status", "org_id", "status"), Index("ix_org_plans_status_end", "status", "ends_at"))
 
+
+
+class CoursePurchase(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """A self-registered learner buying one course for themselves. Invoiced at once; when the invoice is paid, billing announces
+    `course.purchased` and subscription-service grants (or extends) their access. Billing never decides access itself."""
+
+    __tablename__ = "course_purchases"
+
+    public_id: Mapped[int] = mapped_column(BigInteger, unique=True)
+    org_id: Mapped[int] = mapped_column(BigInteger)  # the learners' organisation ("Individual learners")
+    user_id: Mapped[int] = mapped_column(BigInteger)  # the buyer's public user id
+    course_id: Mapped[int] = mapped_column(BigInteger)
+    course_name: Mapped[str] = mapped_column(String(160))
+    valid_days: Mapped[int] = mapped_column(Integer)
+    amount: Mapped[int] = mapped_column(BigInteger)  # paise, the invoice total (incl. GST)
+    status: Mapped[str] = mapped_column(String(10), default=PurchaseStatus.PENDING)
+    invoice_id: Mapped[Any] = mapped_column(ForeignKey("invoices.id", ondelete="CASCADE"))
+    paid_at: Mapped[datetime | None]
+
+    __table_args__ = (Index("ix_course_purchases_user_status", "user_id", "status"),)

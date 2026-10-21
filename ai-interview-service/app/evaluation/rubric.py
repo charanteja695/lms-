@@ -19,6 +19,7 @@ from app.domain.enums import Criterion, Recommendation
 _SPACE = re.compile(r"\s+")
 _EDGE = re.compile(r"^[\W_]+|[\W_]+$")
 MIN_QUOTE_CHARS = 12
+SCORE_MIN, SCORE_MAX = 1, 5  # every criterion is scored on this scale; the overall score is their weighted mean
 
 
 def _norm(text: str) -> str:

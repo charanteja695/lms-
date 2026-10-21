@@ -104,12 +104,16 @@ async def test_export_streams_in_batches(client: AsyncClient, hierarchy: Hierarc
     original = settings.EXPORT_BATCH_SIZE, settings.EXPORT_MAX_ROWS
     settings.EXPORT_BATCH_SIZE, settings.EXPORT_MAX_ROWS = 100, 4
     try:
-        capped = _rows((await client.get(f"{API}/users/export", headers=hierarchy.staff)).text)
+        capped = _rows(
+            (await client.get(f"{API}/users/export", params={"role": "student"}, headers=hierarchy.head)).text
+        )
     finally:
         settings.EXPORT_BATCH_SIZE, settings.EXPORT_MAX_ROWS = original
     assert len(capped) == 4
 
-    everything = _rows((await client.get(f"{API}/users/export", headers=hierarchy.staff)).text)
+    everything = _rows(
+        (await client.get(f"{API}/users/export", params={"role": "student"}, headers=hierarchy.head)).text
+    )
     assert len(everything) == 6
     assert len({r["user_id"] for r in everything}) == 6
 

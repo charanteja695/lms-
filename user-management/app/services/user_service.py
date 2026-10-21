@@ -81,6 +81,7 @@ _ACTION_VERBS = {
     Action.CHANGE_STATUS: "change the status of",
     Action.DELETE: "delete",
     Action.REVOKE: "revoke access for",
+    Action.EXPORT: "download",
 }
 _PROFILE_FIELDS = ("gender", "date_of_birth", "alternate_phone", "preferred_language", "timezone")
 _USER_NAME_FIELDS = ("first_name", "middle_name", "last_name", "phone")
@@ -198,7 +199,7 @@ class UserService:
         self, actor: User, query: UserFilters, *, only_role: Role | None = None
     ) -> list[ColumnElement[bool]] | None:
         """Authorise an export and record it in the audit log. Rows are streamed by the caller."""
-        conditions = await self.filter_conditions(actor, query, only_role=only_role)
+        conditions = await self.filter_conditions(actor, query, only_role=only_role, action=Action.EXPORT)
         self.audit.log(
             AuditAction.USERS_EXPORTED,
             actor_id=actor.id,
@@ -210,18 +211,19 @@ class UserService:
         return conditions
 
     async def filter_conditions(
-        self, actor: User, query: UserFilters, *, only_role: Role | None = None
+        self, actor: User, query: UserFilters, *, only_role: Role | None = None, action: Action = Action.VIEW
     ) -> list[ColumnElement[bool]] | None:
-        """WHERE conditions for everything ``actor`` may see that matches ``query``.
-        ``None`` means nothing can match (e.g. an unknown organization_id)."""
-        viewable = policies.allowed_target_roles(actor.role, Action.VIEW)
+        """WHERE conditions for everything ``actor`` may see (or, with ``Action.EXPORT``, download) that matches
+        ``query``. ``None`` means nothing can match (e.g. an unknown organization_id)."""
+        verb = _ACTION_VERBS[action]
+        viewable = policies.allowed_target_roles(actor, Action.VIEW) & policies.allowed_target_roles(actor, action)
         if not viewable:
-            raise PermissionDeniedError("You are not allowed to view other users.")
+            raise PermissionDeniedError(f"You are not allowed to {verb} other users.")
 
         query_role = getattr(query, "role", None)
         requested = only_role or (Role(query_role.value) if query_role else None)
         if requested is not None and requested not in viewable:
-            raise PermissionDeniedError(f"You are not allowed to view {_ROLE_LABELS[requested]} accounts.")
+            raise PermissionDeniedError(f"You are not allowed to {verb} {_ROLE_LABELS[requested]} accounts.")
         roles = {requested} if requested else set(viewable)
 
         conditions: list[ColumnElement[bool]] = [User.role.in_(roles), User.id != actor.id]
@@ -344,7 +346,7 @@ class UserService:
         ``reserved`` holds identities already claimed by earlier rows of the same bulk import.
         """
         role = Role(data.role)
-        if not policies.can_act_on_role(actor.role, Action.CREATE, role):
+        if not policies.can_act_on_role(actor, Action.CREATE, role):
             raise PermissionDeniedError(f"You are not allowed to create {_ROLE_LABELS[role]} accounts.")
 
         institution = await self._resolve_institution(actor, role, data.organization_id, require_active=True)
@@ -503,7 +505,7 @@ class UserService:
                         )
                     ],
                 )
-            if not policies.can_act_on_role(actor.role, Action.UPDATE, requested):
+            if not policies.can_act_on_role(actor, Action.UPDATE, requested):
                 raise PermissionDeniedError(f"You are not allowed to assign the {_ROLE_LABELS[requested]} role.")
             new_role = requested
 
@@ -782,11 +784,11 @@ class UserService:
                 "You cannot perform this action on your own account.", code="SELF_ACTION_NOT_ALLOWED"
             )
         if not (
-            policies.can_act_on_role(actor.role, Action.VIEW, target.role)
+            policies.can_act_on_role(actor, Action.VIEW, target.role)
             and policies.is_user_in_scope(actor, target, target.institution)
         ):
             raise not_found
-        if not policies.can_act_on_role(actor.role, action, target.role):
+        if not policies.can_act_on_role(actor, action, target.role):
             raise PermissionDeniedError(f"You are not allowed to {_ACTION_VERBS[action]} this user.")
         return target
 

@@ -51,6 +51,11 @@ class Notifier:
             )
         )
 
+    def signup_code(self, *, email: str, name: str, otp: str) -> None:
+        self._queue(
+            templates.signup_code_email(to=email, name=name, otp=otp, expires_minutes=self._settings.OTP_EXPIRE_MINUTES)
+        )
+
     def account_setup(self, user: User, *, link_token: str) -> None:
         link = f"{self._settings.frontend_url(self._settings.FRONTEND_ACCOUNT_SETUP_PATH)}?token={link_token}"
         self._queue(

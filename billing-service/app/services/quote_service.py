@@ -61,7 +61,7 @@ class QuoteService:
         return applied, cgst + sgst + igst, taxable + cgst + sgst + igst
 
     async def create(self, auth: AccessTokenClaims, org_id: int, requested: list[dict[str, int]]) -> Quote:
-        if not owns(auth, org_id):
+        if not owns(auth, org_id, "update"):
             raise NotFoundError("Organisation not found.", code="ORGANIZATION_NOT_FOUND")
         ref = await self.db.get(OrgRef, org_id)
         if ref is not None and ref.org_type == "employer":

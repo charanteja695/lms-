@@ -2,6 +2,7 @@
 (app/ai/guard.py); nothing is saved from here. A suggestion that contains anything not in its source is returned with
 ``applicable: false`` and the list of what was invented, so the client can show it but not offer to apply it."""
 
+import json
 import re
 from typing import Any
 
@@ -11,11 +12,14 @@ from app.ats.language import check_text
 from app.clients.gateway import GatewayClient, GatewayDisabled, GatewayError, GatewayQuotaExceeded
 from app.core.config import Settings
 from app.core.exceptions import AiDisabledError, AiQuotaExceededError, AiUnavailableError, ValidationFailedError
+from app.domain.enums import SELF_KINDS, ItemKind
 from app.resume.document import document_text
+from app.resume.options import TONE_OPTIONS
+from app.schemas.items import validate_item_data
 from app.services.profile_service import ItemView
 
 _LEADING_NUMBER = re.compile(r"^\s*(?:\d+[.)]|[-•*])\s*")
-_TONES = {"professional", "warm", "concise"}
+_TONES = {t["key"] for t in TONE_OPTIONS}
 
 
 def facts_from_views(views: list[ItemView], *, profile_summary: str | None = None) -> str:
@@ -106,6 +110,11 @@ class AiService:
         )
         return self._suggestion(text, out, original=text)
 
+    async def read_resume(self, *, organization_id: int | None, user_id: int, text: str) -> tuple[dict[str, str | None], list[dict[str, Any]], int]:
+        """An old resume's text -> proposed profile entries (nothing is saved here; the student picks what to keep)."""
+        raw = await self._complete(organization_id=organization_id, user_id=user_id, prompt_key="career.import", variables={}, content=f"RESUME:\n{text}")
+        return parse_import(text, raw)
+
     async def tailor_summary(
         self, *, organization_id: int | None, user_id: int, views: list[ItemView], profile_summary: str | None, target_role: str | None, keywords: list[str]
     ) -> dict[str, Any]:
@@ -119,6 +128,65 @@ class AiService:
         )
         source = facts + "\n" + (target_role or "")  # the role the student chose is theirs to name
         return self._suggestion(source, text, extra=unsupported_keywords(source, text, keywords))
+
+
+_DATE_FIELDS = {"start_date", "end_date", "date"}  # reformatted from the text (Jun 2024 -> 2024-06), so not compared word for word
+_FENCE = re.compile(r"^```(?:json)?\s*|\s*```$")
+
+
+def _checked_text(data: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for key, value in data.items():
+        if key in _DATE_FIELDS or isinstance(value, bool) or value is None:
+            continue
+        parts.extend(str(v) for v in value) if isinstance(value, list) else parts.append(str(value))
+    return "\n".join(parts)
+
+
+_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9+#.\-]*|\d[\d,.]*")
+
+
+def _copied_from(source: str, text: str) -> bool:
+    """An imported entry must be copied, not written: no number, link or name the file lacks (the general guard), and no
+    capitalised word — a company, school, tool — that does not appear in the file, even as a one-word value like a skill."""
+    if invented(source, text):
+        return False
+    words = {t.lower().strip(".-,") for t in _TOKEN.findall(source)}
+    for token in _TOKEN.findall(text):
+        clean = token.strip(".-,")
+        if (clean[:1].isupper() or clean[:1].isdigit()) and clean.lower() not in words and clean.lower() not in source.lower():
+            return False
+    return True
+
+
+def parse_import(source: str, raw: str) -> tuple[dict[str, str | None], list[dict[str, Any]], int]:
+    """The model's reading of an old resume, kept only where it holds up: every entry must be a valid profile item and must not
+    say anything (a number, name, link) the file does not. Returns (profile fields, entries, how many were dropped)."""
+    try:
+        parsed = json.loads(_FENCE.sub("", raw.strip()))
+    except json.JSONDecodeError as exc:
+        raise AiUnavailableError("The AI's answer was not in the expected shape. Please try again.", code="AI_BAD_OUTPUT") from exc
+    if not isinstance(parsed, dict):
+        raise AiUnavailableError("The AI's answer was not in the expected shape. Please try again.", code="AI_BAD_OUTPUT")
+    profile: dict[str, str | None] = {}
+    for name, limit in (("headline", 160), ("summary", 1_000), ("phone", 30), ("location", 120)):
+        value = parsed.get(name)
+        profile[name] = value.strip()[:limit] if isinstance(value, str) and value.strip() and not invented(source, value) else None
+    items, skipped = [], 0
+    for entry in parsed.get("items") or []:
+        try:
+            kind = ItemKind(entry["kind"])
+            if kind not in SELF_KINDS:
+                raise ValueError(kind)
+            data = validate_item_data(kind, entry.get("data") or {})
+        except (KeyError, TypeError, ValueError, ValidationFailedError):
+            skipped += 1
+            continue
+        if not _copied_from(source, _checked_text(data)):
+            skipped += 1
+            continue
+        items.append({"kind": kind.value, "data": data})
+    return profile, items, skipped
 
 
 def gap_report(job_description: str, document: dict[str, Any], views: list[ItemView], profile_summary: str | None) -> dict[str, Any]:

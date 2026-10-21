@@ -18,6 +18,7 @@ from app.api.v1.endpoints.jobs import JobServiceDep
 from app.api.v1.endpoints.users import credentials_out, csv_response
 from app.models.job import JobType
 from app.models.user import User
+from app.permissions.policies import Action
 from app.permissions.roles import Role
 from app.schemas.common import PageContext, SuccessResponse
 from app.schemas.jobs import JobOut, JobResponse
@@ -123,7 +124,9 @@ async def create_admin_export_job(
     service: UserServiceDep,
     jobs: JobServiceDep,
 ) -> JobResponse:
-    await service.filter_conditions(auth.user, query.as_user_filters(UserExportQuery), only_role=Role.ADMIN)
+    await service.filter_conditions(
+        auth.user, query.as_user_filters(UserExportQuery), only_role=Role.ADMIN, action=Action.EXPORT
+    )
     job = await jobs.create_export_job(auth.user, JobType.ADMIN_EXPORT, query, only_role=Role.ADMIN)
     return JobResponse(message="Export queued. You will be emailed when it is ready.", job=JobOut.from_model(job))
 

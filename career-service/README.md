@@ -41,13 +41,23 @@ how well an applicant tracking system will read them, and exported as PDF or JSO
   list of references to profile items. The *document* resolves the draft against the profile at one moment; a **version** freezes the
   draft and that document with its ATS score, so old versions keep showing what they showed. Edits carry `expected_revision`
   (`409 STALE_DRAFT` for a lost race, proven under real concurrency). Restoring saves the current draft as a version first. Keep one
-  resume per target role; `duplicate` copies one.
+  resume per target role; `duplicate` copies one. Each resume has an **experience level** (`fresher`, `junior` 1–3 yrs, `mid` 3–8,
+  `senior` 8+): it sets the section order of a new draft (a fresher leads with skills, projects and internships; experienced people
+  with work history, education last), changing it reorders an existing draft (nothing is shown or hidden), and the ATS length target
+  follows it. `GET /resume-options` serves the levels (with what each changes), ways to start, AI tones, share-expiry choices and role
+  suggestions — the student's own target roles first, then `RESUME_ROLE_SUGGESTIONS` — so the client hardcodes none of them.
+- **Import** (`app/importing/`, `POST /profile/import`): an old resume or a LinkedIn "Save to PDF" (PDF, .docx or .txt, up to
+  `MAX_IMPORT_BYTES`; read, never stored; the file type is decided by its bytes; PDFs read for at most 10 pages, a .docx with a DTD or
+  entity declaration is refused). The `career.import` prompt reads the text into entries; each entry is kept only if it is a valid
+  profile item **and** copied from the file — no number, link or capitalised word (a company, school, tool) that the file lacks.
+  Nothing is saved: the student picks entries and sends them to `POST /profile/items/bulk` (all-or-nothing).
 - **Templates** (`app/rendering/templates.py`): Classic, Modern, Compact — all single-column plain text with standard headings, the
   layout an ATS reads in order. `ats_safe` is a property of the template; a template that breaks the rule lowers the score.
 - **ATS score** (`app/ats/`): rule-based, so the same resume always scores the same and each point has a reason. Contact 10 ·
   sections 15 · bullet quality 30 (action verb, a number, length, wording) · summary 5 · length 10 · template 10 · keyword match 20
   (only with a job description; otherwise scaled to the 80 that apply). `fixes` are ordered most valuable first and point at the
-  section and item. **It is a quality heuristic, not calibrated against any real ATS.**
+  section and item; `path_to_100` lists each part short of full marks with the points (out of 100) it would add and its fixes.
+  **It is a quality heuristic, not calibrated against any real ATS.**
 - **AI** (`app/services/ai_service.py`, prompts in `app/ai/prompts.py`): summary, bullet rewrite, tailored summary, grammar polish.
   Prompts are registered as drafts with `python -m app.cli register-prompts` and must be activated by a *different* AI manager in
   ai-gateway. The grammar and tone check itself (repeated words, first person, weak openings, filler) is rule-based and free.

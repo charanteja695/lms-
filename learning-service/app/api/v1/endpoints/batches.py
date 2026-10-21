@@ -9,7 +9,7 @@ from app.api.deps import (
     CurrentAuth,
     DbSession,
     RedisDep,
-    RequireBatchManager,
+    RequireBatchCreate,
     SettingsDep,
     ensure_organization_visible,
     institutions_in_care,
@@ -37,12 +37,12 @@ def _resolve_organization_id(auth: AccessTokenClaims, requested: int | None) -> 
         return requested
     if requested is not None and requested != auth.organization_id:
         raise BadRequestError("You can only create batches for your own institution.", code="ORGANIZATION_MISMATCH")
-    assert auth.organization_id is not None  # require_batch_manager already guarantees this
+    assert auth.organization_id is not None  # require_batch_action already guarantees this
     return auth.organization_id
 
 
 @router.post("", response_model=BatchResponse, status_code=201, summary="Create a batch", responses=errors(400, 401, 403, 404, 409, 422))
-async def create_batch(data: BatchCreate, auth: RequireBatchManager, db: DbSession, settings: SettingsDep, redis: RedisDep) -> BatchResponse:
+async def create_batch(data: BatchCreate, auth: RequireBatchCreate, db: DbSession, settings: SettingsDep, redis: RedisDep) -> BatchResponse:
     organization_id = _resolve_organization_id(auth, data.organization_id)
     batch = await BatchService(db, settings, redis).create(auth.user_id, organization_id, data)
     return BatchResponse(message="Batch created successfully.", batch=BatchOut.model_validate(batch))

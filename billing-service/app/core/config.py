@@ -91,6 +91,14 @@ class Settings(BaseSettings):
     PAYMENT_GATEWAY_API_KEY: SecretStr = SecretStr("")
     PAYMENT_GATEWAY_TIMEOUT_SECONDS: float = Field(default=15.0, gt=0)
     PAYMENT_WEBHOOK_SECRET: SecretStr = SecretStr(f"{DEV_SECRET_MARKER}-payment-webhook-secret")
+    # Razorpay (the learner store's checkout; also used for invoice payments when its keys are set). The key id is public
+    # (the browser's checkout needs it); the key secret signs and verifies. PAYMENT_WEBHOOK_SECRET is Razorpay's webhook secret.
+    PAYMENT_PROVIDER: str = Field(default="razorpay", pattern=r"^(razorpay|generic)$")
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: SecretStr = SecretStr("")
+    RAZORPAY_API_URL: str = "https://api.razorpay.com/v1"
+    SELLER_DISPLAY_NAME: str = "LMS"  # shown in the checkout window
+    LEARNER_ACCESS_DAYS: int = Field(default=365, ge=1, le=3650)  # a course price's default access period for learners
 
     @property
     def is_production_like(self) -> bool:

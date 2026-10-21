@@ -119,6 +119,11 @@ async def test_a_full_interview_is_evaluated_and_the_candidates_report_never_sho
     assert "recommendation" not in body
     assert body["summary"] == "A solid interview." and body["improvement_plan"]  # a mock interview gets a candidate-facing improvement plan
     assert 0 < body["criterion_scores"]["technical_depth"] <= 5
+    assert 1 <= body["overall_score"] <= body["score_max"] == 5
+    technical = next(r for r in body["rounds"] if r["round"] == "technical_1")
+    assert technical["score"] and technical["quotes"] and all(q for q in technical["quotes"])
+    listed = (await client.get(f"{API}/student/interviews")).json()["interviews"]
+    assert next(i for i in listed if i["interview_id"] == interview_id)["overall_score"] == body["overall_score"]
 
 
 async def test_a_follow_up_the_model_proposes_is_asked_next(client, who, gateway):

@@ -4,7 +4,7 @@ from lms_common.envelopes import PageContext, RequestSchema, ResponseSchema, Suc
 from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
-from app.domain.enums import ItemKind, SectionKey
+from app.domain.enums import ExperienceLevel, ItemKind, SectionKey
 from app.schemas.items import Bullets, Url
 from app.schemas.types import PublicIdOut, Timestamp, id_field, multiline_text, text
 
@@ -83,6 +83,7 @@ class ResumeCreate(RequestSchema):
     target_role: text(120) | None = None  # type: ignore[valid-type]
     template_key: text(30) | None = None  # type: ignore[valid-type]
     job_description: multiline_text(8_000) | None = None  # type: ignore[valid-type]
+    experience_level: ExperienceLevel = Field(default=ExperienceLevel.FRESHER, description="Sets the section order and the length the ATS score expects")
     blank: bool = Field(default=False, description="Start with no sections instead of everything in the profile")
 
 
@@ -92,6 +93,7 @@ class ResumeUpdate(RequestSchema):
     target_role: text(120) | None = None  # type: ignore[valid-type]
     template_key: text(30) | None = None  # type: ignore[valid-type]
     job_description: multiline_text(8_000) | None = None  # type: ignore[valid-type]
+    experience_level: ExperienceLevel | None = Field(default=None, description="Changing it puts the sections in that level's order (unless `draft` is sent too)")
     draft: DraftIn | None = None
 
 
@@ -189,15 +191,64 @@ class TemplatesResponse(SuccessResponse):
     templates: list[TemplateOut]
 
 
+class LevelOption(ResponseSchema):
+    key: str
+    label: str
+    note: str
+
+
+class StartOption(ResponseSchema):
+    key: str
+    label: str
+    description: str
+    accepts: list[str]
+
+
+class ResumeOptionsResponse(SuccessResponse):
+    experience_levels: list[LevelOption]
+    start_options: list[StartOption]
+    role_suggestions: list[str]
+    ai_tones: list[LevelOption] = Field(description="Tones the AI writing help accepts; `note` says what each sounds like")
+    max_resumes: int
+    max_import_bytes: int
+    share_expiry_days: list[int]
+    share_default_days: int
+
+
+class ImportedItem(ResponseSchema):
+    kind: str
+    data: dict[str, Any]
+    label: str
+
+
+class ImportedProfile(ResponseSchema):
+    headline: str | None = None
+    summary: str | None = None
+    phone: str | None = None
+    location: str | None = None
+
+
+class ImportResponse(SuccessResponse):
+    profile: ImportedProfile
+    items: list[ImportedItem]
+    skipped: int = Field(description="Entries the AI found but that failed checks (an invented fact or an invalid field); they are not offered")
+
+
+class BulkItemsCreate(RequestSchema):
+    items: Annotated[list[ItemCreate], Field(min_length=1, max_length=60)]
+
+
 class ResumeOut(ResponseSchema):
     resume_id: PublicIdOut = Field(validation_alias="public_id")
     title: str
     target_role: str | None
     template_key: str
+    experience_level: str
     draft_revision: int
     latest_version_no: int
     shared: bool = False
     share_expires_at: Timestamp | None = None
+    ats_score: int | None = Field(default=None, description="The live ATS score (in lists; the detail carries the full report)")
     created_at: Timestamp
     updated_at: Timestamp
 

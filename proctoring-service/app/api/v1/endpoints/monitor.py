@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import CurrentAuth, DbSession, SessionIdParam, SettingsDep
 from app.api.responses import AUTHENTICATED, errors
+from app.api.titles import test_titles
 from app.domain.enums import SessionStatus
 from app.models.session import ProctorSession
 from app.schemas.proctoring import (
@@ -37,7 +38,7 @@ class MonitorQuery(BaseModel):
 async def _detail(service: MonitorService, session: ProctorSession, message: str) -> MonitorSessionResponse:
     return MonitorSessionResponse(
         message=message,
-        session=SessionDetailOut.model_validate(session),
+        session=SessionDetailOut.model_validate(session).model_copy(update={"test_title": (await test_titles(service.db, [session.test_id])).get(session.test_id)}),
         events=await service.recent_events(session),
         directives=[DirectiveOut.model_validate(d) for d in await service.directives(session)],
     )
@@ -55,9 +56,10 @@ async def list_sessions(query: Annotated[MonitorQuery, Query()], auth: CurrentAu
     rows, total, exact = await MonitorService(db, settings).list_sessions(
         auth, test_id=query.test_id, status=query.status, min_risk=query.min_risk, only_critical=query.only_critical, page=query.page, per_page=query.per_page
     )
+    titles = await test_titles(db, (s.test_id for s in rows))
     return SessionListResponse(
         message="Sessions retrieved successfully.",
-        sessions=[SessionOut.model_validate(s) for s in rows],
+        sessions=[SessionOut.model_validate(s).model_copy(update={"test_title": titles.get(s.test_id)}) for s in rows],
         page_context=PageContext.build(page=query.page, per_page=query.per_page, total=total, is_exact=exact, sort_column="risk_score", sort_order=SortOrder.DESC),
     )
 
@@ -77,7 +79,7 @@ async def get_session(session_id: SessionIdParam, auth: CurrentAuth, db: DbSessi
 )
 async def warn(session_id: SessionIdParam, data: WarnIn, auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> MonitorSessionResponse:
     service = MonitorService(db, settings)
-    session = await service.get(session_id, auth)
+    session = await service.get(session_id, auth, "update")
     await service.warn(session, data.message, auth)
     return await _detail(service, session, "Warning sent.")
 
@@ -92,7 +94,7 @@ async def warn(session_id: SessionIdParam, data: WarnIn, auth: CurrentAuth, db: 
 )
 async def pause(session_id: SessionIdParam, data: NoteIn, auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> MonitorSessionResponse:
     service = MonitorService(db, settings)
-    session = await service.get(session_id, auth)
+    session = await service.get(session_id, auth, "update")
     await service.pause(session, data.message, auth)
     return await _detail(service, session, "Attempt paused.")
 
@@ -100,7 +102,7 @@ async def pause(session_id: SessionIdParam, data: NoteIn, auth: CurrentAuth, db:
 @router.post("/sessions/{session_id}/resume", response_model=MonitorSessionResponse, summary="Resume a paused attempt", responses=errors(*AUTHENTICATED, 404, 409, 502))
 async def resume(session_id: SessionIdParam, auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> MonitorSessionResponse:
     service = MonitorService(db, settings)
-    session = await service.get(session_id, auth)
+    session = await service.get(session_id, auth, "update")
     await service.resume(session, auth)
     return await _detail(service, session, "Attempt resumed.")
 
@@ -115,7 +117,7 @@ async def resume(session_id: SessionIdParam, auth: CurrentAuth, db: DbSession, s
 )
 async def terminate(session_id: SessionIdParam, data: NoteIn, auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> MonitorSessionResponse:
     service = MonitorService(db, settings)
-    session = await service.get(session_id, auth)
+    session = await service.get(session_id, auth, "update")
     await service.terminate(session, data.message, auth)
     return await _detail(service, session, "Attempt terminated.")
 

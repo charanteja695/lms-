@@ -26,6 +26,7 @@ from app.models.job import BackgroundJob, JobStatus, JobType
 from app.models.user import User
 from app.notifications.email import EmailSender
 from app.notifications.notifier import Notifier
+from app.permissions.policies import Action
 from app.permissions.roles import OrganizationType, Role
 from app.repositories.institution_repository import InstitutionRepository
 from app.schemas.employer import EmployerExportQuery
@@ -36,6 +37,7 @@ from app.services.access_service import ensure_institution_access, ensure_user_a
 from app.services.import_service import REPORT_COLUMNS, ImportMode, ImportService, report_rows
 from app.services.institution_service import InstitutionService
 from app.services.job_service import job_file_path, job_input_path
+from app.services.permission_service import PermissionService
 from app.services.user_service import UserService
 
 logger = logging.getLogger("app.worker")
@@ -208,6 +210,7 @@ async def _authorised_actor(db: AsyncSession, job: BackgroundJob) -> User:
         await ensure_institution_access(actor, InstitutionRepository(db))
     except Exception as exc:
         raise PermissionError("The requesting user no longer has access") from exc
+    actor.grant(await PermissionService(db).effective_for(actor))
     return actor
 
 
@@ -227,13 +230,17 @@ async def _run_export(ctx: WorkerContext, job: BackgroundJob) -> tuple[int, User
 
         if job.job_type == JobType.INSTITUTION_EXPORT:
             service = InstitutionService(db, settings, request_ctx)
-            conditions = await service.filter_conditions(actor, InstitutionExportQuery.model_validate(filters))
+            conditions = await service.filter_conditions(
+                actor, InstitutionExportQuery.model_validate(filters), action="export"
+            )
             model, columns = export_service.Institution, export_service.INSTITUTION_EXPORT_COLUMNS
             options, loader = export_service.INSTITUTION_EXPORT_OPTIONS, export_service.INSTITUTION_COUNTS_LOADER
             resource = "institutions"
         elif job.job_type == JobType.EMPLOYER_EXPORT:
             service = InstitutionService(db, settings, request_ctx, org_type=OrganizationType.EMPLOYER)
-            conditions = await service.filter_conditions(actor, EmployerExportQuery.model_validate(filters))
+            conditions = await service.filter_conditions(
+                actor, EmployerExportQuery.model_validate(filters), action="export"
+            )
             model, columns = export_service.Institution, export_service.EMPLOYER_EXPORT_COLUMNS
             options, loader = export_service.INSTITUTION_EXPORT_OPTIONS, export_service.INSTITUTION_COUNTS_LOADER
             resource = "employers"
@@ -241,10 +248,14 @@ async def _run_export(ctx: WorkerContext, job: BackgroundJob) -> tuple[int, User
             users = UserService(db, settings, request_ctx, Notifier(None, ctx.email_sender, settings))
             if job.job_type == JobType.ADMIN_EXPORT:
                 user_filters = AdminExportQuery.model_validate(filters).as_user_filters(UserExportQuery)
-                conditions = await users.filter_conditions(actor, user_filters, only_role=Role.ADMIN)
+                conditions = await users.filter_conditions(
+                    actor, user_filters, only_role=Role.ADMIN, action=Action.EXPORT
+                )
                 resource = "admins"
             else:
-                conditions = await users.filter_conditions(actor, UserExportQuery.model_validate(filters))
+                conditions = await users.filter_conditions(
+                    actor, UserExportQuery.model_validate(filters), action=Action.EXPORT
+                )
                 resource = "users"
             model, columns = export_service.User, export_service.USER_EXPORT_COLUMNS
             options, loader = export_service.USER_EXPORT_OPTIONS, None

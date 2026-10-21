@@ -17,6 +17,13 @@ class SubscriptionStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class CourseAccessStatus(StrEnum):
+    """A learner's bought access: active until ``ends_at``, then expired (buying again re-opens it)."""
+
+    ACTIVE = "active"
+    EXPIRED = "expired"
+
+
 class InstitutionStatus(StrEnum):
     """Local mirror of user-management's institution status (see app/models/institution_ref.py):
     only the values this service needs to react to."""

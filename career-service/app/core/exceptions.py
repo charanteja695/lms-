@@ -66,6 +66,12 @@ class ValidationFailedError(AppError):
     message = "Some fields are missing or invalid."
 
 
+class PayloadTooLargeError(AppError):
+    status_code = 413
+    code = "FILE_TOO_LARGE"
+    message = "The file is too large."
+
+
 class RateLimitedError(AppError):
     status_code = 429
     code = "TOO_MANY_REQUESTS"

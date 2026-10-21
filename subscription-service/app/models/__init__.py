@@ -1,6 +1,7 @@
 """Import every model here so Base.metadata (and Alembic) sees all tables."""
 
 from app.db.base import Base
+from app.models.course_access import CourseAccess, CourseAccessPurchase
 from app.models.course_ref import CourseRef
 from app.models.course_request import CourseRequest
 from app.models.institution_ref import InstitutionRef
@@ -10,6 +11,8 @@ from app.models.subscription import Subscription
 
 __all__ = [
     "Base",
+    "CourseAccess",
+    "CourseAccessPurchase",
     "CourseRef",
     "CourseRequest",
     "InstitutionRef",

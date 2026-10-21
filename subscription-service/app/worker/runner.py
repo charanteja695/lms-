@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.config import Settings
 from app.events.consumers.router import dispatch
 from app.events.publisher import RedisStreamPublisher, relay_outbox
+from app.services.course_access_service import CourseAccessService
 from app.services.subscription_service import SubscriptionService
 
 logger = logging.getLogger("app.worker")
@@ -66,6 +67,10 @@ async def run_expiry_sweep(sessionmaker: async_sessionmaker[AsyncSession], redis
                 expired = await SubscriptionService(db, settings, redis).expire_due()
                 if expired:
                     logger.info("expired subscriptions", extra={"extra_fields": {"count": expired}})
+            async with sessionmaker() as db:
+                ended = await CourseAccessService(db).expire_due()
+                if ended:
+                    logger.info("expired learner course access", extra={"extra_fields": {"count": ended}})
         except Exception:
             logger.exception("expiry sweep iteration failed")
         try:

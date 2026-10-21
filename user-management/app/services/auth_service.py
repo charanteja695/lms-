@@ -233,13 +233,7 @@ class AuthService:
         issued = await self.sessions.issue_tokens(
             user, institution, session, mfa_enabled=await self.mfa.is_enabled(user)
         )
-        self.audit.log(
-            AuditAction.TOKEN_REFRESHED,
-            actor_id=user.id,
-            institution_id=user.institution_id,
-            resource_type="session",
-            resource_id=session.id,
-        )
+        # Not audited: a refresh happens every few minutes per open session (session.last_used_at records it).
         await self.db.commit()
         return issued
 

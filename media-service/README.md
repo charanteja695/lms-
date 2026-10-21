@@ -33,6 +33,10 @@ POST /media/{id}/playback-tokens -> opaque short-lived token for a <video> tag
 GET  /playback/{token}           -> 307 redirect to a fresh, short-lived presigned S3 GET URL
 ```
 
+The **Videos & PDFs library** (super admin, `content.author`) reads `GET /media` with `kind`, `status`,
+`search` (file name) and `archived=true`, the counts from `GET /media/summary`, archives with
+`DELETE /media/{id}` and brings a file back with `POST /media/{id}/restore`.
+
 **Compression** (see [app/pipeline/](app/pipeline)): every video is re-encoded H.264/AAC at
 CRF 23 ("visually lossless" in practice) and scaled to whichever of 1080p/720p/480p are at or
 below the source's own height — never upscaled. The raw original is deleted from S3 once the

@@ -98,6 +98,7 @@ def _require(check: Callable[[AccessTokenClaims], bool], message: str, code: str
 
 
 RequireStudent = Annotated[AccessTokenClaims, Depends(_require(is_student, "Only students can do this.", "STUDENTS_ONLY"))]
+RequireInterviewStarter = Annotated[AccessTokenClaims, Depends(_require(lambda a: is_student(a, "create"), "Starting interviews is turned off for your account.", "ACTION_NOT_PERMITTED"))]
 RequireEmployer = Annotated[AccessTokenClaims, Depends(_require(is_employer_member, "Only a company's recruiters and admins can do this.", "EMPLOYERS_ONLY"))]
 RequireEmployerOrManager = Annotated[
     AccessTokenClaims, Depends(_require(lambda a: is_employer_member(a) or can_manage_careers(a), "Only a company's team or a careers manager can do this.", "EMPLOYERS_ONLY"))

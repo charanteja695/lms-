@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from datetime import datetime
 
 
+# Roles user-management sets on the permission matrix (page × action cells, e.g. ``students.delete``).
+MATRIX_ROLES = frozenset({"admin", "institution_head", "staff", "student"})
+
+
 @dataclass(frozen=True, slots=True)
 class AccessTokenClaims:
     """All identifiers are public ids (see ``lms_common.ids``), not internal database keys."""
@@ -35,3 +39,16 @@ class AccessTokenClaims:
     def can(self, permission: str) -> bool:
         """Whether this person holds ``permission``. A super admin holds every permission and can't be restricted."""
         return self.role == "super_admin" or permission in self.scopes
+
+    def can_act(self, cell: str, legacy: str) -> bool:
+        """One action on one page of the permission matrix (``batches.delete``), as user-management's super admin ticked it.
+
+        Admins, institution heads, staff and students are set on the matrix, so they need the exact cell. The older company
+        roles still hold coarse feature keys, so for them ``legacy`` (the key the cell implies, ``learning.batches.manage``)
+        decides. A super admin can do everything.
+        """
+        if self.role == "super_admin":
+            return True
+        if self.role in MATRIX_ROLES:
+            return cell in self.scopes
+        return legacy in self.scopes

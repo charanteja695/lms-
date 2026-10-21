@@ -127,6 +127,32 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         self.scopes = f",{','.join(unique)}," if unique else None
 
     @property
+    def granted(self) -> frozenset[str]:
+        """Their effective permissions, loaded with the request's sign-in check (``deps._authenticate``).
+
+        Until loaded (a user read for some other reason), their role's catalog defaults.
+        """
+        loaded = self.__dict__.get("_granted")
+        if loaded is None:
+            from app.permissions.effective import effective  # noqa: PLC0415 - permissions import the models
+            from app.permissions.roles import Role, organization_type_for  # noqa: PLC0415
+
+            kind = organization_type_for(self.role)
+            loaded = frozenset(
+                effective(
+                    Role(self.role),
+                    kind.value if kind else None,
+                    admin_scopes=self.scope_list,
+                    role_overrides={},
+                    user_overrides={},
+                )
+            )
+        return loaded
+
+    def grant(self, permissions: list[str] | frozenset[str]) -> None:
+        self.__dict__["_granted"] = frozenset(permissions)
+
+    @property
     def full_name(self) -> str:
         return " ".join(part for part in (self.first_name, self.middle_name, self.last_name) if part)
 

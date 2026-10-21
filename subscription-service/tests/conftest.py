@@ -33,7 +33,8 @@ def _settings() -> Settings:
 
 
 # What user-management puts in a token by default (its permission catalog), for the permissions this service checks.
-ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {"institution_head": ("subscriptions.request",)}
+# What user-management's token carries by default: the permission-matrix cells plus the feature key they imply.
+ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {"institution_head": ("course_requests.view", "course_requests.create", "subscriptions.request")}
 
 
 def make_claims(

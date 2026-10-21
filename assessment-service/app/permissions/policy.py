@@ -45,9 +45,10 @@ def runs_employer_tests(auth: AccessTokenClaims) -> bool:
     return _employer_may(auth, MANAGE)
 
 
-def is_institution_staff(auth: AccessTokenClaims) -> bool:
-    """Grades and follows their own institution's students' attempts."""
-    return auth.organization_id is not None and auth.organization_type == "institution" and auth.has_scope(GRADE)
+def is_institution_staff(auth: AccessTokenClaims, action: str = "view") -> bool:
+    """Follows (``view``) or grades and supervises (``update``) their own institution's students' attempts: the
+    Attempts & grading page's cells on user-management's permission matrix."""
+    return auth.organization_id is not None and auth.organization_type == "institution" and auth.can_act(f"attempts.{action}", GRADE)
 
 
 def can_manage_exams(auth: AccessTokenClaims) -> bool:
@@ -129,4 +130,4 @@ def can_grade_attempt(
         return True
     if test_owner_id is not None:
         return can_manage_owned_by(auth, test_owner_id)
-    return is_institution_staff(auth) and auth.organization_id == attempt_organization_id
+    return is_institution_staff(auth, "update") and auth.organization_id == attempt_organization_id

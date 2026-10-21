@@ -61,10 +61,16 @@ def _person(user: User) -> PersonNode:
     return PersonNode(user_id=user.public_id, full_name=user.full_name, status=user.status)
 
 
-@router.get("/hierarchy", response_model=HierarchyResponse, summary="Super admin -> admins -> institutions -> head -> staff and students")
+@router.get(
+    "/hierarchy",
+    response_model=HierarchyResponse,
+    summary="Super admin -> admins -> institutions -> head -> staff and students",
+)
 async def hierarchy(auth: CurrentAuth, db: DbSession) -> HierarchyResponse:
     actor = auth.user
-    scope = select(Institution).where(Institution.org_type == OrganizationType.INSTITUTION, Institution.deleted_at.is_(None))
+    scope = select(Institution).where(
+        Institution.org_type == OrganizationType.INSTITUTION, Institution.deleted_at.is_(None)
+    )
     if actor.role == Role.ADMIN:
         scope = scope.where(Institution.admin_id == actor.id)
     elif actor.role != Role.SUPER_ADMIN:
@@ -89,7 +95,9 @@ async def hierarchy(auth: CurrentAuth, db: DbSession) -> HierarchyResponse:
                 counts[institution_id][role] = int(count)
         for head in (
             await db.execute(
-                select(User).where(User.institution_id.in_(ids), User.role == Role.INSTITUTION_HEAD, User.deleted_at.is_(None)).order_by(User.first_name)
+                select(User)
+                .where(User.institution_id.in_(ids), User.role == Role.INSTITUTION_HEAD, User.deleted_at.is_(None))
+                .order_by(User.first_name)
             )
         ).scalars():
             if head.institution_id is not None:
@@ -97,14 +105,22 @@ async def hierarchy(auth: CurrentAuth, db: DbSession) -> HierarchyResponse:
         departments = {
             k: int(v)
             for k, v in (
-                await db.execute(select(Department.institution_id, func.count()).where(Department.institution_id.in_(ids)).group_by(Department.institution_id))
+                await db.execute(
+                    select(Department.institution_id, func.count())
+                    .where(Department.institution_id.in_(ids))
+                    .group_by(Department.institution_id)
+                )
             ).tuples()
         }
 
     admin_ids = {i.admin_id for i in institutions}
     if actor.role == Role.SUPER_ADMIN:  # admins with no institutions yet still belong in the tree
-        admin_ids |= set((await db.execute(select(User.id).where(User.role == Role.ADMIN, User.deleted_at.is_(None)))).scalars())
-    people = {u.id: u for u in (await db.execute(select(User).where(User.id.in_(admin_ids)))).scalars()} if admin_ids else {}
+        admin_ids |= set(
+            (await db.execute(select(User.id).where(User.role == Role.ADMIN, User.deleted_at.is_(None)))).scalars()
+        )
+    people = (
+        {u.id: u for u in (await db.execute(select(User).where(User.id.in_(admin_ids)))).scalars()} if admin_ids else {}
+    )
 
     grouped: dict[uuid.UUID, list[InstitutionNode]] = defaultdict(list)
     for institution in institutions:
@@ -126,13 +142,21 @@ async def hierarchy(auth: CurrentAuth, db: DbSession) -> HierarchyResponse:
     for admin_id in sorted(admin_ids, key=lambda i: people[i].full_name.lower() if i in people else ""):
         person = people.get(admin_id)
         is_admin = person is not None and person.role == Role.ADMIN
-        admins.append(AdminNode(admin=_person(person) if is_admin and person else None, institutions=grouped.get(admin_id, [])))
+        admins.append(
+            AdminNode(admin=_person(person) if is_admin and person else None, institutions=grouped.get(admin_id, []))
+        )
 
     super_admins: list[PersonNode] = []
     if actor.role == Role.SUPER_ADMIN:
         super_admins = [
             _person(u)
-            for u in (await db.execute(select(User).where(User.role == Role.SUPER_ADMIN, User.status == UserStatus.ACTIVE, User.deleted_at.is_(None)))).scalars()
+            for u in (
+                await db.execute(
+                    select(User).where(
+                        User.role == Role.SUPER_ADMIN, User.status == UserStatus.ACTIVE, User.deleted_at.is_(None)
+                    )
+                )
+            ).scalars()
         ]
     return HierarchyResponse(
         message="Organisation tree retrieved successfully.",

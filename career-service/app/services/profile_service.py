@@ -12,7 +12,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
-from app.core.exceptions import ConflictError, NotFoundError, PermissionDeniedError
+from app.core.exceptions import ConflictError, NotFoundError, PermissionDeniedError, ValidationFailedError
 from app.core.ids import new_public_id
 from app.core.time import utcnow
 from app.domain.enums import SELF_KINDS, VERIFIED_KINDS, ItemKind, ItemSource
@@ -107,6 +107,38 @@ class ProfileService:
         await self.touch(profile)
         await self.db.commit()
         return item
+
+    async def add_items(self, user_id: int, organization_id: int | None, entries: list[tuple[ItemKind, dict[str, Any]]]) -> list[ProfileItem]:
+        """Add several entries at once (an imported resume): all are validated first, and either all are saved or none."""
+        problems: list[dict[str, Any]] = []
+        clean: list[tuple[ItemKind, dict[str, Any]]] = []
+        for index, (kind, data) in enumerate(entries):
+            if kind not in SELF_KINDS:
+                problems.append({"field": f"items.{index}.kind", "code": "VERIFIED_KIND", "message": "Certificates, courses and scores come from the platform"})
+                continue
+            try:
+                clean.append((kind, validate_item_data(kind, data)))
+            except ValidationFailedError as exc:
+                problems.extend({**d, "field": f"items.{index}.{d.get('field', 'data')}"} for d in (exc.details or []))
+        if problems:
+            raise ValidationFailedError(details=problems)
+        for kind in {k for k, _ in clean}:
+            if await self._count(user_id, kind) + sum(1 for k, _ in clean if k == kind) > self.settings.MAX_PROFILE_ITEMS_PER_KIND:
+                raise ConflictError(f"You can keep at most {self.settings.MAX_PROFILE_ITEMS_PER_KIND} {kind.value} entries.", code="TOO_MANY_ITEMS")
+        profile = await self.get_or_create(user_id, organization_id)
+        positions: dict[ItemKind, int] = {}
+        items: list[ProfileItem] = []
+        for kind, data in clean:
+            if kind not in positions:
+                last = (await self.db.execute(select(func.max(ProfileItem.position)).where(ProfileItem.user_id == user_id, ProfileItem.kind == kind))).scalar_one()
+                positions[kind] = last if last is not None else -1
+            positions[kind] += 1
+            item = ProfileItem(public_id=new_public_id(), user_id=user_id, kind=kind, verified=False, source=ItemSource.SELF, data=data, position=positions[kind], active=True)
+            self.db.add(item)
+            items.append(item)
+        await self.touch(profile)
+        await self.db.commit()
+        return items
 
     async def get_item(self, user_id: int, public_id: int) -> ProfileItem:
         item = (await self.db.execute(select(ProfileItem).where(ProfileItem.public_id == public_id, ProfileItem.user_id == user_id))).scalar_one_or_none()

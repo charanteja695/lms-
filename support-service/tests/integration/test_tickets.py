@@ -460,13 +460,13 @@ async def test_only_people_who_still_hold_the_permission_can_be_assigned(client,
         await send_event("user.created", {"user_id": str(user), "first_name": "P", "last_name": str(user), "role": role, "status": "active", "organization_id": str(org)})
     who.student()
     learning = (await open_ticket(client, category="learning"))["ticket_id"]
-    people.removed.add((STAFF_A2, "support.agent"))  # a super admin took support away from this one staff member
+    people.removed.add((STAFF_A2, "support_queue.update"))  # a super admin took answering away from this one staff member
     who.head()
     listed = (await client.get(f"{API}/agent/tickets/{learning}/assignees")).json()["assignees"]
     assert [p["user_id"] for p in listed] == [str(STAFF_A)]
     refused = await client.post(f"{API}/agent/tickets/{learning}/assign", json={"assignee_user_id": str(STAFF_A2)})
     assert refused.status_code == 422 and refused.json()["code"] == "ASSIGNEE_NOT_ELIGIBLE"
-    assert people.calls[-1] == {"permission": "support.agent", "user_ids": [str(STAFF_A2)]}
+    assert people.calls[-1] == {"permission": "support_queue.update", "user_ids": [str(STAFF_A2)]}
 
     people.down = True  # never assign on a guess
     unavailable = await client.post(f"{API}/agent/tickets/{learning}/assign", json={"assignee_user_id": str(STAFF_A)})

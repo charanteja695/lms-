@@ -41,7 +41,8 @@ def _settings(**overrides: Any) -> Settings:
 
 
 # What user-management puts in a token by default (its permission catalog), for the permissions this service checks.
-ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {"student": ("interviews.practice",), "employer_admin": ("interviews.screen",), "recruiter": ("interviews.screen",)}
+# What user-management's token carries by default: matrix cells plus the feature keys they imply (company roles: keys only).
+ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {"student": ("ai_interview.view", "ai_interview.create", "interviews.practice"), "employer_admin": ("interviews.screen",), "recruiter": ("interviews.screen",)}
 
 
 def make_claims(*, user_id: int, role: str, organization_id: int | None, scopes: tuple[str, ...] = (), defaults: bool = True) -> AccessTokenClaims:

@@ -57,7 +57,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_origins=settings.CORS_ORIGINS,
             allow_credentials=True,
             allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-            allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Signature"],
+            allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Signature", "X-Razorpay-Signature"],
             expose_headers=["X-Request-ID", "Retry-After"],
             max_age=600,
         )

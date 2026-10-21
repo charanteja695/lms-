@@ -319,3 +319,15 @@ async def test_a_file_answer_is_uploaded_directly_confirmed_and_graded_by_a_pers
     assert graded.json()["attempt"]["result"] == "passed"
     who.student(user_id=1755000000007102)
     assert (await client.get(f"/api/v1/attempts/{attempt_id}/answers/{q_file}/files/0")).status_code == 403  # another student
+
+
+async def test_attempts_view_and_grading_are_separate_matrix_cells(client, act_as) -> None:
+    """Staff left only View on Attempts & grading follow attempts but get no grading queue, although the coarse
+    assessments.grade key is still in their token."""
+    from tests.conftest import STAFF_A
+
+    act_as(STAFF_A, role="staff", defaults=False, scopes=("attempts.view", "assessments.grade"))
+    assert (await client.get("/api/v1/attempts")).status_code == 200
+    assert (await client.get("/api/v1/grading/queue")).status_code == 403
+    act_as(STAFF_A, role="staff")
+    assert (await client.get("/api/v1/grading/queue")).status_code == 200

@@ -32,7 +32,7 @@ API = "/api/v1"
 def _settings(**overrides: Any) -> Settings:
     values: dict[str, Any] = {
         "ENVIRONMENT": "test", "DATABASE_URL": "sqlite+aiosqlite:///:memory:", "REDIS_URL": "redis://localhost:6379/15", "DOCS_ENABLED": False, "RATE_LIMIT_ENABLED": False, "LOG_JSON": False,
-        "SELLER_STATE": "Karnataka", "GST_RATE_PERCENT": 18, "PAYMENT_GATEWAY_URL": "http://pay.test", "PAYMENT_WEBHOOK_SECRET": WEBHOOK_SECRET,
+        "SELLER_STATE": "Karnataka", "GST_RATE_PERCENT": 18, "PAYMENT_PROVIDER": "generic", "PAYMENT_GATEWAY_URL": "http://pay.test", "PAYMENT_WEBHOOK_SECRET": WEBHOOK_SECRET,
     }
     values.update(overrides)
     return Settings(**values)
@@ -40,7 +40,7 @@ def _settings(**overrides: Any) -> Settings:
 
 # What user-management puts in a token by default (its permission catalog), for the permissions this service checks.
 ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
-    "institution_head": ("billing.contact",),
+    "institution_head": ("billing.view", "billing.update", "billing.contact"),  # matrix cells plus the key they imply
     "employer_admin": ("billing.contact", "billing.plans.buy"),
 }
 

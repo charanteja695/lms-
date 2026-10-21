@@ -4,6 +4,7 @@ for the payload contracts this service consumes from user-management and catalog
 from lms_common.events import Event
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.events.consumers.access_events import handle_course_access_expired, handle_course_access_granted
 from app.events.consumers.assessment_events import handle_attempt_finalized
 from app.events.consumers.catalog_events import handle_course_published, handle_course_retired
 from app.events.consumers.institution_events import handle_institution_deleted, handle_institution_upserted
@@ -17,6 +18,9 @@ _HANDLERS = {
     "course.published": handle_course_published,
     "course.retired": handle_course_retired,
     "attempt.finalized": handle_attempt_finalized,
+    "course_access.granted": handle_course_access_granted,
+    "course_access.extended": handle_course_access_granted,
+    "course_access.expired": handle_course_access_expired,
 }
 
 

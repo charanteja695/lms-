@@ -44,14 +44,16 @@ class PriceCreate(RequestSchema):
     name: text(160, min_length=2)  # type: ignore[valid-type]
     unit_amount: Paise
     job_posts: int | None = Field(default=None, ge=1, le=10_000, description="employer_plan only")
-    valid_days: int | None = Field(default=None, ge=1, le=1_095, description="employer_plan only")
+    valid_days: int | None = Field(
+        default=None, ge=1, le=1_095, description="employer_plan: the plan's days; course_seat: days of access a self-registered learner's purchase gives (default 365)"
+    )
 
     @model_validator(mode="after")
     def _plan_fields(self) -> "PriceCreate":
         if self.kind == PriceKind.EMPLOYER_PLAN and (self.job_posts is None or self.valid_days is None):
             raise PydanticCustomError("REQUIRED", "An employer plan needs job_posts and valid_days")
-        if self.kind == PriceKind.COURSE_SEAT and (self.job_posts is not None or self.valid_days is not None):
-            raise PydanticCustomError("NOT_ALLOWED", "job_posts and valid_days apply to an employer plan only")
+        if self.kind == PriceKind.COURSE_SEAT and self.job_posts is not None:
+            raise PydanticCustomError("NOT_ALLOWED", "job_posts apply to an employer plan only")
         return self
 
 
@@ -59,6 +61,7 @@ class PriceUpdate(RequestSchema):
     name: text(160, min_length=2) | None = None  # type: ignore[valid-type]
     unit_amount: Paise | None = None
     active: bool | None = None
+    valid_days: int | None = Field(default=None, ge=1, le=1_095, description="course_seat: days of access a learner's purchase gives")
 
 
 class PriceOut(ResponseSchema):
@@ -294,3 +297,65 @@ class PurchaseResponse(SuccessResponse):
 
 class OrgPlanPage(SuccessResponse):
     plans: list[OrgPlanOut]
+
+
+# ====================================================================== the learner store
+
+
+class StoreOfferOut(ResponseSchema):
+    course_id: PublicIdOut
+    name: str
+    price: int = Field(description="Before GST, in paise")
+    gst: int
+    total: int = Field(description="What the learner pays, in paise")
+    valid_days: int = Field(description="Days of access a purchase gives (a repeat purchase extends it)")
+
+
+class StoreOffersResponse(SuccessResponse):
+    offers: list[StoreOfferOut]
+    payments_available: bool = Field(description="False while the payment provider isn't configured: buying is closed")
+
+
+class BuyRequest(RequestSchema):
+    name: text(200)  # type: ignore[valid-type]
+    email: text(254) | None = None  # type: ignore[valid-type]
+
+
+class CheckoutOut(ResponseSchema):
+    provider: str = Field(description="razorpay: open its checkout with key_id and order_id")
+    key_id: str | None
+    order_id: str
+    amount: int
+    currency: str
+    seller_name: str
+
+
+class CoursePurchaseOut(ResponseSchema):
+    purchase_id: PublicIdOut = Field(validation_alias="public_id")
+    course_id: PublicIdOut
+    course_name: str
+    valid_days: int
+    amount: int
+    status: str
+    paid_at: Timestamp | None
+    created_at: Timestamp
+    invoice_number: str | None = None
+
+
+class BuyResponse(SuccessResponse):
+    purchase: CoursePurchaseOut
+    checkout: CheckoutOut
+
+
+class ConfirmPaymentRequest(RequestSchema):
+    razorpay_order_id: text(80)  # type: ignore[valid-type]
+    razorpay_payment_id: text(80)  # type: ignore[valid-type]
+    razorpay_signature: text(200)  # type: ignore[valid-type]
+
+
+class CoursePurchaseResponse(SuccessResponse):
+    purchase: CoursePurchaseOut
+
+
+class CoursePurchasePage(SuccessResponse):
+    purchases: list[CoursePurchaseOut]

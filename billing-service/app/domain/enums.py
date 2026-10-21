@@ -18,6 +18,13 @@ class QuoteStatus(StrEnum):
 class InvoiceKind(StrEnum):
     SUBSCRIPTION = "subscription"
     PLAN = "plan"
+    COURSE = "course"  # an individual learner's course purchase
+
+
+class PurchaseStatus(StrEnum):
+    PENDING = "pending"  # invoiced, waiting for payment
+    PAID = "paid"  # access granted (course.purchased announced)
+    CANCELLED = "cancelled"  # its invoice was voided
 
 
 class InvoiceStatus(StrEnum):

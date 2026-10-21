@@ -14,8 +14,16 @@ from typing import Any
 from app.ats.keywords import Keyword
 from app.ats.keywords import coverage as keyword_coverage
 from app.ats.language import check_text, is_quantified, starts_with_action_verb
-from app.domain.enums import DEFAULT_TITLES
+from app.domain.enums import DEFAULT_TITLES, ExperienceLevel
 from app.resume.document import document_text
+
+# (fewest, most) words a resume at each level should have, and how to say it
+_LENGTH: dict[ExperienceLevel, tuple[int, int, str]] = {
+    ExperienceLevel.FRESHER: (250, 700, "one page"),
+    ExperienceLevel.JUNIOR: (300, 800, "one page"),
+    ExperienceLevel.MID: (350, 1000, "one to two pages"),
+    ExperienceLevel.SENIOR: (400, 1200, "two pages at most"),
+}
 
 _STANDARD_TITLES = {t.lower() for t in DEFAULT_TITLES.values()} | {
     "work experience", "professional experience", "employment", "education", "academic background", "technical skills", "certifications", "certificates",
@@ -49,6 +57,17 @@ class AtsReport:
     fixes: list[Fix]
     keywords: list[Keyword] = field(default_factory=list)
     word_count: int = 0
+    total_max: int = 80
+
+    def path_to_100(self) -> list[dict[str, Any]]:
+        """Each part that is short of full marks, the points (out of 100) it would add, and the fixes that earn them: biggest gain first."""
+        out = []
+        for c in self.components:
+            gap = c.maximum - c.points
+            if gap > 0.05:
+                codes = [f for f in self.fixes if _COMPONENT_OF.get(f.code, "bullets") == c.key]
+                out.append({"key": c.key, "label": c.label, "gain": round(100 * gap / self.total_max, 1), "fix_codes": sorted({f.code for f in codes})})
+        return sorted(out, key=lambda p: -p["gain"])
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -56,7 +75,16 @@ class AtsReport:
             "components": [{"key": c.key, "label": c.label, "points": round(c.points, 1), "max": c.maximum, "detail": c.detail} for c in self.components],
             "fixes": [{"code": f.code, "severity": f.severity, "message": f.message, "section": f.section, "item_id": f.item_id} for f in self.fixes],
             "keywords": [{"term": k.term, "weight": k.weight, "present": k.present} for k in self.keywords],
+            "path_to_100": self.path_to_100(),
         }
+
+
+# which part of the score each fix raises (anything unlisted is a wording fix on a bullet)
+_COMPONENT_OF = {
+    "NO_EMAIL": "contact", "NO_PHONE": "contact", "NO_LOCATION_OR_LINK": "contact",
+    "NO_EDUCATION": "sections", "NO_EXPERIENCE_OR_PROJECTS": "sections", "NO_SKILLS": "sections", "NONSTANDARD_HEADING": "sections",
+    "SUMMARY_LENGTH": "summary", "NO_SUMMARY": "summary", "LENGTH": "length", "TEMPLATE_NOT_ATS_SAFE": "template", "MISSING_KEYWORDS": "keywords",
+}
 
 
 def _bullets(document: dict[str, Any]) -> list[tuple[str, str, str]]:
@@ -69,7 +97,9 @@ def _bullets(document: dict[str, Any]) -> list[tuple[str, str, str]]:
     return out
 
 
-def score_document(document: dict[str, Any], *, template_ats_safe: bool, job_description: str | None = None) -> AtsReport:
+def score_document(
+    document: dict[str, Any], *, template_ats_safe: bool, job_description: str | None = None, experience_level: ExperienceLevel = ExperienceLevel.FRESHER
+) -> AtsReport:
     personal, sections = document["personal"], document["sections"]
     keys = {s["key"] for s in sections}
     text = document_text(document)
@@ -99,10 +129,12 @@ def score_document(document: dict[str, Any], *, template_ats_safe: bool, job_des
         points += 5
     else:
         fixes.append(Fix("NO_EDUCATION", "high", "Add an Education section."))
-    if keys & {"experience", "projects"}:
+    if experience_level != ExperienceLevel.FRESHER and "experience" not in keys:
+        fixes.append(Fix("NO_EXPERIENCE_OR_PROJECTS", "high", "Add your work experience: for someone with experience it is the first thing recruiters read."))
+    elif keys & {"experience", "projects"}:
         points += 5
     else:
-        fixes.append(Fix("NO_EXPERIENCE_OR_PROJECTS", "high", "Add Experience or Projects: it is what most recruiters read first."))
+        fixes.append(Fix("NO_EXPERIENCE_OR_PROJECTS", "high", "Add Projects or an internship: it is what recruiters read first on a fresher's resume."))
     if "skills" in keys:
         points += 5
     else:
@@ -147,14 +179,16 @@ def score_document(document: dict[str, Any], *, template_ats_safe: bool, job_des
         fixes.append(Fix("NO_SUMMARY", "low", "Add a two- or three-sentence summary aimed at the role."))
 
     # length
-    if 250 <= words <= 800:
+    low, high, pages = _LENGTH[experience_level]
+    advice = f"Aim for {low}–{high} words ({pages}); you have {words}."
+    if low <= words <= high:
         length_points, note = 10, "a good length"
-    elif 150 <= words < 250 or 800 < words <= 1000:
+    elif 0.6 * low <= words < low or high < words <= 1.25 * high:
         length_points, note = 6, "a little short or long"
-        fixes.append(Fix("LENGTH", "low", "Aim for 250–800 words: one page for a fresher, two at most."))
+        fixes.append(Fix("LENGTH", "low", advice))
     else:
         length_points, note = 2, "too short or too long"
-        fixes.append(Fix("LENGTH", "medium", "Aim for 250–800 words: one page for a fresher, two at most."))
+        fixes.append(Fix("LENGTH", "medium", advice))
     components.append(Component("length", "Length", length_points, 10, f"{words} words, {note}"))
 
     # template
@@ -177,4 +211,4 @@ def score_document(document: dict[str, Any], *, template_ats_safe: bool, job_des
     total = sum(c.points for c in components)
     order = {"high": 0, "medium": 1, "low": 2}
     fixes.sort(key=lambda f: order[f.severity])
-    return AtsReport(score=round(100 * total / total_max), components=components, fixes=fixes, keywords=coverage, word_count=words)
+    return AtsReport(score=round(100 * total / total_max), components=components, fixes=fixes, keywords=coverage, word_count=words, total_max=total_max)

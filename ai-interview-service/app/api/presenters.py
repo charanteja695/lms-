@@ -1,6 +1,7 @@
 """Turn rows into response objects, so every endpoint shows an interview, a turn or an evaluation the same way, and a candidate never
 sees what only a recruiter or careers manager may (the AI's recommendation, the transcript before the interview is theirs to read)."""
 
+from app.evaluation import rubric
 from app.models.calibration import CalibrationRun, CalibrationSample
 from app.models.interview import Appeal, Evaluation, Interview, InterviewTurn
 from app.models.plan import InterviewPlan
@@ -77,9 +78,14 @@ def report_out(interview: Interview, evaluation: Evaluation | None) -> ReportOut
     """The candidate's report: never the recommendation (docs/PRODUCT.md §5.8), and only once released."""
     if not interview.feedback_released or evaluation is None or evaluation.status != "final":
         return ReportOut(released=False)
+    rounds = []
+    for r in evaluation.rounds or []:
+        scores = [s["score"] for s in (r.get("scores") or {}).values() if isinstance(s, dict) and isinstance(s.get("score"), int | float)]
+        quotes = [e["quote"] for s in (r.get("scores") or {}).values() if isinstance(s, dict) for e in s.get("evidence") or []][:3]
+        rounds.append({"round": r.get("round"), "type": r.get("type"), "score": round(sum(scores) / len(scores), 1) if scores else None, "comment": r.get("comment") or "", "quotes": quotes})
     return ReportOut(
         released=True, summary=evaluation.summary, criterion_scores=evaluation.criterion_scores, strengths=evaluation.strengths, improvements=evaluation.improvements,
-        improvement_plan=evaluation.improvement_plan,
+        improvement_plan=evaluation.improvement_plan, overall_score=evaluation.overall_score, score_max=rubric.SCORE_MAX, rounds=rounds,
     )
 
 

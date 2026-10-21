@@ -13,6 +13,7 @@ from app.api.deps import (
     MessageIdParam,
     ReplyRateLimit,
     RequireStudent,
+    RequireTicketOpener,
     SettingsDep,
     TicketIdParam,
     TicketRateLimit,
@@ -77,7 +78,7 @@ async def load_own(service: TicketService, auth: AccessTokenClaims, ticket_id: i
     "integrity to the exam team. An `Idempotency-Key` makes a retried request return the same ticket.",
     responses=errors(*AUTHENTICATED), dependencies=[TicketRateLimit],
 )
-async def create_ticket(body: TicketCreate, auth: RequireStudent, db: DbSession, settings: SettingsDep, key: IdempotencyKeyHeader = None) -> TicketResponse:
+async def create_ticket(body: TicketCreate, auth: RequireTicketOpener, db: DbSession, settings: SettingsDep, key: IdempotencyKeyHeader = None) -> TicketResponse:
     attachments = await AttachmentService(settings).verify(auth.user_id, body.attachments)
     ticket, created = await TicketService(db, settings).create(
         requester_user_id=auth.user_id, organization_id=auth.organization_id, subject=body.subject, description=body.description,

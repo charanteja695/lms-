@@ -6,7 +6,16 @@ from pydantic_core import PydanticCustomError
 from app.permissions.roles import Role
 from app.schemas.common import RequestSchema, ResponseSchema, SuccessResponse
 from app.schemas.summaries import InstitutionRef
-from app.schemas.types import Identifier, OpaqueToken, Password, PublicIdOut, Timestamp
+from app.schemas.types import (
+    EmailAddress,
+    FirstName,
+    Identifier,
+    LastName,
+    OpaqueToken,
+    Password,
+    PublicIdOut,
+    Timestamp,
+)
 
 
 def _passwords_match(value: str, info: ValidationInfo) -> str:
@@ -22,6 +31,18 @@ def _passwords_match(value: str, info: ValidationInfo) -> str:
 class LoginRequest(RequestSchema):
     identifier: Identifier = Field(description="Email address or username")
     password: Password
+
+
+class SignupRequestBody(RequestSchema):
+    first_name: FirstName
+    last_name: LastName
+    email: EmailAddress
+    password: Password
+
+
+class SignupConfirmRequest(RequestSchema):
+    email: EmailAddress
+    code: str = Field(strict=True, pattern=r"^[0-9]{6,10}$", examples=["482913"])
 
 
 class RefreshTokenRequest(RequestSchema):
@@ -165,3 +186,12 @@ class SessionOut(ResponseSchema):
 
 class SessionListResponse(SuccessResponse):
     sessions: list[SessionOut]
+
+
+class SignupStartedOut(ResponseSchema):
+    email: str
+    expires_in: int = Field(description="Seconds until the emailed code expires")
+
+
+class SignupStartedResponse(SuccessResponse):
+    signup: SignupStartedOut

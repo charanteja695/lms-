@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.events.consumers.catalog_events import handle_course_published, handle_course_retired
 from app.events.consumers.institution_events import handle_institution_deleted, handle_institution_upserted
+from app.events.consumers.purchase_events import handle_course_purchased
 
 _HANDLERS = {
     "institution.created": handle_institution_upserted,
@@ -15,6 +16,7 @@ _HANDLERS = {
     "institution.deleted": handle_institution_deleted,
     "course.published": handle_course_published,
     "course.retired": handle_course_retired,
+    "course.purchased": handle_course_purchased,
 }
 
 

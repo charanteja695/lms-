@@ -96,6 +96,19 @@ class AssessmentOut(ResponseSchema):
     integrity: str | None
 
 
+class ProgressStepOut(ResponseSchema):
+    key: str
+    label: str
+    state: str = Field(description="done | current | upcoming | stopped (where a rejected, withdrawn or declined application ended)")
+
+
+class NextActionOut(ResponseSchema):
+    kind: str = Field(description="assessment | ai_interview | offer")
+    label: str
+    detail: str
+    due_at: Timestamp | None = None
+
+
 class MyApplicationOut(ResponseSchema):
     application_id: PublicIdOut
     job_id: PublicIdOut
@@ -108,6 +121,8 @@ class MyApplicationOut(ResponseSchema):
     assessment: AssessmentOut | None = None
     offer: OfferOut | None = None
     history: list[StageOut] = Field(default_factory=list)
+    progress: list[ProgressStepOut] = Field(default_factory=list, description="The job's steps and how far this application has got")
+    next_action: NextActionOut | None = Field(default=None, description="What the candidate must do now; null while the company is acting")
     applied_at: Timestamp
     status_changed_at: Timestamp | None
 
@@ -252,6 +267,7 @@ class MatchedJob(ResponseSchema):
 class FunnelResponse(SuccessResponse):
     job_id: PublicIdOut
     by_status: dict[str, int]
+    stages: list[dict[str, Any]] = Field(default_factory=list, description="This job's working tabs ({key, label, statuses, count}); filter the applicants list by `statuses`")
     total: int
     placed: int
     openings: int

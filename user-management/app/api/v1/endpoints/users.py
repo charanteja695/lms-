@@ -197,7 +197,7 @@ async def import_users(
     dry_run: Annotated[bool, Form()] = False,
     mode: Annotated[ImportMode, Form()] = ImportMode.ALL_OR_NOTHING,
 ) -> ImportResponse:
-    if not policies.allowed_target_roles(auth.user.role, Action.CREATE):
+    if not policies.allowed_target_roles(auth.user, Action.CREATE):
         raise PermissionDeniedError("You are not allowed to create users.")
     settings = service.settings
     content = await file.read(settings.IMPORT_MAX_FILE_BYTES + 1)
@@ -230,7 +230,7 @@ async def create_import_job(
     dry_run: Annotated[bool, Form()] = False,
     mode: Annotated[ImportMode, Form()] = ImportMode.ALL_OR_NOTHING,
 ) -> JobResponse:
-    if not policies.allowed_target_roles(auth.user.role, Action.CREATE):
+    if not policies.allowed_target_roles(auth.user, Action.CREATE):
         raise PermissionDeniedError("You are not allowed to create users.")
     content = await file.read(service.settings.IMPORT_JOB_MAX_FILE_BYTES + 1)
     job = await jobs.create_import_job(auth.user, content, mode=mode.value, dry_run=dry_run)
@@ -253,7 +253,9 @@ async def create_user_export_job(
     service: UserServiceDep,
     jobs: JobServiceDep,
 ) -> JobResponse:
-    await service.filter_conditions(auth.user, query)  # fail fast on filters the caller may not use
+    await service.filter_conditions(
+        auth.user, query, action=Action.EXPORT
+    )  # fail fast on filters the caller may not use
     job = await jobs.create_export_job(auth.user, JobType.USER_EXPORT, query)
     return JobResponse(message="Export queued. You will be emailed when it is ready.", job=JobOut.from_model(job))
 

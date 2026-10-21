@@ -10,16 +10,25 @@ version keeps showing what it showed.
 
 from typing import Any
 
-from app.domain.enums import DEFAULT_TITLES, SECTION_KINDS, ItemKind, SectionKey
+from app.domain.enums import DEFAULT_TITLES, SECTION_KINDS, ExperienceLevel, ItemKind, SectionKey
 from app.services.profile_service import ItemView
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
-# A fresher's resume leads with education and projects; the order is the student's to change.
-DEFAULT_ORDER = (
-    SectionKey.EDUCATION, SectionKey.PROJECTS, SectionKey.EXPERIENCE, SectionKey.SKILLS, SectionKey.CERTIFICATES, SectionKey.SKILL_SCORES,
+# A fresher's resume leads with what they can prove now (skills, projects, education); someone with work experience leads with
+# it and moves education to the end. The order is the student's to change afterwards.
+_FRESHER_ORDER = (
+    SectionKey.SKILLS, SectionKey.PROJECTS, SectionKey.EXPERIENCE, SectionKey.EDUCATION, SectionKey.CERTIFICATES, SectionKey.SKILL_SCORES,
     SectionKey.ACHIEVEMENTS, SectionKey.COURSES,
 )
+_EXPERIENCED_ORDER = (
+    SectionKey.EXPERIENCE, SectionKey.SKILLS, SectionKey.PROJECTS, SectionKey.CERTIFICATES, SectionKey.SKILL_SCORES, SectionKey.ACHIEVEMENTS,
+    SectionKey.EDUCATION, SectionKey.COURSES,
+)
+SECTION_ORDER: dict[ExperienceLevel, tuple[SectionKey, ...]] = {
+    ExperienceLevel.FRESHER: _FRESHER_ORDER, ExperienceLevel.JUNIOR: _EXPERIENCED_ORDER, ExperienceLevel.MID: _EXPERIENCED_ORDER, ExperienceLevel.SENIOR: _EXPERIENCED_ORDER,
+}
+DEFAULT_ORDER = _FRESHER_ORDER
 _HIDDEN_BY_DEFAULT = {SectionKey.COURSES}  # a completed course is already implied by its certificate
 
 
@@ -41,13 +50,20 @@ def date_range(start: str | None, end: str | None, current: bool = False) -> str
     return first or last
 
 
-def default_draft(views: list[ItemView]) -> dict[str, Any]:
-    """A first draft: every section that has something in it, in a sensible order, using the profile as it stands."""
+def reorder_sections(draft: dict[str, Any], level: ExperienceLevel) -> dict[str, Any]:
+    """The same draft with its sections in ``level``'s order; nothing is added, removed or hidden."""
+    rank = {key.value: i for i, key in enumerate(SECTION_ORDER[level])}
+    sections = sorted(draft.get("sections", []), key=lambda s: rank.get(s["key"], len(rank)))
+    return {**draft, "sections": sections}
+
+
+def default_draft(views: list[ItemView], level: ExperienceLevel = ExperienceLevel.FRESHER) -> dict[str, Any]:
+    """A first draft: every section that has something in it, in the order that suits ``level``, using the profile as it stands."""
     by_kind: dict[str, list[ItemView]] = {}
     for view in views:
         by_kind.setdefault(view.item.kind, []).append(view)
     sections = []
-    for key in DEFAULT_ORDER:
+    for key in SECTION_ORDER[level]:
         items = by_kind.get(SECTION_KINDS[key].value, [])
         if items:
             sections.append(

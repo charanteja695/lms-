@@ -24,6 +24,8 @@ class EnrollmentService:
     async def enroll(self, batch: Batch, student_user_id: int) -> Enrollment:
         if batch.status != BatchStatus.ACTIVE:
             raise BadRequestError("This batch is archived and cannot accept new enrolments.", code="BATCH_NOT_ACTIVE")
+        if batch.subscription_id == 0:  # a learner-store batch: learners join by buying the course
+            raise BadRequestError("Learners join this course by buying it in the store.", code="LEARNER_BATCH")
 
         enrollment_public_id = new_public_id()
         # Captured up front: if the insert below fails, the session rolls back and expires
@@ -89,7 +91,8 @@ class EnrollmentService:
             },
         )
         await self.db.commit()
-        await release_seat(self.settings, batch.subscription_id, str(enrollment.public_id))
+        if batch.subscription_id != 0:  # a learner-store batch holds no institution seat
+            await release_seat(self.settings, batch.subscription_id, str(enrollment.public_id))
         return enrollment
 
     async def get(self, enrollment_id: int) -> Enrollment:

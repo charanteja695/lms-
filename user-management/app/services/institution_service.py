@@ -119,7 +119,7 @@ class InstitutionService:
 
     async def prepare_export(self, actor: User, query: Any) -> list[ColumnElement[bool]] | None:
         # See the comment on list_institutions(): InstitutionFilters or EmployerFilters, duck-typed on purpose.
-        conditions = await self.filter_conditions(actor, query)
+        conditions = await self.filter_conditions(actor, query, action="export")
         self.audit.log(
             _AUDIT[self.org_type]["exported"],
             actor_id=actor.id,
@@ -129,7 +129,14 @@ class InstitutionService:
         await self.db.commit()
         return conditions
 
-    async def filter_conditions(self, actor: User, query: Any) -> list[ColumnElement[bool]] | None:
+    async def filter_conditions(
+        self, actor: User, query: Any, *, action: str = "view"
+    ) -> list[ColumnElement[bool]] | None:
+        """``action`` is the matrix action the caller needs on the list: ``view``, or ``export`` to download it."""
+        if not policies.can_list_organizations(actor, self.org_type, action):
+            raise PermissionDeniedError(
+                f"You are not allowed to {'download' if action == 'export' else 'see'} institutions."
+            )
         conditions: list[ColumnElement[bool]] = [Institution.org_type == self.org_type]
         if query.status == InstitutionStatus.DELETED:
             if actor.role != Role.SUPER_ADMIN:
@@ -299,7 +306,7 @@ class InstitutionService:
     async def change_status(
         self, actor: User, organization_id: int, status: StatusChange, reason: str | None
     ) -> tuple[Institution, MemberCounts]:
-        institution = await self._load_manageable(actor, organization_id)
+        institution = await self._load_manageable(actor, organization_id, "revoke")
         if institution.status != status:
             previous = institution.status
             institution.status = status
@@ -327,7 +334,7 @@ class InstitutionService:
 
     async def delete_institution(self, actor: User, organization_id: int) -> None:
         """Soft delete. Members keep their records but lose all access."""
-        institution = await self._load_manageable(actor, organization_id)
+        institution = await self._load_manageable(actor, organization_id, "delete")
         institution.status = InstitutionStatus.DELETED
         institution.deleted_at = utcnow()
         revoked = await self.sessions.revoke_all_for_institution(
@@ -346,7 +353,7 @@ class InstitutionService:
 
     async def revoke_access(self, actor: User, organization_id: int) -> int:
         """Sign out every member of the institution. Accounts stay active."""
-        institution = await self._load_manageable(actor, organization_id)
+        institution = await self._load_manageable(actor, organization_id, "revoke")
         revoked = await self.sessions.revoke_all_for_institution(institution.id, reason=RevokeReason.INSTITUTION_REVOKE)
         self.audit.log(
             _AUDIT[self.org_type]["access_revoked"],
@@ -374,11 +381,12 @@ class InstitutionService:
             raise NotFoundError(f"{self.label.capitalize()} not found.", code=self.not_found_code)
         return institution
 
-    async def _load_manageable(self, actor: User, organization_id: int) -> Institution:
+    async def _load_manageable(self, actor: User, organization_id: int, action: str = "update") -> Institution:
+        """``action``: the matrix action needed: ``update``, ``revoke`` (suspend, reactivate, sign out) or ``delete``."""
         institution = await self._load_visible(actor, organization_id)
         if institution.deleted_at is not None:
             raise NotFoundError(f"{self.label.capitalize()} not found.", code=self.not_found_code)
-        if not policies.can_manage_institution(actor, institution):
+        if not policies.can_manage_institution(actor, institution, action):
             raise PermissionDeniedError(f"You are not allowed to manage this {self.label}.")
         return institution
 

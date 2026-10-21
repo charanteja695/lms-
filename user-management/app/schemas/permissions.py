@@ -23,6 +23,7 @@ Section = Literal[
     "security",
     # One per other backend service (docs/PRODUCT.md §6), gating that module's whole side-menu entry. Coarse only:
     # who sees the *student* vs *staff* vs *admin* view within a section is that service's own, finer-grained call.
+    "store",  # self-registered learners: buy courses (billing-service)
     "catalog",
     "subscriptions",
     "learning",
@@ -58,6 +59,7 @@ class AdminsPermissionsOut(ResponseSchema):
 
 class OrganizationsPermissionsOut(ResponseSchema):
     create: bool
+    export: bool = Field(description="May download the list")
     filter_statuses: list[str]
     filter_by_admin: bool
     reassign_admin: bool

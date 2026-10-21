@@ -24,6 +24,7 @@ from app.domain.enums import ApplicationStatus
 from app.models.application import Application
 from app.models.job import Job
 from app.models.refs import UserRef
+from app.pipeline import progress as pipeline_progress
 from app.schemas.application import (
     BatchOut,
     BatchResponse,
@@ -46,7 +47,7 @@ from app.schemas.application import (
     RejectRequest,
     TransitionRequest,
 )
-from app.services.application_service import ApplicationService
+from app.services.application_service import ApplicationService, template_of
 from app.services.job_service import JobService
 from app.services.offer_service import OfferService
 from app.services.screening_service import ScreeningService
@@ -87,7 +88,8 @@ async def applicants(
 async def funnel(job_id: JobIdParam, auth: RequireEmployerOrManager, db: DbSession, settings: SettingsDep) -> FunnelResponse:
     job = await _job(db, settings, auth, job_id)
     counts = await ApplicationService(db, settings).status_counts(job)
-    return FunnelResponse(message="", job_id=job.public_id, by_status=counts, total=sum(counts.values()), placed=counts.get(ApplicationStatus.PLACED.value, 0), openings=job.openings)
+    stages = [{**g, "count": sum(counts.get(s, 0) for s in g["statuses"])} for g in pipeline_progress.stage_groups(template_of(job))]
+    return FunnelResponse(message="", job_id=job.public_id, by_status=counts, stages=stages, total=sum(counts.values()), placed=counts.get(ApplicationStatus.PLACED.value, 0), openings=job.openings)
 
 
 @router.get(

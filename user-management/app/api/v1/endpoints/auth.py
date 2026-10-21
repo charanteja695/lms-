@@ -9,6 +9,7 @@ from app.api.deps import (
     MfaServiceDep,
     SessionIdParam,
     SettingsDep,
+    SignupServiceDep,
     rate_limit,
 )
 from app.api.responses import errors
@@ -33,6 +34,10 @@ from app.schemas.auth import (
     ResetPasswordRequest,
     SessionListResponse,
     SessionOut,
+    SignupConfirmRequest,
+    SignupRequestBody,
+    SignupStartedOut,
+    SignupStartedResponse,
     VerifyOtpRequest,
     VerifyOtpResponse,
 )
@@ -66,6 +71,41 @@ async def login(
         )
     token = session_cookie.deliver(request, response, outcome.token, settings)
     return LoginResponse(message="Logged in successfully.", token=token, user=outcome.user)
+
+
+@router.post(
+    "/register",
+    response_model=SignupStartedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Sign up as an individual learner",
+    description="Emails a code to confirm the address; the account is created by `POST /auth/register/verify`. "
+    "Calling it again sends a new code (the old one stops working).",
+    dependencies=[Depends(rate_limit("signup", "SIGNUP_RATE_LIMIT_PER_HOUR", 3600))],
+    responses=errors(403, 409, 422, 429),
+)
+async def register(body: SignupRequestBody, service: SignupServiceDep) -> SignupStartedResponse:
+    expires_in = await service.start(
+        first_name=body.first_name, last_name=body.last_name, email=body.email, password=body.password
+    )
+    return SignupStartedResponse(
+        message="We sent a code to your email.",
+        signup=SignupStartedOut(email=body.email.lower(), expires_in=expires_in),
+    )
+
+
+@router.post(
+    "/register/verify",
+    response_model=LoginResponse,
+    summary="Confirm the emailed code: creates the account and signs in",
+    dependencies=[Depends(rate_limit("signup_verify", "OTP_VERIFY_RATE_LIMIT_PER_MINUTE", 60))],
+    responses=errors(400, 409, 422, 429),
+)
+async def register_verify(
+    body: SignupConfirmRequest, service: SignupServiceDep, request: Request, response: Response, settings: SettingsDep
+) -> LoginResponse:
+    issued = await service.confirm(email=body.email, code=body.code)
+    token = session_cookie.deliver(request, response, issued.token, settings)
+    return LoginResponse(message="Welcome! Your account is ready.", token=token, user=issued.user)
 
 
 @router.post(

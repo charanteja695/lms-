@@ -11,6 +11,7 @@ from app.models.password_reset import PasswordResetPurpose, PasswordResetRequest
 from app.models.permission import RolePermission, UserPermission
 from app.models.profiles import EmploymentProfile, StudentGuardian, StudentProfile, UserProfile
 from app.models.session import RefreshToken, UserSession
+from app.models.signup import SignupRequest
 from app.models.user import User
 
 __all__ = [
@@ -31,6 +32,7 @@ __all__ = [
     "Program",
     "RefreshToken",
     "RolePermission",
+    "SignupRequest",
     "StudentGuardian",
     "StudentProfile",
     "User",

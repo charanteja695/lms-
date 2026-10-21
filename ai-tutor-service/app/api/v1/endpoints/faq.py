@@ -59,7 +59,7 @@ async def promote(body: FaqPromote, auth: CurrentAuth, db: DbSession, settings: 
         raise PermissionDeniedError()
     question = (await db.execute(select(Message.content).where(Message.conversation_id == conversation.id, Message.seq == answer.seq - 1))).scalar_one_or_none() or ""
     # An institution's staff write for their own institution; a course author or support manager writes for the course.
-    default = FaqScope.COURSE if conversation.course_id and can_manage_faq(auth, FaqScope.COURSE, organization_id=conversation.organization_id) else FaqScope.ORGANIZATION
+    default = FaqScope.COURSE if conversation.course_id and can_manage_faq(auth, FaqScope.COURSE, organization_id=conversation.organization_id, action="create") else FaqScope.ORGANIZATION
     scope = body.scope or default
     entry = await FaqService(db, settings, gateway).create(
         auth, scope=scope, organization_id=conversation.organization_id if scope != FaqScope.PLATFORM else None,
@@ -89,5 +89,5 @@ async def publish_faq(faq_id: FaqIdParam, auth: CurrentAuth, db: DbSession, sett
 async def archive_faq(faq_id: FaqIdParam, auth: CurrentAuth, db: DbSession, settings: SettingsDep, gateway: GatewayDep) -> FaqResponse:
     service = FaqService(db, settings, gateway)
     entry = await service.get(faq_id)
-    service.authorize(auth, entry.scope, entry.organization_id)
+    service.authorize(auth, entry.scope, entry.organization_id, "delete")
     return FaqResponse(message="Entry archived.", faq=FaqOut.model_validate(await service.archive(entry)))

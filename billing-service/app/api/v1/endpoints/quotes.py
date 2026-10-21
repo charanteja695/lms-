@@ -15,10 +15,10 @@ from app.api.deps import (
     WriteRateLimit,
 )
 from app.api.responses import AUTHENTICATED, errors
-from app.core.exceptions import ValidationFailedError
+from app.core.exceptions import PermissionDeniedError, ValidationFailedError
 from app.core.ids import parse_public_id
 from app.domain.enums import QuoteStatus
-from app.permissions.policy import can_manage_billing
+from app.permissions.policy import can_manage_billing, owns
 from app.schemas.billing import DiscountIn, QuoteCreate, QuoteOut, QuotePage, QuoteResponse
 from app.services.quote_service import QuoteService
 
@@ -59,13 +59,19 @@ async def get_quote(quote_id: QuoteIdParam, auth: RequireBillingContact, db: DbS
              description="Fixes the price: it does not itself create a subscription (subscription-service's own approval does that).")
 async def accept_quote(quote_id: QuoteIdParam, auth: RequireBillingContact, db: DbSession, settings: SettingsDep) -> QuoteResponse:
     service = QuoteService(db, settings)
-    return QuoteResponse(message="Accepted.", quote=QuoteOut.model_validate(await service.accept(await service.get(auth, quote_id))))
+    quote = await service.get(auth, quote_id)
+    if not owns(auth, quote.org_id, "update"):
+        raise PermissionDeniedError("Accepting quotes is turned off for your account.", code="ACTION_NOT_PERMITTED")
+    return QuoteResponse(message="Accepted.", quote=QuoteOut.model_validate(await service.accept(quote)))
 
 
 @router.post("/{quote_id}/cancel", response_model=QuoteResponse, summary="Cancel an open quote", responses=errors(*AUTHENTICATED, 404, 409), dependencies=[WriteRateLimit])
 async def cancel_quote(quote_id: QuoteIdParam, auth: RequireBillingContact, db: DbSession, settings: SettingsDep) -> QuoteResponse:
     service = QuoteService(db, settings)
-    return QuoteResponse(message="Cancelled.", quote=QuoteOut.model_validate(await service.cancel(await service.get(auth, quote_id))))
+    quote = await service.get(auth, quote_id)
+    if not owns(auth, quote.org_id, "update"):
+        raise PermissionDeniedError("Changing quotes is turned off for your account.", code="ACTION_NOT_PERMITTED")
+    return QuoteResponse(message="Cancelled.", quote=QuoteOut.model_validate(await service.cancel(quote)))
 
 
 @admin.post("/{quote_id}/discount", response_model=QuoteResponse, summary="Apply a discount to an open quote", responses=errors(*AUTHENTICATED, 404, 409), dependencies=[WriteRateLimit])

@@ -2,14 +2,31 @@
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile
 
-from app.api.deps import CurrentAuth, DbSession, ItemIdParam, RequireStudent, SettingsDep, UserIdParam, WriteRateLimit
+from app.api.deps import (
+    AiRateLimit,
+    CurrentAuth,
+    DbSession,
+    GatewayDep,
+    ItemIdParam,
+    RequireStudent,
+    SettingsDep,
+    UserIdParam,
+    WriteRateLimit,
+)
 from app.api.responses import AUTHENTICATED, errors
-from app.core.exceptions import NotFoundError, PermissionDeniedError
+from app.core.exceptions import NotFoundError, PayloadTooLargeError, PermissionDeniedError
+from app.domain.enums import ItemKind
+from app.importing.extract import extract_text
+from app.importing.summary import item_label
 from app.models.profile import Profile
 from app.permissions.policy import can_view_student_profile
 from app.schemas.resume import (
+    BulkItemsCreate,
+    ImportedItem,
+    ImportedProfile,
+    ImportResponse,
     ItemCreate,
     ItemOut,
     ItemReorder,
@@ -21,6 +38,7 @@ from app.schemas.resume import (
     ProfileResponse,
     ProfileUpdate,
 )
+from app.services.ai_service import AiService
 from app.services.profile_service import ItemView, ProfileService
 
 router = APIRouter(prefix="/profile", tags=["Skill profile"])
@@ -78,6 +96,34 @@ async def add_item(body: ItemCreate, auth: RequireStudent, db: DbSession, settin
     service = ProfileService(db, settings)
     item = await service.add_item(auth.user_id, auth.organization_id, body.kind, body.data)
     return ItemResponse(message="Added.", item=present_item(ItemView(item=item, data=dict(item.data))))
+
+
+@router.post(
+    "/import", response_model=ImportResponse, summary="Read an old resume or LinkedIn PDF into proposed entries",
+    description="Upload a PDF, Word (.docx) or text file. The AI reads it into profile entries; each is checked (valid fields, no fact the file does not "
+    "contain) and **nothing is saved** — send the ones the student keeps to `POST /profile/items/bulk`. The file itself is not stored.",
+    responses=errors(*AUTHENTICATED, 413, 422, 503), dependencies=[AiRateLimit],
+)
+async def import_resume(file: UploadFile, auth: RequireStudent, db: DbSession, settings: SettingsDep, gateway: GatewayDep) -> ImportResponse:
+    content = await file.read(settings.MAX_IMPORT_BYTES + 1)
+    if len(content) > settings.MAX_IMPORT_BYTES:
+        raise PayloadTooLargeError(f"The file is larger than {settings.MAX_IMPORT_BYTES // (1024 * 1024)} MB.", code="FILE_TOO_LARGE")
+    text = extract_text(content)[: settings.MAX_IMPORT_TEXT_CHARS]
+    await db.commit()  # no transaction is held open across the model call
+    fields, items, skipped = await AiService(settings, gateway).read_resume(organization_id=auth.organization_id, user_id=auth.user_id, text=text)
+    proposed = [ImportedItem(kind=i["kind"], data=i["data"], label=item_label(ItemKind(i["kind"]), i["data"])) for i in items]
+    message = f"Found {len(proposed)} entries. Choose the ones to add." if proposed else "No entries could be read from this file."
+    return ImportResponse(message=message, profile=ImportedProfile(**fields), items=proposed, skipped=skipped)
+
+
+@router.post(
+    "/items/bulk", response_model=ItemsResponse, status_code=201, summary="Add several entries at once (after an import)",
+    description="All entries are validated first; either every one is added or none is.", responses=errors(*AUTHENTICATED, 409, 422), dependencies=[WriteRateLimit],
+)
+async def add_items(body: BulkItemsCreate, auth: RequireStudent, db: DbSession, settings: SettingsDep) -> ItemsResponse:
+    service = ProfileService(db, settings)
+    items = await service.add_items(auth.user_id, auth.organization_id, [(i.kind, i.data) for i in body.items])
+    return ItemsResponse(message=f"Added {len(items)} entries.", items=[present_item(ItemView(item=i, data=dict(i.data))) for i in items])
 
 
 @router.put("/items/order", response_model=ItemsResponse, summary="Reorder one kind of item", responses=errors(*AUTHENTICATED, 409), dependencies=[WriteRateLimit])

@@ -107,6 +107,15 @@ def require_manager(auth: CurrentAuth) -> AccessTokenClaims:
 
 
 RequireStudent = Annotated[AccessTokenClaims, Depends(require_student)]
+
+
+def require_ticket_opener(auth: CurrentAuth) -> AccessTokenClaims:
+    if not is_student(auth, "create"):
+        raise PermissionDeniedError("Opening tickets is turned off for your account.", code="ACTION_NOT_PERMITTED")
+    return auth
+
+
+RequireTicketOpener = Annotated[AccessTokenClaims, Depends(require_ticket_opener)]
 RequireAgent = Annotated[AccessTokenClaims, Depends(require_agent)]
 RequireManager = Annotated[AccessTokenClaims, Depends(require_manager)]
 

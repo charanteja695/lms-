@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app.api.deps import CaseIdParam, CurrentAuth, DbSession, RequireExamManager, SettingsDep, SnapshotIdParam
 from app.api.responses import AUTHENTICATED, errors
+from app.api.titles import test_titles
 from app.clients.assessment import AssessmentClient
 from app.core.exceptions import NotFoundError, PermissionDeniedError
 from app.domain.enums import CaseStatus
@@ -89,7 +90,8 @@ async def list_cases(query: Annotated[CaseQuery, Query()], auth: CurrentAuth, db
         stmt = stmt.where(IntegrityCase.status == query.status)
     service = CaseService(db, settings)
     rows, total, exact = await paginate(db, stmt.order_by(IntegrityCase.created_at.desc(), IntegrityCase.id), query.page, query.per_page)
-    cases = [_out(c, service) for c in rows]
+    titles = await test_titles(db, (c.test_id for c in rows))
+    cases = [_out(c, service).model_copy(update={"test_title": titles.get(c.test_id)}) for c in rows]
     if query.overdue is not None:
         cases = [c for c in cases if c.overdue == query.overdue]
     return CaseListResponse(
@@ -112,6 +114,7 @@ async def get_case(case_id: CaseIdParam, auth: CurrentAuth, db: DbSession, setti
     case = await service.get_for_reviewer(case_id, auth)
     snapshots = (await db.execute(select(Snapshot).where(Snapshot.session_id == case.session_id).order_by(Snapshot.taken_at).limit(500))).scalars()
     out = _out(case, service)
+    out.test_title = (await test_titles(db, [case.test_id])).get(case.test_id)
     detail = CaseDetailOut.model_construct(  # the raw values under their field names (the ORM attributes carry aliases)
         **{name: getattr(out, name) for name in CaseOut.model_fields}, report=case.report, snapshots=[SnapshotOut.model_validate(s) for s in snapshots]
     )

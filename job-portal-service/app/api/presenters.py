@@ -7,11 +7,13 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.enums import ApplicationStatus
 from app.models.application import Application, ApplicationNote, ApplicationStage
 from app.models.employer import EmployerProfile
 from app.models.job import Job
 from app.models.offer import Offer
 from app.models.refs import OrgRef, UserRef
+from app.pipeline import progress as pipeline_progress
 from app.schemas.application import (
     AssessmentOut,
     CandidateSummary,
@@ -24,6 +26,7 @@ from app.schemas.application import (
 )
 from app.schemas.employer import EmployerOut
 from app.schemas.job import CandidateJobOut, EligibilityOut, EmployerJobOut, MatchOut
+from app.services.application_service import template_of
 
 
 async def company_names(db: AsyncSession, org_ids: set[int]) -> dict[int, str]:
@@ -55,7 +58,7 @@ def _base(job: Job, company_name: str | None) -> dict[str, Any]:
 def employer_job_out(job: Job, company_name: str | None, *, institution_ids: list[int], applications: int = 0, placed: int = 0) -> EmployerJobOut:
     return EmployerJobOut(
         **_base(job, company_name), eligibility={**(job.eligibility or {}), "institution_ids": [str(i) for i in institution_ids]}, institution_ids=[str(i) for i in institution_ids],
-        pipeline=dict(job.pipeline or {}), review_note=job.review_note, closed_reason=job.closed_reason, applications=applications, placed=placed, created_by=job.created_by,
+        pipeline=dict(job.pipeline or {}), steps=pipeline_progress.steps(template_of(job)), review_note=job.review_note, closed_reason=job.closed_reason, applications=applications, placed=placed, created_by=job.created_by,
     )
 
 
@@ -67,7 +70,7 @@ def candidate_job_out(
         **_base(job, company_name),
         eligibility_result=EligibilityOut(eligible=eligible, reasons=reasons or []) if eligible is not None else None,
         match=MatchOut(score=match[0], explanation=match[1], breakdown=match[2], method=match[3]) if match else None,
-        applied=application_id is not None, application_id=application_id,
+        applied=application_id is not None, application_id=application_id, steps=pipeline_progress.steps(template_of(job)),
     )
 
 
@@ -90,13 +93,23 @@ def _assessment(application: Application) -> AssessmentOut | None:
 
 
 def my_application_out(
-    application: Application, job: Job, company_name: str | None, *, history: list[ApplicationStage] | None = None, offer: Offer | None = None
+    application: Application, job: Job, company_name: str | None, *, history: list[ApplicationStage] | None = None, offer: Offer | None = None,
+    stopped_from: str | None = None,
 ) -> MyApplicationOut:
-    """What the candidate sees: their status and history, never the recruiter's notes or the screening."""
+    """What the candidate sees: their status, progress through the job's steps, what to do next and the history — never the recruiter's
+    notes or the screening. ``stopped_from``: for a closed application, the status it was in when it closed (else read from ``history``)."""
+    status = ApplicationStatus(application.status)
+    if stopped_from is None and history:
+        stopped_from = history[-1].from_status
+    steps = pipeline_progress.progress(status, template_of(job), stopped_from=ApplicationStatus(stopped_from) if stopped_from else None)
+    action = pipeline_progress.next_action(
+        status, assessment_invite_state=application.assessment_invite_state, offer_status=offer.status if offer else None, offer_expires_at=offer.expires_at if offer else None
+    )
     return MyApplicationOut(
         application_id=application.public_id, job_id=job.public_id, job_title=job.title, company_name=company_name, status=application.status,
         match_score=application.match_score, match_explanation=application.match_explanation, resume_version_no=application.resume_version_no, assessment=_assessment(application),
-        offer=offer_out(offer), history=[stage_out(s) for s in history or []], applied_at=application.created_at, status_changed_at=application.status_changed_at,
+        offer=offer_out(offer), history=[stage_out(s) for s in history or []], progress=steps, next_action=action.as_dict() if action else None,
+        applied_at=application.created_at, status_changed_at=application.status_changed_at,
     )
 
 

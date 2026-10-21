@@ -18,7 +18,9 @@ _STOP = frozenset(
     ability able about abilities across additional applicant applicants apply based benefits candidate candidates career company preferred required requirements
     responsibilities role roles skills skill strong team teams work working worked works year years experience experienced excellent good great looking
     opportunity opportunities plus position positions qualifications knowledge understanding etc including include includes join environment fast paced
-    ensure ensuring support new well building build across various related relevant minimum degree bachelor bachelors master masters equivalent need needs needed essential important seeking want wanted ideal hiring hire looking day every daily""".split()
+    ensure ensuring support new well building build across various related relevant minimum degree bachelor bachelors master masters equivalent need needs needed essential important seeking want wanted ideal hiring hire looking day every daily
+    matter matters comfortable familiar familiarity proficient proficiency hands solid nice bonus get make makes help helps let lets someone person people
+    please send email resume cv salary location office remote hybrid onsite full time part""".split()
 )
 _TOKEN = re.compile(r"[a-z][a-z0-9+#.\-]*[a-z0-9+#]|[a-z]")
 _TRIM = ".-"

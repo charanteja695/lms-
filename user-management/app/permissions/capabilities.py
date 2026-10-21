@@ -52,7 +52,7 @@ def user_actions(actor: User, target: User) -> list[str]:
         return []
 
     def allowed(action: Action) -> bool:
-        return policies.can_act_on_role(actor.role, action, target.role)
+        return policies.can_act_on_role(actor, action, target.role)
 
     actions: list[str] = []
     if allowed(Action.UPDATE):
@@ -71,17 +71,23 @@ def user_actions(actor: User, target: User) -> list[str]:
 def institution_actions(actor: User, organization: Institution) -> list[str]:
     """Actions on an institution or employer the actor can already see."""
     actions: list[str] = []
-    if organization.status != UserStatus.DELETED and policies.can_manage_institution(actor, organization):
-        actions.append(OrganizationAction.UPDATE)
-        active = organization.status == UserStatus.ACTIVE
-        actions.append(OrganizationAction.SUSPEND if active else OrganizationAction.ACTIVATE)
-        actions += [OrganizationAction.REVOKE_SESSIONS, OrganizationAction.DELETE]
+    if organization.status != UserStatus.DELETED:
+        if policies.can_manage_institution(actor, organization, "update"):
+            actions.append(OrganizationAction.UPDATE)
+        if policies.can_manage_institution(actor, organization, "revoke"):
+            active = organization.status == UserStatus.ACTIVE
+            actions += [
+                OrganizationAction.SUSPEND if active else OrganizationAction.ACTIVATE,
+                OrganizationAction.REVOKE_SESSIONS,
+            ]
+        if policies.can_manage_institution(actor, organization, "delete"):
+            actions.append(OrganizationAction.DELETE)
     if organization.deleted_at is None and policies.can_access_institution(actor, organization):
         is_employer = organization.org_type == OrganizationType.EMPLOYER
         member_roles = EMPLOYER_MEMBER_ROLES if is_employer else INSTITUTION_MEMBER_ROLES
-        if member_roles & policies.allowed_target_roles(actor.role, Action.CREATE):
+        if member_roles & policies.allowed_target_roles(actor, Action.CREATE):
             actions.append(OrganizationAction.ADD_MEMBER)
-        if member_roles & policies.allowed_target_roles(actor.role, Action.VIEW):
+        if member_roles & policies.allowed_target_roles(actor, Action.VIEW):
             actions.append(OrganizationAction.VIEW_MEMBERS)
     return actions
 
@@ -93,13 +99,14 @@ MANAGED_ORDER = (Role.ADMIN, Role.INSTITUTION_HEAD, Role.STAFF, Role.STUDENT, Ro
 
 
 def _roles(actor: User, action: Action, *, exclude: frozenset[Role] = frozenset()) -> list[str]:
-    allowed = policies.allowed_target_roles(actor.role, action)
+    allowed = policies.allowed_target_roles(actor, action)
     return [role.value for role in MANAGED_ORDER if role in allowed and role not in exclude]
 
 
 def _organization_rights(actor: User, org_type: OrganizationType, statuses: list[str]) -> dict[str, object]:
     return {
         "create": policies.can_create_organization(actor, org_type),
+        "export": policies.can_export_organizations(actor, org_type),
         "filter_statuses": statuses,
         "filter_by_admin": actor.role == Role.SUPER_ADMIN,
         # companies belong to the super admin; only institutions move between admins
@@ -120,16 +127,20 @@ def my_permissions(actor: User, permissions: list[str]) -> dict[str, object]:
     sections = ["dashboard"]
     if is_super:
         sections += ["admins", "permissions"]  # roles & permissions: the 1/0 matrix and per-person grants
-    if policies.can_create_organization(actor, OrganizationType.INSTITUTION):
+    if policies.can_see_organizations(actor, OrganizationType.INSTITUTION):
         sections.append("institutions")
-    if policies.can_create_organization(actor, OrganizationType.EMPLOYER):
+    if policies.can_see_organizations(actor, OrganizationType.EMPLOYER):
         sections.append("employers")
-    if organization_type is not None:
+    if organization_type is not None and "store.buy" not in permissions:  # the shared learners' home isn't theirs
         sections.append("my_organization")
     if role in (Role.SUPER_ADMIN, Role.ADMIN, Role.INSTITUTION_HEAD):
         sections.append("hierarchy")  # the organisation tree, their own part of it
     # the academic structure: kept by the head (and the owning admin / super admin), read by staff
-    if is_super or (role == Role.ADMIN and policies.has_scope(actor, AdminScope.ACCOUNTS_MANAGE)) or {"academics.view", "academics.manage"} & set(permissions):
+    if (
+        is_super
+        or (role == Role.ADMIN and policies.has_scope(actor, AdminScope.ACCOUNTS_MANAGE))
+        or {"academics.view", "academics.manage"} & set(permissions)
+    ):
         sections.append("academics")
     if member_view_roles:
         sections += ["users", "downloads"]
@@ -149,7 +160,7 @@ def my_permissions(actor: User, permissions: list[str]) -> dict[str, object]:
             "view_roles": member_view_roles,
             "create_roles": member_create_roles,
             "can_import": bool(member_create_roles),
-            "can_export": bool(member_view_roles),
+            "can_export": bool(_roles(actor, Action.EXPORT, exclude=frozenset({Role.ADMIN}))),
             "filter_statuses": statuses,
             "filter_by_institution": role in (Role.SUPER_ADMIN, Role.ADMIN),
         },
@@ -160,7 +171,9 @@ def my_permissions(actor: User, permissions: list[str]) -> dict[str, object]:
         "audit_logs": {"view": "audit_logs" in sections},
         "academics": {
             "view": "academics" in sections,
-            "manage": is_super or (role == Role.ADMIN and policies.has_scope(actor, AdminScope.ACCOUNTS_MANAGE)) or "academics.manage" in permissions,
+            "manage": is_super
+            or (role == Role.ADMIN and policies.has_scope(actor, AdminScope.ACCOUNTS_MANAGE))
+            or "academics.manage" in permissions,
         },
     }
 

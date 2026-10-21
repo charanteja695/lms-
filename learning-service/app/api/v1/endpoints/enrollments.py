@@ -10,7 +10,8 @@ from app.api.deps import (
     DbSession,
     EnrollmentIdParam,
     RedisDep,
-    RequireBatchManager,
+    RequireBatchCreate,
+    RequireBatchRevoke,
     SettingsDep,
     ensure_organization_visible,
     institutions_in_care,
@@ -50,7 +51,7 @@ def _ensure_enrollment_visible(auth: AccessTokenClaims, enrollment: Enrollment) 
     responses=errors(400, 401, 403, 404, 409, 422),
 )
 async def create_enrollment(
-    batch_id: BatchIdParam, data: EnrollmentCreate, auth: RequireBatchManager, db: DbSession, settings: SettingsDep, redis: RedisDep
+    batch_id: BatchIdParam, data: EnrollmentCreate, auth: RequireBatchCreate, db: DbSession, settings: SettingsDep, redis: RedisDep
 ) -> EnrollmentResponse:
     batch = await BatchService(db, settings, redis).get(batch_id)
     ensure_organization_visible(auth, batch.organization_id)
@@ -110,7 +111,7 @@ async def get_enrollment(enrollment_id: EnrollmentIdParam, auth: CurrentAuth, db
     description="Releases the reserved seat on the batch's subscription.",
     responses=errors(400, 401, 403, 404, 422),
 )
-async def withdraw_enrollment(enrollment_id: EnrollmentIdParam, auth: RequireBatchManager, db: DbSession, settings: SettingsDep) -> EnrollmentResponse:
+async def withdraw_enrollment(enrollment_id: EnrollmentIdParam, auth: RequireBatchRevoke, db: DbSession, settings: SettingsDep) -> EnrollmentResponse:
     service = EnrollmentService(db, settings)
     enrollment = await service.get(enrollment_id)
     ensure_organization_visible(auth, enrollment.batch.organization_id)

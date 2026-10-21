@@ -33,6 +33,7 @@ class Resume(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(120))
     target_role: Mapped[str | None] = mapped_column(String(120))
     template_key: Mapped[str] = mapped_column(String(30))
+    experience_level: Mapped[str] = mapped_column(String(10), default="fresher", server_default="fresher")  # ExperienceLevel
     job_description: Mapped[str | None] = mapped_column(Text)  # what this resume is tailored to
     draft: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
     draft_revision: Mapped[int] = mapped_column(Integer, default=0)  # optimistic concurrency for edits

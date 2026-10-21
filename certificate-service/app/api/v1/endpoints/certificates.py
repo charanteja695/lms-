@@ -21,7 +21,7 @@ from app.api.responses import AUTHENTICATED, errors
 from app.core.exceptions import PermissionDeniedError
 from app.domain.enums import CertificateStatus, PdfStatus
 from app.models.certificate import Certificate
-from app.permissions.policy import can_manage_certificates, is_institution_staff
+from app.permissions.policy import can_manage_certificates, is_institution_staff, is_student
 from app.schemas.certificate import (
     CertificateListResponse,
     CertificateOut,
@@ -108,7 +108,7 @@ _EXPORT_MAX_ROWS = 10_000
     responses={200: {"content": {"text/csv": {}}}, **errors(*AUTHENTICATED, 403)},
 )
 async def export_certificates(query: Annotated[CertificateExportQuery, Query()], auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> StreamingResponse:
-    if not (can_manage_certificates(auth) or is_institution_staff(auth)):
+    if not (can_manage_certificates(auth) or is_institution_staff(auth, "export")):
         raise PermissionDeniedError()
     rows, _, _ = await CertificateService(db, settings).list_certificates(
         auth, course_id=query.course_id, student_user_id=None, status=query.status, pdf_status=None, page=1, per_page=_EXPORT_MAX_ROWS, ascending=False,
@@ -161,6 +161,8 @@ async def get_certificate(certificate_id: CertificateIdParam, auth: CurrentAuth,
 async def download_certificate(certificate_id: CertificateIdParam, auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> DownloadResponse:
     service = CertificateService(db, settings)
     certificate = await service.get(certificate_id, auth)
+    if certificate.student_user_id == auth.user_id and not is_student(auth, "export"):
+        raise PermissionDeniedError("Downloading your certificates is turned off for your account.")
     url, filename = await service.download(certificate, auth)
     return DownloadResponse(message="Download link issued.", download=DownloadOut(url=url, filename=filename, expires_in=settings.S3_DOWNLOAD_URL_EXPIRES_SECONDS))
 

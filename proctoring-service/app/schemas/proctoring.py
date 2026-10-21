@@ -101,6 +101,7 @@ class FindingsIn(RequestSchema):
 class SessionOut(ResponseSchema):
     session_id: PublicIdOut = Field(validation_alias="public_id")
     test_id: PublicIdOut
+    test_title: str | None = Field(default=None, description="The test's name (in lists)")
     user_id: PublicIdOut
     organization_id: PublicIdOut | None
     attempt_id: PublicIdOut | None
@@ -209,6 +210,7 @@ class CaseOut(ResponseSchema):
     session_id: PublicIdOut = Field(validation_alias="session_public_id")
     attempt_id: PublicIdOut
     test_id: PublicIdOut
+    test_title: str | None = Field(default=None, description="The test's name (in lists)")
     user_id: PublicIdOut
     organization_id: PublicIdOut | None
     status: str
@@ -241,6 +243,7 @@ class StudentCaseOut(ResponseSchema):
     case_id: PublicIdOut = Field(validation_alias="public_id")
     attempt_id: PublicIdOut
     test_id: PublicIdOut
+    test_title: str | None = Field(default=None, description="The test's name, so a student never has to read an id")
     status: str
     decision: str | None
     decision_note: str | None

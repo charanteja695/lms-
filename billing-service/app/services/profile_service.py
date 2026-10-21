@@ -25,7 +25,7 @@ class ProfileService:
         return profile
 
     async def put(self, auth: AccessTokenClaims, org_id: int, fields: dict[str, Any]) -> BillingProfile:
-        if not owns(auth, org_id):
+        if not owns(auth, org_id, "update"):
             raise NotFoundError("Organisation not found.", code="ORGANIZATION_NOT_FOUND")
         if await self.db.get(OrgRef, org_id) is None:
             raise NotFoundError("Organisation not found.", code="ORGANIZATION_NOT_FOUND")

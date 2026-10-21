@@ -31,12 +31,18 @@ async def test_institution_head_can_submit(client: AsyncClient, as_institution_h
 
 
 async def test_course_requests_follow_the_persons_permission(client: AsyncClient, authed) -> None:
-    """A super admin can let one staff member request courses, or stop a head."""
+    """The Course requests page's cells decide: staff never reach it; a head left only View sees requests but can't
+    submit one (although the coarse subscriptions.request key is still in the token); a head without View sees nothing."""
     authed(role="staff", organization_id=TEST_ORG_ID)
     assert (await client.post("/api/v1/course-requests", json=REQUEST_PAYLOAD)).status_code == 403
-    authed(role="institution_head", organization_id=TEST_ORG_ID, defaults=False)
+    assert (await client.get("/api/v1/course-requests")).status_code == 403
+    authed(role="institution_head", organization_id=TEST_ORG_ID, defaults=False, scopes=("course_requests.view", "subscriptions.request"))
+    assert (await client.get("/api/v1/course-requests")).status_code == 200
+    assert (await client.get("/api/v1/subscriptions")).status_code == 200
     assert (await client.post("/api/v1/course-requests", json=REQUEST_PAYLOAD)).status_code == 403
-    authed(role="staff", organization_id=TEST_ORG_ID, scopes=("subscriptions.request",))
+    authed(role="institution_head", organization_id=TEST_ORG_ID, defaults=False)
+    assert (await client.get("/api/v1/subscriptions")).status_code == 403
+    authed(role="institution_head", organization_id=TEST_ORG_ID)
     assert (await client.post("/api/v1/course-requests", json=REQUEST_PAYLOAD)).status_code != 403
 
 

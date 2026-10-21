@@ -11,13 +11,15 @@ from app.api.deps import (
     CareerDep,
     DbSession,
     JobIdParam,
+    RequireApplicant,
     RequireStudent,
+    RequireWithdrawer,
     SettingsDep,
     WriteRateLimit,
 )
 from app.api.presenters import company_names, my_application_out
 from app.api.responses import AUTHENTICATED, errors
-from app.domain.enums import ApplicationStatus
+from app.domain.enums import TERMINAL_STATUSES, ApplicationStatus
 from app.models.application import Application
 from app.models.job import Job
 from app.schemas.application import (
@@ -47,7 +49,7 @@ async def _mine(service: ApplicationService, application: Application, job: Job,
     "The resume is frozen at this moment: later edits never change what the recruiter sees. One application per job (`409 ALREADY_APPLIED`).",
     responses=errors(*AUTHENTICATED, 404, 409), dependencies=[ApplyRateLimit],
 )
-async def apply(job_id: JobIdParam, body: ApplyRequest, auth: RequireStudent, db: DbSession, settings: SettingsDep, career: CareerDep) -> MyApplicationResponse:
+async def apply(job_id: JobIdParam, body: ApplyRequest, auth: RequireApplicant, db: DbSession, settings: SettingsDep, career: CareerDep) -> MyApplicationResponse:
     service = ApplicationService(db, settings)
     application = await service.apply(auth, job_id, resume_id=body.resume_id, cover_note=body.cover_note, career=career)
     return await _mine(service, application, await service.job_of(application), db, message="Application sent.")
@@ -56,12 +58,18 @@ async def apply(job_id: JobIdParam, body: ApplyRequest, auth: RequireStudent, db
 @router.get("/applications", response_model=MyApplicationPage, summary="My applications", responses=errors(*AUTHENTICATED))
 async def my_applications(
     auth: RequireStudent, db: DbSession, settings: SettingsDep, status: Annotated[ApplicationStatus | None, Query()] = None,
+    active: Annotated[bool | None, Query(description="true: still in progress; false: closed (placed, rejected, withdrawn, declined)")] = None,
     page: Annotated[int, Query(ge=1, le=10_000)] = 1, per_page: Annotated[int, Query(ge=1, le=50)] = 20,
 ) -> MyApplicationPage:
     service = ApplicationService(db, settings)
-    rows, total = await service.list_mine(auth.user_id, status=status.value if status else None, page=page, per_page=per_page)
+    rows, total = await service.list_mine(auth.user_id, status=status.value if status else None, active=active, page=page, per_page=per_page)
     names = await company_names(db, {job.employer_org_id for _, job in rows})
-    out = [my_application_out(a, j, names.get(j.employer_org_id)) for a, j in rows]
+    offers = OfferService(db, settings)
+    out = []
+    for a, j in rows:
+        offer = await offers.for_application(a) if a.status == ApplicationStatus.OFFERED else None
+        stopped = (await service.history(a))[-1].from_status if a.status in TERMINAL_STATUSES else None
+        out.append(my_application_out(a, j, names.get(j.employer_org_id), offer=offer, stopped_from=stopped))
     context = PageContext.build(page=page, per_page=per_page, total=total, is_exact=True, sort_column="created_at", sort_order=SortOrder.DESC)
     return MyApplicationPage(message="", applications=out, page_context=context)
 
@@ -77,7 +85,7 @@ async def get_application(application_id: ApplicationIdParam, auth: RequireStude
     "/applications/{application_id}/withdraw", response_model=MyApplicationResponse, summary="Withdraw an application",
     description="Possible at any stage until it is closed. Withdrawing while an offer is open declines the offer.", responses=errors(*AUTHENTICATED, 404, 409), dependencies=[WriteRateLimit],
 )
-async def withdraw(application_id: ApplicationIdParam, body: WithdrawRequest, auth: RequireStudent, db: DbSession, settings: SettingsDep) -> MyApplicationResponse:
+async def withdraw(application_id: ApplicationIdParam, body: WithdrawRequest, auth: RequireWithdrawer, db: DbSession, settings: SettingsDep) -> MyApplicationResponse:
     service = ApplicationService(db, settings)
     application = await service.withdraw(auth.user_id, await service.get_mine(auth.user_id, application_id), body.note)
     return await _mine(service, application, await service.job_of(application), db, message="Withdrawn.")
@@ -87,7 +95,7 @@ async def withdraw(application_id: ApplicationIdParam, body: WithdrawRequest, au
     "/applications/{application_id}/offer/respond", response_model=OfferResponse, summary="Accept or decline an offer",
     description="`409 OFFER_EXPIRED` once the offer's time is up (it is then closed as declined); `409 NO_OPEN_OFFER` when there is nothing to answer.", responses=errors(*AUTHENTICATED, 404, 409), dependencies=[WriteRateLimit],
 )
-async def respond(application_id: ApplicationIdParam, body: OfferResponseRequest, auth: RequireStudent, db: DbSession, settings: SettingsDep) -> OfferResponse:
+async def respond(application_id: ApplicationIdParam, body: OfferResponseRequest, auth: RequireApplicant, db: DbSession, settings: SettingsDep) -> OfferResponse:
     applications = ApplicationService(db, settings)
     offer = await OfferService(db, settings).respond(auth.user_id, await applications.get_mine(auth.user_id, application_id), accept=body.accept, note=body.note)
     return OfferResponse(message="Offer accepted." if body.accept else "Offer declined.", offer=OfferOut.model_validate(offer))

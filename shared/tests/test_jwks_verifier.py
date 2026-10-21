@@ -106,3 +106,21 @@ async def test_refetches_once_for_a_new_key_id_after_rotation() -> None:
     claims = await _verifier(fetch=rotating_fetch).verify(token)
     assert claims.user_id == 358672738860850316
     assert calls["count"] == 1
+
+
+def test_can_act_needs_the_exact_cell_for_matrix_roles_and_the_coarse_key_for_company_roles() -> None:
+    from datetime import UTC, datetime
+
+    from lms_common.auth import AccessTokenClaims
+
+    def claims(role: str, *scopes: str) -> AccessTokenClaims:
+        return AccessTokenClaims(
+            user_id=1, session_id=1, role=role, organization_id=1, organization_type=None, scopes=scopes, token_version=0,
+            token_id="t", issued_at=0, expires_at=datetime.now(UTC),
+        )
+
+    head = claims("institution_head", "batches.view", "batches.create", "learning.batches.manage")
+    assert head.can_act("batches.create", "learning.batches.manage")
+    assert not head.can_act("batches.delete", "learning.batches.manage")  # the coarse key no longer decides
+    assert claims("recruiter", "jobs.hire").can_act("placements.view", "jobs.hire")
+    assert claims("super_admin").can_act("anything.delete", "anything")

@@ -10,16 +10,20 @@ from app.api.responses import AUTHENTICATED, errors
 from app.ats.language import check_text
 from app.core.exceptions import ValidationFailedError
 from app.models.resume import Resume, ResumeVersion
+from app.resume.options import LEVEL_OPTIONS, START_OPTIONS, TONE_OPTIONS
 from app.schemas.resume import (
     AtsRequest,
     AtsResponse,
     GrammarResponse,
+    LevelOption,
     ResumeCreate,
     ResumeDetail,
+    ResumeOptionsResponse,
     ResumeOut,
     ResumePage,
     ResumeResponse,
     ResumeUpdate,
+    StartOption,
     TemplateOut,
     TemplatesResponse,
     VersionCreate,
@@ -29,6 +33,7 @@ from app.schemas.resume import (
     VersionsResponse,
 )
 from app.services.ai_service import gap_report
+from app.services.profile_service import ProfileService
 from app.services.resume_service import ResumeService
 
 router = APIRouter(tags=["Resumes"])
@@ -48,13 +53,31 @@ async def templates(_: RequireStudent, db: DbSession, settings: SettingsDep) -> 
     return TemplatesResponse(message="", templates=[TemplateOut.model_validate(t) for t in await ResumeService(db, settings).templates()])
 
 
+@router.get(
+    "/resume-options", response_model=ResumeOptionsResponse, summary="Choices for a new resume",
+    description="Experience levels (each with what it changes), ways to start, and role suggestions: the student's own target roles first, then the configured list.",
+    responses=errors(*AUTHENTICATED),
+)
+async def resume_options(auth: RequireStudent, db: DbSession, settings: SettingsDep) -> ResumeOptionsResponse:
+    profile = await ProfileService(db, settings).get(auth.user_id)
+    own = list(profile.target_roles or []) if profile else []
+    roles = own + [r for r in settings.RESUME_ROLE_SUGGESTIONS if r.lower() not in {o.lower() for o in own}]
+    return ResumeOptionsResponse(
+        message="", experience_levels=[LevelOption(**option) for option in LEVEL_OPTIONS], start_options=[StartOption(**option) for option in START_OPTIONS], role_suggestions=roles,
+        ai_tones=[LevelOption(**option) for option in TONE_OPTIONS],
+        max_resumes=settings.MAX_RESUMES_PER_USER, max_import_bytes=settings.MAX_IMPORT_BYTES,
+        share_expiry_days=[d for d in settings.SHARE_EXPIRY_CHOICES if 1 <= d <= 365], share_default_days=settings.SHARE_DEFAULT_DAYS,
+    )
+
+
 @router.get("/resumes", response_model=ResumePage, summary="My resumes", responses=errors(*AUTHENTICATED))
 async def list_resumes(
     auth: RequireStudent, db: DbSession, settings: SettingsDep, page: Annotated[int, Query(ge=1, le=1_000)] = 1, per_page: Annotated[int, Query(ge=1, le=50)] = 20
 ) -> ResumePage:
-    rows, total = await ResumeService(db, settings).list_for(auth.user_id, page=page, per_page=per_page)
+    service = ResumeService(db, settings)
+    rows, total = await service.list_for(auth.user_id, page=page, per_page=per_page)
     context = PageContext.build(page=page, per_page=per_page, total=total, is_exact=True, sort_column="updated_at", sort_order=SortOrder.DESC)
-    return ResumePage(message="", resumes=[present_resume(r) for r in rows], page_context=context)
+    return ResumePage(message="", resumes=[present_resume(r).model_copy(update={"ats_score": (await service.ats(r, job_description=None)).score}) for r in rows], page_context=context)
 
 
 @router.post(
@@ -64,7 +87,8 @@ async def list_resumes(
 )
 async def create_resume(body: ResumeCreate, auth: RequireStudent, db: DbSession, settings: SettingsDep) -> ResumeResponse:
     resume = await ResumeService(db, settings).create(
-        auth.user_id, auth.organization_id, title=body.title, target_role=body.target_role, template_key=body.template_key, job_description=body.job_description, blank=body.blank
+        auth.user_id, auth.organization_id, title=body.title, target_role=body.target_role, template_key=body.template_key, job_description=body.job_description, blank=body.blank,
+        experience_level=body.experience_level,
     )
     return ResumeResponse(message="Resume created.", resume=present_resume(resume))
 
@@ -95,7 +119,7 @@ async def update_resume(resume_id: ResumeIdParam, body: ResumeUpdate, auth: Requ
     resume = await service.get(auth.user_id, resume_id)
     updated = await service.update(
         resume, expected_revision=body.expected_revision, title=body.title, target_role=body.target_role, template_key=body.template_key,
-        job_description=body.job_description, draft=body.draft.model_dump(mode="json") if body.draft else None,
+        job_description=body.job_description, draft=body.draft.model_dump(mode="json") if body.draft else None, experience_level=body.experience_level,
     )
     return ResumeResponse(message="Saved.", resume=present_resume(updated))
 

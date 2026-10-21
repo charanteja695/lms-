@@ -92,6 +92,17 @@ class Settings(BaseSettings):
     MAX_BULLET_CHARS: int = Field(default=300, ge=50)
     MAX_JOB_DESCRIPTION_CHARS: int = Field(default=8_000, ge=500)
     SHARE_DEFAULT_DAYS: int = Field(default=30, ge=1, le=365)  # a share link with no explicit expiry lasts this long
+    SHARE_EXPIRY_CHOICES: list[int] = Field(default_factory=lambda: [7, 30, 90])  # offered when a student shares (days, each 1-365)
+    # Roles offered as one-tap suggestions when a resume is created (the student can type any role); the student's own target
+    # roles are offered first. Set as a JSON list in the environment.
+    RESUME_ROLE_SUGGESTIONS: list[str] = Field(
+        default_factory=lambda: [
+            "Frontend Developer", "Backend Developer", "Full Stack Developer", "Java Developer", "Python Developer", ".NET Developer", "Mobile App Developer",
+            "Data Analyst", "Data Scientist", "DevOps Engineer", "Cloud Engineer", "QA / Test Engineer", "Cyber Security Analyst", "UI/UX Designer",
+        ]
+    )
+    MAX_IMPORT_BYTES: int = Field(default=5 * 1024 * 1024, ge=100_000)  # an uploaded old resume / LinkedIn PDF
+    MAX_IMPORT_TEXT_CHARS: int = Field(default=20_000, ge=2_000)  # text sent to the model from that file
     # A skill score shows a percentile only when at least this many students have a score for the course; a percentile
     # among five people would be noise, and would let a student be identified from the numbers.
     PERCENTILE_MIN_COHORT: int = Field(default=20, ge=2)

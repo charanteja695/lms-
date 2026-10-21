@@ -101,6 +101,8 @@ class InterviewOut(ResponseSchema):
     retake_granted: bool
     created_at: Timestamp
     current_round: CurrentRoundOut | None = None
+    overall_score: float | None = Field(default=None, description="The candidate's own list only: the overall score once feedback is released")
+    score_max: int = 5
 
 
 class TimeLeftOut(ResponseSchema):
@@ -117,6 +119,9 @@ class ReportOut(ResponseSchema):
     strengths: list[str] = Field(default_factory=list)
     improvements: list[str] = Field(default_factory=list)
     improvement_plan: str | None = None
+    overall_score: float | None = None
+    score_max: int = Field(default=5, description="Scores run from 1 to this")
+    rounds: list[dict[str, Any]] = Field(default_factory=list, description="Per round: {round, type, score, comment, quotes} — the candidate's own words the scores rest on")
 
 
 class InterviewResponse(SuccessResponse):

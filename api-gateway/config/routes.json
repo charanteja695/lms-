@@ -233,6 +233,10 @@
       "service": "ai-gateway"
     },
     {
+      "path": "/api/v1/me",
+      "service": "subscription-service"
+    },
+    {
       "path": "/api/v1/media",
       "service": "media-service"
     },
@@ -325,6 +329,10 @@
       "service": "assessment-service"
     },
     {
+      "path": "/api/v1/resume-options",
+      "service": "career-service"
+    },
+    {
       "path": "/api/v1/resume-templates",
       "service": "career-service"
     },
@@ -343,6 +351,10 @@
     {
       "path": "/api/v1/sessions",
       "service": "proctoring-service"
+    },
+    {
+      "path": "/api/v1/store",
+      "service": "billing-service"
     },
     {
       "path": "/api/v1/student",

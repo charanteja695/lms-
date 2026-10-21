@@ -149,6 +149,8 @@ CurrentAuth = Annotated[AccessTokenClaims, Depends(_authenticate)]
 #   learning.batches.view   their own institution's batches and who is in them (staff, head)
 #   learning.batches.manage create batches, enrol and withdraw, for their own institution (a head)
 #   accounts.manage         every institution's batches and enrolments
+# Heads, staff and students are set per action on user-management's permission matrix: the Batches page's cells
+# (batches.view / .create / .revoke) decide for them; the coarse keys above still decide for older roles (can_act).
 STUDY, BATCHES_VIEW, BATCHES_MANAGE = "learning.study", "learning.batches.view", "learning.batches.manage"
 
 
@@ -168,7 +170,7 @@ def manages_institution(auth: AccessTokenClaims, organization_id: int) -> bool:
 
 
 def sees_own_batches(auth: AccessTokenClaims) -> bool:
-    return auth.organization_id is not None and (auth.has_scope(BATCHES_VIEW) or auth.has_scope(BATCHES_MANAGE))
+    return auth.organization_id is not None and (auth.can_act("batches.view", BATCHES_VIEW) or auth.can_act("batches.view", BATCHES_MANAGE))
 
 
 def require_scope(scope: Scope) -> Callable[[AccessTokenClaims], AccessTokenClaims]:
@@ -183,17 +185,22 @@ def require_scope(scope: Scope) -> Callable[[AccessTokenClaims], AccessTokenClai
 RequireAccountsManage = Annotated[AccessTokenClaims, Depends(require_scope(Scope.ACCOUNTS_MANAGE))]
 
 
-def require_batch_manager(auth: CurrentAuth) -> AccessTokenClaims:
-    """Creates/manages batches and enrolments: an institution head for their own institution,
-    or a platform admin for any institution."""
-    if sees_all_institutions(auth):
-        return auth
-    if auth.organization_id is not None and auth.has_scope(BATCHES_MANAGE):
-        return auth
-    raise PermissionDeniedError()
+def require_batch_action(action: str) -> Callable[[AccessTokenClaims], AccessTokenClaims]:
+    """One action on batches (``create``: a batch or an enrolment; ``revoke``: take a student out): for their own
+    institution, holding that cell; or a platform admin for any institution."""
+
+    def dependency(auth: CurrentAuth) -> AccessTokenClaims:
+        if sees_all_institutions(auth):
+            return auth
+        if auth.organization_id is not None and auth.can_act(f"batches.{action}", BATCHES_MANAGE):
+            return auth
+        raise PermissionDeniedError()
+
+    return dependency
 
 
-RequireBatchManager = Annotated[AccessTokenClaims, Depends(require_batch_manager)]
+RequireBatchCreate = Annotated[AccessTokenClaims, Depends(require_batch_action("create"))]
+RequireBatchRevoke = Annotated[AccessTokenClaims, Depends(require_batch_action("revoke"))]
 
 
 def ensure_organization_visible(auth: AccessTokenClaims, organization_id: int) -> None:

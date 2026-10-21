@@ -33,8 +33,8 @@ class FaqService:
             raise NotFoundError("FAQ entry not found.", code="FAQ_NOT_FOUND")
         return entry
 
-    def authorize(self, auth: AccessTokenClaims, scope: str, organization_id: int | None) -> None:
-        if not can_manage_faq(auth, scope, organization_id=organization_id):
+    def authorize(self, auth: AccessTokenClaims, scope: str, organization_id: int | None, action: str = "update") -> None:
+        if not can_manage_faq(auth, scope, organization_id=organization_id, action=action):
             raise PermissionDeniedError("You may not manage FAQ entries of this scope.", code="FAQ_SCOPE_FORBIDDEN")
 
     @staticmethod
@@ -51,7 +51,7 @@ class FaqService:
         source_message_id: int | None = None, citations: list[dict[str, object]] | None = None,
     ) -> FaqEntry:
         self._check_scope(scope, organization_id, course_id)
-        self.authorize(auth, scope, organization_id)
+        self.authorize(auth, scope, organization_id, "create")
         entry = FaqEntry(
             public_id=new_public_id(), scope=scope, organization_id=organization_id, course_id=course_id, question=question, answer=answer,
             status=FaqStatus.DRAFT, source_message_id=source_message_id, created_by=auth.user_id, citations=citations,

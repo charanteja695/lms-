@@ -171,13 +171,23 @@ def no_mfa_test_code() -> Iterator[str | None]:
     yield from _fixed_code(None)  # whatever a developer's .env says
 
 
-async def test_a_test_server_accepts_its_fixed_code_again_and_again(client: AsyncClient, super_admin: User, mfa_test_code: str) -> None:
+async def test_a_test_server_accepts_its_fixed_code_again_and_again(
+    client: AsyncClient, super_admin: User, mfa_test_code: str
+) -> None:
     headers = bearer(await login(client, SUPER_ADMIN_USERNAME, STRONG_PASSWORD))
     setup = await client.post(f"{API}/auth/mfa/setup", json={"password": STRONG_PASSWORD}, headers=headers)
-    assert (await client.post(f"{API}/auth/mfa/enable", json={"code": mfa_test_code}, headers=headers)).status_code == 200, setup.text
+    assert (
+        await client.post(f"{API}/auth/mfa/enable", json={"code": mfa_test_code}, headers=headers)
+    ).status_code == 200, setup.text
     for _ in range(2):  # unlike a real code, the fixed one is not used up
-        challenge = (await client.post(f"{API}/auth/login", json={"identifier": SUPER_ADMIN_USERNAME, "password": STRONG_PASSWORD})).json()["mfa_challenge"]
-        verified = await client.post(f"{API}/auth/mfa/verify", json={"mfa_token": challenge["mfa_token"], "code": mfa_test_code})
+        challenge = (
+            await client.post(
+                f"{API}/auth/login", json={"identifier": SUPER_ADMIN_USERNAME, "password": STRONG_PASSWORD}
+            )
+        ).json()["mfa_challenge"]
+        verified = await client.post(
+            f"{API}/auth/mfa/verify", json={"mfa_token": challenge["mfa_token"], "code": mfa_test_code}
+        )
         assert verified.status_code == 200, verified.text
 
 

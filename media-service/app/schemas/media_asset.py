@@ -66,6 +66,22 @@ class MediaAssetResponse(SuccessResponse):
     asset: MediaAssetOut
 
 
+class KindTotal(ResponseSchema):
+    kind: str
+    count: int
+    byte_size: int
+
+
+class MediaSummaryOut(ResponseSchema):
+    kinds: list[KindTotal] = Field(description="Live files per kind (video, document, image) and their size")
+    failed: int
+    archived: int
+
+
+class MediaSummaryResponse(SuccessResponse):
+    summary: MediaSummaryOut
+
+
 class MediaAssetListResponse(SuccessResponse):
     assets: list[MediaAssetOut]
     page_context: PageContext

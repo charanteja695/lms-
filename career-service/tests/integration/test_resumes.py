@@ -43,7 +43,7 @@ async def test_templates_are_listed_and_all_ats_safe(client, who):
 async def test_a_new_resume_starts_from_the_whole_profile(client, who, send_event):
     ids, rid = await ready_student(client, who, send_event)
     detail = (await client.get(f"{API}/resumes/{rid}")).json()
-    assert [s["key"] for s in detail["draft"]["sections"]] == ["education", "projects", "experience", "skills", "certificates", "skill_scores", "achievements", "courses"]
+    assert [s["key"] for s in detail["draft"]["sections"]] == ["skills", "projects", "experience", "education", "certificates", "skill_scores", "achievements", "courses"]
     keys = {s["key"]: s for s in detail["document"]["sections"]}
     assert "courses" not in keys and keys["certificates"]["entries"][0]["verified"] is True
     assert keys["skills"]["entries"][0]["heading"] == "Python"
@@ -210,3 +210,19 @@ async def test_grammar_check_reads_own_words_only(client, who, send_event):
     issues = (await client.post(f"{API}/resumes/{rid}/grammar")).json()["issues"]
     codes = {i["code"] for i in issues}
     assert {"REPEATED_WORD", "LOWERCASE_START", "WEAK_OPENING"} <= codes and all(i["item_id"] == ids["job"] for i in issues)
+
+
+async def test_each_resume_action_is_its_own_matrix_cell(client, act_as) -> None:
+    """A student left View + Create (no Update, no Delete) can make a resume and score it, but not edit or delete it,
+    although the coarse career.profile key is still in their token."""
+    from tests.conftest import ORG_A, STUDENT
+
+    act_as(STUDENT, role="student", organization_id=ORG_A, defaults=False, scopes=("my_career.view", "my_career.create", "career.profile"))
+    created = await client.post("/api/v1/resumes", json={"title": "Backend roles", "target_role": "Backend Developer"})
+    assert created.status_code == 201, created.text
+    resume_id = created.json()["resume"]["resume_id"]
+    assert (await client.post(f"/api/v1/resumes/{resume_id}/ats", json={})).status_code == 200  # a check only reads
+    assert (await client.patch(f"/api/v1/resumes/{resume_id}", json={"title": "Renamed"})).status_code == 403
+    assert (await client.delete(f"/api/v1/resumes/{resume_id}")).status_code == 403
+    act_as(STUDENT, role="student", organization_id=ORG_A)
+    assert (await client.delete(f"/api/v1/resumes/{resume_id}")).status_code == 200

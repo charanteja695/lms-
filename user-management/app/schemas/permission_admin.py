@@ -15,8 +15,32 @@ class CatalogEntry(ResponseSchema):
     default_roles: list[str]
 
 
+class ActionOut(ResponseSchema):
+    key: str = Field(description="view, create, update, delete, revoke, export or approve")
+    label: str
+
+
+class PageAction(ResponseSchema):
+    action: str
+    key: str = Field(description="The cell's permission key, <page>.<action>")
+    meaning: str = Field(description="What the action lets them do on this page")
+    default_roles: list[str]
+
+
+class CatalogPage(ResponseSchema):
+    key: str
+    label: str
+    group: str
+    description: str
+    holders: list[str] = Field(description="Roles that may be given anything on this page")
+    actions: list[PageAction] = Field(description="The actions this page has, in column order")
+
+
 class CatalogResponse(SuccessResponse):
-    permissions: list[CatalogEntry]
+    permissions: list[CatalogEntry] = Field(description="Feature keys: admin scopes and the older company roles' rows")
+    actions: list[ActionOut] = Field(description="The matrix columns, in order")
+    pages: list[CatalogPage] = Field(description="The matrix rows (module → page), in menu order")
+    matrix_roles: list[str] = Field(description="Roles set on the matrix (the others use feature keys)")
 
 
 class RoleCell(ResponseSchema):
@@ -37,7 +61,7 @@ class RoleMatrixResponse(SuccessResponse):
 class PermissionChanges(RequestSchema):
     changes: dict[str, bool | None] = Field(
         min_length=1,
-        max_length=60,
+        max_length=400,
         description="permission key → true (allow), false (remove), null (back to the default)",
     )
     reason: text(300) | None = None  # type: ignore[valid-type]

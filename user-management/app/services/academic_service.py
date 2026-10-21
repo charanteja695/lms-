@@ -25,7 +25,6 @@ from app.permissions.roles import OrganizationType, Role, UserStatus
 from app.repositories.institution_repository import InstitutionRepository
 from app.repositories.user_repository import USER_LIST_OPTIONS, UserRepository
 from app.services.audit_service import AuditAction, AuditService
-from app.services.permission_service import PermissionService
 
 _TEACHING_ROLES = (Role.INSTITUTION_HEAD, Role.STAFF)
 
@@ -34,6 +33,7 @@ _TEACHING_ROLES = (Role.INSTITUTION_HEAD, Role.STAFF)
 class Access:
     institution: Institution
     can_manage: bool
+    rights: dict[str, bool]  # create / update / delete: the matrix cells the person holds here
 
 
 @dataclass(slots=True)
@@ -58,7 +58,8 @@ class AcademicService:
 
     # ================================================================== access
 
-    async def access(self, actor: User, organization_id: int, *, manage: bool = False) -> Access:
+    async def access(self, actor: User, organization_id: int, *, manage: str | None = None) -> Access:
+        """``manage``: the matrix action a change needs (``create``, ``update`` or ``delete``); ``None`` to read."""
         institution = await self.institutions.get_by_public_id(organization_id)
         if (
             institution is None
@@ -66,16 +67,17 @@ class AcademicService:
             or not policies.can_access_institution(actor, institution)
         ):
             raise NotFoundError("Institution not found.", code="INSTITUTION_NOT_FOUND")
-        if policies.can_manage_institution(actor, institution):
-            can_manage = True  # the super admin, or the admin who owns it
+        if policies.owns_institution(actor, institution):
+            rights = dict.fromkeys(("create", "update", "delete"), True)  # the super admin, or the admin who owns it
+            can_manage = True
         else:
-            held = set(await PermissionService(self.db).effective_for(actor))
-            if not held & {"academics.view", "academics.manage"}:
+            if not policies.holds(actor, "academic_structure.view"):
                 raise PermissionDeniedError("You cannot see this institution's academic structure.")
-            can_manage = "academics.manage" in held
+            rights = {a: policies.holds(actor, f"academic_structure.{a}") for a in ("create", "update", "delete")}
+            can_manage = rights.get(manage, False) if manage else any(rights.values())
         if manage and not can_manage:
             raise PermissionDeniedError("Only the institute head (or its admin) changes the academic structure.")
-        return Access(institution, can_manage)
+        return Access(institution, can_manage, rights)
 
     # ================================================================== reading
 
@@ -115,7 +117,9 @@ class AcademicService:
                     )
                     .group_by(StudentProfile.class_section_id)
                 )
-            ).tuples().all()
+            )
+            .tuples()
+            .all()
         )
         people_ids = {d.head_user_id for d in departments if d.head_user_id} | {
             s.class_teacher_id for group in sections.values() for s in group if s.class_teacher_id

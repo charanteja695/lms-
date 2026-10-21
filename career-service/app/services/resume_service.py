@@ -18,10 +18,10 @@ from app.core.config import Settings
 from app.core.exceptions import ConflictError, NotFoundError, ValidationFailedError
 from app.core.ids import new_public_id
 from app.core.time import utcnow
-from app.domain.enums import DEFAULT_TITLES, SECTION_KINDS, SectionKey, VersionSource
+from app.domain.enums import DEFAULT_TITLES, SECTION_KINDS, ExperienceLevel, SectionKey, VersionSource
 from app.models.resume import Resume, ResumeTemplate, ResumeVersion
 from app.rendering.templates import DEFAULT_TEMPLATE_KEY, DEFAULT_TEMPLATES
-from app.resume.document import build_document, default_draft
+from app.resume.document import build_document, default_draft, reorder_sections
 from app.services.outbox import write_event
 from app.services.profile_service import ItemView, ProfileService
 
@@ -81,17 +81,19 @@ class ResumeService:
 
     # ------------------------------------------------------------------ create / edit
     async def create(
-        self, user_id: int, organization_id: int | None, *, title: str, target_role: str | None, template_key: str | None, job_description: str | None, blank: bool
+        self, user_id: int, organization_id: int | None, *, title: str, target_role: str | None, template_key: str | None, job_description: str | None, blank: bool,
+        experience_level: ExperienceLevel = ExperienceLevel.FRESHER,
     ) -> Resume:
         count = int((await self.db.execute(select(func.count()).select_from(Resume).where(Resume.user_id == user_id, Resume.deleted_at.is_(None)))).scalar_one())
         if count >= self.settings.MAX_RESUMES_PER_USER:
             raise ConflictError(f"You can keep at most {self.settings.MAX_RESUMES_PER_USER} resumes. Delete one first.", code="TOO_MANY_RESUMES")
         template = await self.template(template_key or DEFAULT_TEMPLATE_KEY)
         views = [] if blank else await self.profiles.views(user_id)
-        draft = default_draft(views)
+        draft = default_draft(views, experience_level)
         resume = Resume(
             public_id=new_public_id(), user_id=user_id, organization_id=organization_id, title=title, target_role=target_role, template_key=template.key,
-            job_description=job_description, draft=draft, draft_revision=0, latest_version_no=0, share_show_contact=False, share_views=0,
+            experience_level=experience_level.value, job_description=job_description, draft=draft, draft_revision=0, latest_version_no=0, share_show_contact=False,
+            share_views=0,
         )
         self.db.add(resume)
         await self.db.commit()
@@ -127,7 +129,8 @@ class ResumeService:
         return {"summary": draft["summary"], "personal": draft["personal"], "sections": sections}
 
     async def update(
-        self, resume: Resume, *, expected_revision: int, title: str | None, target_role: str | None, template_key: str | None, job_description: str | None, draft: dict[str, Any] | None
+        self, resume: Resume, *, expected_revision: int, title: str | None, target_role: str | None, template_key: str | None, job_description: str | None, draft: dict[str, Any] | None,
+        experience_level: ExperienceLevel | None = None,
     ) -> Resume:
         locked = (await self.db.execute(select(Resume).where(Resume.id == resume.id).with_for_update().execution_options(populate_existing=True))).scalar_one()
         if locked.draft_revision != expected_revision:
@@ -142,6 +145,10 @@ class ResumeService:
             locked.job_description = job_description or None
         if draft is not None:
             locked.draft = await self._validated_draft(locked.user_id, draft)
+        if experience_level is not None and experience_level.value != locked.experience_level:
+            locked.experience_level = experience_level.value
+            if draft is None:  # an explicit draft keeps the order the student chose
+                locked.draft = reorder_sections(locked.draft, experience_level)
         locked.draft_revision += 1
         await self.db.commit()
         return locked
@@ -152,7 +159,7 @@ class ResumeService:
             raise ConflictError(f"You can keep at most {self.settings.MAX_RESUMES_PER_USER} resumes. Delete one first.", code="TOO_MANY_RESUMES")
         copy = Resume(
             public_id=new_public_id(), user_id=resume.user_id, organization_id=resume.organization_id, title=title, target_role=resume.target_role,
-            template_key=resume.template_key, job_description=resume.job_description, draft=resume.draft, draft_revision=0, latest_version_no=0, share_show_contact=False, share_views=0,
+            template_key=resume.template_key, experience_level=resume.experience_level, job_description=resume.job_description, draft=resume.draft, draft_revision=0, latest_version_no=0, share_show_contact=False, share_views=0,
         )
         self.db.add(copy)
         await self.db.commit()
@@ -182,7 +189,10 @@ class ResumeService:
     async def ats(self, resume: Resume, *, job_description: str | None, document: dict[str, Any] | None = None) -> AtsReport:
         template = await self.template(resume.template_key)
         doc = document or (await self.document(resume))[0]
-        return score_document(doc, template_ats_safe=template.ats_safe, job_description=job_description if job_description is not None else resume.job_description)
+        return score_document(
+            doc, template_ats_safe=template.ats_safe, job_description=job_description if job_description is not None else resume.job_description,
+            experience_level=ExperienceLevel(resume.experience_level),
+        )
 
     # ------------------------------------------------------------------ versions
     def _event(self, resume: Resume, action: str, version_no: int | None) -> dict[str, Any]:

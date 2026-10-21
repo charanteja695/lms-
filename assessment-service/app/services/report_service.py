@@ -47,7 +47,7 @@ def scope_answers_to_grade(stmt: Select[Any], auth: AccessTokenClaims) -> Select
         return stmt
     if runs_employer_tests(auth):
         return stmt.where(Test.organization_id == auth.organization_id)
-    if is_institution_staff(auth):
+    if is_institution_staff(auth, "update"):
         return stmt.where(Attempt.organization_id == auth.organization_id, Test.organization_id.is_(None))
     raise PermissionDeniedError()
 

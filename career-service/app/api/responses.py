@@ -29,6 +29,7 @@ _ERRORS: dict[int, dict[str, Any]] = {
     403: _error("Not permitted", "PERMISSION_DENIED", "You do not have permission to perform this action."),
     404: _error("Record not found", "RESUME_NOT_FOUND", "Resume not found."),
     409: _error("Duplicate or conflicting data", "DUPLICATE_DATA", "A record with the same details already exists."),
+    413: _error("The uploaded file is too large", "FILE_TOO_LARGE", "The file is larger than 5 MB."),
     422: _error(
         "Validation failed",
         "INVALID_DATA",

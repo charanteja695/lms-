@@ -25,7 +25,9 @@ from app.services.access_service import check_institution_active, ensure_user_ac
 from app.services.auth_service import AuthService
 from app.services.institution_service import InstitutionService
 from app.services.mfa_service import MfaService
+from app.services.permission_service import PermissionService
 from app.services.rate_limiter import RateLimiter
+from app.services.signup_service import SignupService
 from app.services.user_service import UserService
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -168,6 +170,7 @@ async def _authenticate(
         raise AuthenticationError("Your session has ended. Please log in again.", code="SESSION_REVOKED")
 
     ensure_user_active(user)
+    user.grant(await PermissionService(db).effective_for(user))
     return AuthContext(
         user=user,
         session=session,
@@ -237,6 +240,19 @@ def get_institution_service(db: DbSession, settings: SettingsDep, ctx: RequestCt
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+
+
+def get_signup_service(
+    db: DbSession,
+    settings: SettingsDep,
+    ctx: RequestCtx,
+    limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
+    notifier: Annotated[Notifier, Depends(get_notifier)],
+) -> SignupService:
+    return SignupService(db, settings, ctx, limiter, notifier)
+
+
+SignupServiceDep = Annotated[SignupService, Depends(get_signup_service)]
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 MfaServiceDep = Annotated[MfaService, Depends(get_mfa_service)]
 InstitutionServiceDep = Annotated[InstitutionService, Depends(get_institution_service)]

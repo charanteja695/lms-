@@ -25,13 +25,16 @@ def is_super_admin(auth: AccessTokenClaims) -> bool:
     return auth.role == Role.SUPER_ADMIN
 
 
-def _member_may(auth: AccessTokenClaims, kind: str, permission: str) -> bool:
-    return auth.organization_id is not None and auth.organization_type == kind and auth.has_scope(permission)
+def _member_may(auth: AccessTokenClaims, kind: str, permission: str, cell: str | None = None) -> bool:
+    """``cell``: the permission-matrix cell that decides for heads, staff and students (company roles hold the key)."""
+    held = auth.can_act(cell, permission) if cell else auth.has_scope(permission)
+    return auth.organization_id is not None and auth.organization_type == kind and held
 
 
-def is_student(auth: AccessTokenClaims) -> bool:
-    """Searches and applies for jobs (a person's own; never implied by being a super admin)."""
-    return auth.has_scope("jobs.apply")
+def is_student(auth: AccessTokenClaims, action: str = "view") -> bool:
+    """Jobs, one action at a time (the Jobs page's cells): ``view`` browse and search, ``create`` apply and answer
+    offers, ``revoke`` withdraw. A person's own; never implied by being a super admin."""
+    return auth.role != Role.SUPER_ADMIN and auth.can_act(f"jobs.{action}", "jobs.apply")
 
 
 def is_employer_member(auth: AccessTokenClaims) -> bool:
@@ -46,12 +49,12 @@ def is_employer_admin(auth: AccessTokenClaims) -> bool:
 
 def is_institution_staff(auth: AccessTokenClaims) -> bool:
     """Follows their own institution's students' applications and placements."""
-    return _member_may(auth, "institution", "jobs.placements")
+    return _member_may(auth, "institution", "jobs.placements", "placements.view")
 
 
 def is_institution_head(auth: AccessTokenClaims) -> bool:
     """Proposes placement drives for their own institution."""
-    return _member_may(auth, "institution", "jobs.drives.propose")
+    return _member_may(auth, "institution", "jobs.drives.propose", "placements.create")
 
 
 def can_manage_careers(auth: AccessTokenClaims) -> bool:

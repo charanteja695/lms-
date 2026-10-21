@@ -2,7 +2,7 @@ from datetime import timedelta
 from typing import Any
 
 from lms_common.pagination import paginate
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -157,7 +157,15 @@ class MediaAssetService:
         return asset
 
     async def list_assets(self, query: AssetListQuery) -> tuple[list[MediaAsset], int, bool]:
-        stmt = select(MediaAsset).where(MediaAsset.archived_at.is_(None))
+        archived = MediaAsset.archived_at.is_not(None) if query.archived else MediaAsset.archived_at.is_(None)
+        stmt = select(MediaAsset).where(archived)
+        if query.kind:
+            stmt = stmt.where(MediaAsset.kind == query.kind)
+        if query.status:
+            stmt = stmt.where(MediaAsset.status == query.status)
+        if query.search and query.search.strip():
+            escaped = query.search.strip().replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+            stmt = stmt.where(MediaAsset.original_filename.ilike(f"%{escaped}%", escape="\\"))
         if query.context_type:
             stmt = stmt.where(MediaAsset.context_type == query.context_type)
         if query.context_id:
@@ -166,6 +174,32 @@ class MediaAssetService:
             MediaAsset.created_at.desc() if query.sort_order == "desc" else MediaAsset.created_at.asc()
         )
         return await paginate(self.db, stmt, query.page, query.per_page, options=_LOAD_DETAIL)
+
+    async def summary(self) -> dict[str, Any]:
+        """Live files per kind with their total size, plus how many failed and how many are archived."""
+        rows = (
+            await self.db.execute(
+                select(MediaAsset.kind, func.count(), func.coalesce(func.sum(MediaAsset.byte_size), 0))
+                .where(MediaAsset.archived_at.is_(None))
+                .group_by(MediaAsset.kind)
+            )
+        ).all()
+        failed = await self.db.scalar(
+            select(func.count()).where(MediaAsset.archived_at.is_(None), MediaAsset.status == AssetStatus.FAILED)
+        )
+        archived = await self.db.scalar(select(func.count()).where(MediaAsset.archived_at.is_not(None)))
+        return {
+            "kinds": [{"kind": kind, "count": count, "byte_size": int(size)} for kind, count, size in rows],
+            "failed": failed or 0,
+            "archived": archived or 0,
+        }
+
+    async def restore(self, asset: MediaAsset) -> MediaAsset:
+        if asset.archived_at is None:
+            return asset
+        asset.archived_at = None
+        await self.db.commit()
+        return await self.get(asset.public_id)
 
     async def archive(self, asset: MediaAsset) -> MediaAsset:
         if asset.archived_at is not None:

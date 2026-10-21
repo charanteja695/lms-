@@ -111,6 +111,20 @@ class Settings(BaseSettings):
     FRONTEND_RESET_PASSWORD_PATH: str = "/reset-password"
     FRONTEND_ACCOUNT_SETUP_PATH: str = "/set-password"
 
+    # --- Self sign-up (individual learners who buy courses themselves) ---
+    SIGNUP_ENABLED: bool = True
+    SIGNUP_RATE_LIMIT_PER_HOUR: int = 10  # per client IP: sign-up and resend
+    SIGNUP_EMAIL_RATE_LIMIT_PER_HOUR: int = 5  # per email address
+    # The one organisation every self-registered learner belongs to (created on the first sign-up).
+    INDIVIDUAL_ORG_NAME: str = "Individual learners"
+    INDIVIDUAL_ORG_CODE: str = Field(default="INDIVIDUAL", max_length=20)
+    INDIVIDUAL_ORG_EMAIL: str = "learners@example.com"
+    INDIVIDUAL_ORG_PHONE: str = "+910000000000"
+    INDIVIDUAL_ORG_ADDRESS: str = "Online"
+    INDIVIDUAL_ORG_CITY: str = "Online"
+    INDIVIDUAL_ORG_STATE: str = "Online"
+    INDIVIDUAL_ORG_POSTAL_CODE: str = "000000"
+
     # --- Rate limiting (per client IP unless stated) ---
     RATE_LIMIT_ENABLED: bool = True
     # per client IP: a school shares one IP, so sized for a classroom; brute force is stopped per account (lockout)

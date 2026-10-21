@@ -10,11 +10,15 @@ from app.api.responses import errors
 from app.core.exceptions import NotFoundError
 from app.models.user import User
 from app.permissions.features import PERMISSIONS
+from app.permissions.pages import ACTION_LABELS, ACTIONS, MATRIX_ROLES, PAGES
 from app.permissions.roles import Role
 from app.repositories.user_repository import UserRepository
 from app.schemas.permission_admin import (
+    ActionOut,
     CatalogEntry,
+    CatalogPage,
     CatalogResponse,
+    PageAction,
     PermissionChanges,
     PersonPermissions,
     PersonPermissionsResponse,
@@ -42,6 +46,27 @@ async def catalog(auth: CurrentAuth) -> CatalogResponse:
             )
             for p in PERMISSIONS
         ],
+        actions=[ActionOut(key=a, label=ACTION_LABELS[a]) for a in ACTIONS],
+        pages=[
+            CatalogPage(
+                key=p.key,
+                label=p.label,
+                group=p.group,
+                description=p.description,
+                holders=[r.value for r in MATRIX_ROLES if r in p.holders],
+                actions=[
+                    PageAction(
+                        action=a,
+                        key=f"{p.key}.{a}",
+                        meaning=p.meaning[a],
+                        default_roles=[r.value for r in MATRIX_ROLES if r in p.defaults[a]],
+                    )
+                    for a in p.actions
+                ],
+            )
+            for p in PAGES
+        ],
+        matrix_roles=[r.value for r in MATRIX_ROLES],
     )
 
 

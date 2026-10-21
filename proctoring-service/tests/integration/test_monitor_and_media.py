@@ -12,7 +12,8 @@ async def test_staff_see_running_sessions_scoped_to_their_own_students(client, w
     session_id = await go_live(client, who, tests_published, send_event)
     await client.post(f"/api/v1/sessions/{session_id}/events", json={"events": [event("tab_switch")]})
     who.staff()
-    assert [s["session_id"] for s in (await client.get("/api/v1/monitor/sessions")).json()["sessions"]] == [session_id]
+    listed = (await client.get("/api/v1/monitor/sessions")).json()["sessions"]
+    assert [s["session_id"] for s in listed] == [session_id] and listed[0]["test_title"] == f"Test {listed[0]['test_id']}"
     detail = (await client.get(f"/api/v1/monitor/sessions/{session_id}")).json()
     assert detail["session"]["risk_score"] == 6 and detail["session"]["risk_breakdown"] == {"tab_switch": 6}
     assert [e["type"] for e in detail["events"]][:2] == ["tab_switch", "session_started"]

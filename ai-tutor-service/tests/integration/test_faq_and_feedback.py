@@ -185,11 +185,18 @@ async def test_authors_see_totals_and_the_unhelpful_answers_without_who_asked(cl
 
 
 async def test_the_tutor_and_the_faq_follow_the_persons_permissions(client, act_as):
-    """A super admin can stop one student using the tutor, or let one student write their institution's FAQ."""
+    """A super admin can stop one student using the tutor; the Tutor FAQ page's cells decide each action for staff
+    (View alone: no new answers, although the coarse tutor.faq.manage key is still in the token)."""
     act_as(STUDENT, role="student", organization_id=ORG_A, defaults=False)
     assert (await client.post("/api/v1/conversations", json={"course_id": str(COURSE)})).status_code == 403
     entry = {"scope": "organization", "organization_id": str(ORG_A), "question": "When is the lab open?", "answer": "Weekdays, 9 to 5."}
-    act_as(STUDENT, role="student", organization_id=ORG_A, scopes=("tutor.faq.manage",))
-    assert (await client.post("/api/v1/faq/manage", json=entry)).status_code == 201
+    act_as(STAFF_A, role="staff", organization_id=ORG_A, defaults=False, scopes=("tutor_faq.view", "tutor.faq.manage"))
+    assert (await client.post("/api/v1/faq/manage", json=entry)).status_code == 403
+    assert (await client.get("/api/v1/faq/manage")).status_code == 200
+    act_as(STAFF_A, role="staff", organization_id=ORG_A, defaults=False, scopes=("tutor_faq.view", "tutor_faq.create", "tutor.faq.manage"))
+    created = await client.post("/api/v1/faq/manage", json=entry)
+    assert created.status_code == 201
+    archive = await client.post(f"/api/v1/faq/manage/{created.json()['faq']['faq_id']}/archive")
+    assert archive.status_code == 403  # archiving is the Delete cell
     act_as(STAFF_A, role="staff", organization_id=ORG_A, defaults=False)
     assert (await client.post("/api/v1/faq/manage", json=entry)).status_code == 403

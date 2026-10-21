@@ -58,6 +58,7 @@ async def test_a_student_sees_their_applications_and_only_theirs(client, who, se
     who.student()
     detail = (await client.get(f"{API}/job-board/{job_id}")).json()["job"]
     assert detail["applied"] is True and detail["application_id"] == mine["application_id"]
+    assert detail["steps"][0] == {"key": "screening", "label": "Resume check"} and detail["steps"][-1]["key"] == "offer"
 
 
 async def test_application_rules(client, who, send_event, work, career, sessionmaker):
@@ -152,6 +153,10 @@ async def test_recruiters_see_applicants_with_the_resume_as_sent_and_can_search_
     assert detail["screening"]["source"] == "ai" and detail["screening"]["score"] is not None and [h["to_status"] for h in detail["history"]] == ["applied", "ai_screened"]
     funnel = (await client.get(f"{API}/employer/jobs/{job_id}/funnel")).json()
     assert funnel["by_status"] == {"ai_screened": 2} and funnel["total"] == 2 and funnel["placed"] == 0 and funnel["openings"] == 2
+    stages = {g["key"]: g for g in funnel["stages"]}
+    assert stages["new"]["count"] == 2 and stages["closed"]["count"] == 0 and "ai_screened" in stages["new"]["statuses"]
+    listed = (await client.get(f"{API}/employer/jobs/{job_id}/applications", params=[("status", s) for s in stages["new"]["statuses"]])).json()["applications"]
+    assert len(listed) == 2
 
 
 async def test_notes_are_private_to_the_recruiting_team(client, who, send_event, work, career):

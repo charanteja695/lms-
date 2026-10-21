@@ -17,11 +17,11 @@ from app.api.deps import (
 from app.api.presenters import invoice_detail, invoice_out
 from app.api.responses import AUTHENTICATED, errors
 from app.core.config import Settings
-from app.core.exceptions import ValidationFailedError
+from app.core.exceptions import PermissionDeniedError, ValidationFailedError
 from app.core.ids import parse_public_id
 from app.domain.enums import InvoiceStatus
 from app.models.billing import Invoice
-from app.permissions.policy import can_manage_billing
+from app.permissions.policy import can_manage_billing, owns
 from app.schemas.billing import (
     CreditNoteIn,
     CreditNoteOut,
@@ -75,6 +75,8 @@ async def get_invoice(invoice_id: InvoiceIdParam, auth: RequireBillingContact, d
 )
 async def pay_online(invoice_id: InvoiceIdParam, body: GatewayPaymentIn, auth: RequireBillingContact, db: DbSession, settings: SettingsDep, gateway: PaymentGatewayDep) -> GatewayPaymentResponse:
     invoice = await InvoiceService(db, settings).get_visible(auth, invoice_id)
+    if not owns(auth, invoice.org_id, "update"):
+        raise PermissionDeniedError("Paying is turned off for your account.", code="ACTION_NOT_PERMITTED")
     payment, order_id = await PaymentService(db, settings, gateway).start_gateway_payment(invoice, amount=body.amount)
     return GatewayPaymentResponse(message="Complete the payment with the provider.", gateway_payment=GatewayPaymentOut(payment_id=payment.public_id, order_id=order_id, amount=payment.amount, currency=invoice.currency))
 

@@ -338,10 +338,13 @@ class ApplicationService:
         rows = (await self.db.execute(stmt.order_by(*order, Application.id).limit(per_page).offset((page - 1) * per_page))).all()
         return [(a, u) for a, u in rows], total
 
-    async def list_mine(self, user_id: int, *, status: str | None, page: int, per_page: int) -> tuple[list[tuple[Application, Job]], int]:
+    async def list_mine(self, user_id: int, *, status: str | None, page: int, per_page: int, active: bool | None = None) -> tuple[list[tuple[Application, Job]], int]:
         stmt = select(Application, Job).join(Job, Job.id == Application.job_id).where(Application.user_id == user_id)
         if status:
             stmt = stmt.where(Application.status == status)
+        if active is not None:
+            closed = [s.value for s in TERMINAL_STATUSES]
+            stmt = stmt.where(Application.status.not_in(closed) if active else Application.status.in_(closed))
         total = int((await self.db.execute(select(func.count()).select_from(stmt.order_by(None).subquery()))).scalar_one())
         rows = (await self.db.execute(stmt.order_by(Application.created_at.desc(), Application.id).limit(per_page).offset((page - 1) * per_page))).all()
         return [(a, j) for a, j in rows], total

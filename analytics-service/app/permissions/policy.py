@@ -37,13 +37,15 @@ def can_view_platform(auth: AccessTokenClaims, *domain_scopes: Scope) -> bool:
     return auth.can(Scope.ANALYTICS_VIEW.value) or any(auth.has_scope(s.value) for s in domain_scopes)
 
 
-def _own(auth: AccessTokenClaims, kind: str) -> bool:
-    return auth.organization_id is not None and auth.organization_type == kind and auth.has_scope(OWN)
+def _own(auth: AccessTokenClaims, kind: str, action: str = "view") -> bool:
+    """``action``: ``view`` the dashboards, ``export`` schedule reports of them (the Reports page's cells; company
+    roles hold the coarse key)."""
+    return auth.organization_id is not None and auth.organization_type == kind and auth.can_act(f"reports.{action}", OWN)
 
 
-def is_institution_member(auth: AccessTokenClaims) -> bool:
-    """Sees their own institution's dashboards (``analytics.own``; by default its staff and head)."""
-    return _own(auth, "institution")
+def is_institution_member(auth: AccessTokenClaims, action: str = "view") -> bool:
+    """Sees (or exports) their own institution's dashboards (by default its staff and head)."""
+    return _own(auth, "institution", action)
 
 
 def is_employer_member(auth: AccessTokenClaims) -> bool:

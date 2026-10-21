@@ -15,14 +15,14 @@ def is_super_admin(auth: AccessTokenClaims) -> bool:
     return auth.role == Role.SUPER_ADMIN
 
 
-def is_student(auth: AccessTokenClaims) -> bool:
-    """Holds certificates of their own."""
-    return auth.has_scope("certificates.own")
+def is_student(auth: AccessTokenClaims, action: str = "view") -> bool:
+    """Their own certificates: see them (``view``), download and share them (``export``) — the My certificates cells."""
+    return auth.can_act(f"my_certificates.{action}", "certificates.own")
 
 
-def is_institution_staff(auth: AccessTokenClaims) -> bool:
-    """Sees their own institution's students' certificates."""
-    return auth.organization_id is not None and auth.has_scope("certificates.students")
+def is_institution_staff(auth: AccessTokenClaims, action: str = "view") -> bool:
+    """Their own institution's students' certificates: see them (``view``), download the list (``export``)."""
+    return auth.organization_id is not None and auth.can_act(f"certificates.{action}", "certificates.students")
 
 
 def can_author_templates(auth: AccessTokenClaims) -> bool:

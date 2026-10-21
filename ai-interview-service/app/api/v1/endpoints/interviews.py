@@ -15,6 +15,7 @@ from app.api.deps import (
     GatewayDep,
     IdempotencyKeyHeader,
     InterviewIdParam,
+    RequireInterviewStarter,
     RequireStudent,
     SettingsDep,
     TurnRateLimit,
@@ -59,7 +60,7 @@ MAX_AUDIO_BYTES = 15 * 1024 * 1024
     description="Up to your monthly allowance; only one practice interview may be open at a time. The invitation must be started within its window.",
     dependencies=[WriteRateLimit],
 )
-async def create_mock_interview(body: MockInterviewCreate, auth: RequireStudent, db: DbSession, settings: SettingsDep) -> InterviewResponse:
+async def create_mock_interview(body: MockInterviewCreate, auth: RequireInterviewStarter, db: DbSession, settings: SettingsDep) -> InterviewResponse:
     plan = await PlanService(db, settings).get_for_student(body.plan_id)
     interview = await InterviewService(db, settings).create_mock(auth, plan)
     return InterviewResponse(message="Practice interview created: accept the consent, then start.", interview=interview_out(interview))
@@ -71,8 +72,14 @@ async def list_my_interviews(
     page: Annotated[int, Query(ge=1, le=10_000)] = 1, per_page: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> InterviewPage:
     interviews, total = await InterviewService(db, settings).list_mine(auth.user_id, status=status.value if status else None, kind=kind.value if kind else None, page=page, per_page=per_page)
+    evaluations = EvaluationService(db, settings, None)
+    out = []
+    for i in interviews:
+        evaluation = await evaluations.for_interview(i) if i.feedback_released else None
+        score = evaluation.overall_score if evaluation is not None and evaluation.status == "final" else None
+        out.append(interview_out(i).model_copy(update={"overall_score": score}))
     return InterviewPage(
-        message="", interviews=[interview_out(i) for i in interviews],
+        message="", interviews=out,
         page_context=PageContext.build(page=page, per_page=per_page, total=total, is_exact=True, sort_column="created_at", sort_order=SortOrder.DESC),
     )
 
@@ -207,7 +214,7 @@ async def appeal_interview(interview_id: InterviewIdParam, body: AppealRequest, 
 
 
 @router.post("/{interview_id}/retake", response_model=InterviewResponse, status_code=201, summary="Take the fresh attempt an upheld appeal granted", responses=errors(*AUTHENTICATED, 403, 409))
-async def retake_interview(interview_id: InterviewIdParam, auth: RequireStudent, db: DbSession, settings: SettingsDep) -> InterviewResponse:
+async def retake_interview(interview_id: InterviewIdParam, auth: RequireInterviewStarter, db: DbSession, settings: SettingsDep) -> InterviewResponse:
     service = InterviewService(db, settings)
     fresh = await service.retake(auth, await service.get_mine(auth.user_id, interview_id))
     return InterviewResponse(message="A new interview has been created for your retake.", interview=interview_out(fresh))

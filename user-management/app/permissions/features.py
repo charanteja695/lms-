@@ -374,6 +374,13 @@ PERMISSIONS: tuple[Permission, ...] = (
         _EA,
     ),
     _p("billing.plans.buy", "Buy hiring plans", "Buy job-post plans for their company.", ("billing",), "employer", _EA),
+    _p(
+        "store.buy",
+        "Buy courses",
+        "Browse the course store and buy courses for themselves (self-registered learners only, never ticked by hand).",
+        ("store",),
+        "institution",
+    ),
     _p("support.ask", "Ask for help", "Open support tickets.", ("support",), "institution", _S),
     _p(
         "support.agent",
@@ -409,9 +416,11 @@ PLATFORM_KEYS: frozenset[str] = frozenset(p.key for p in PERMISSIONS if p.audien
 # Menu entries (feature level) → the permissions that open them (any one is enough). Display order.
 MENU: dict[str, tuple[str, ...]] = {
     "my_learning": ("learning.study",),
+    "store": ("store.buy",),
     "batches": ("learning.batches.view", "learning.batches.manage", AdminScope.ACCOUNTS_MANAGE),
     "courses": ("catalog.browse", AdminScope.CONTENT_AUTHOR, AdminScope.CONTENT_REVIEW),
     "learning_paths": ("catalog.browse", AdminScope.CONTENT_AUTHOR, AdminScope.CONTENT_REVIEW),
+    "media_library": (AdminScope.CONTENT_AUTHOR,),
     "course_requests": ("subscriptions.request", AdminScope.ACCOUNTS_MANAGE),
     "subscriptions": ("subscriptions.request", AdminScope.ACCOUNTS_MANAGE),
     "problems": ("code.practice", AdminScope.CONTENT_AUTHOR, AdminScope.CONTENT_REVIEW),
@@ -464,6 +473,7 @@ MENU: dict[str, tuple[str, ...]] = {
 
 # The other services' modules, in menu order (``permissions.sections``); "notifications" is everyone's.
 MODULES: tuple[str, ...] = (
+    "store",
     "catalog",
     "subscriptions",
     "learning",

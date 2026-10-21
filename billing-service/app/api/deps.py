@@ -20,7 +20,7 @@ from app.core.exceptions import AuthenticationError, NotFoundError, PermissionDe
 from app.core.ids import parse_public_id
 from app.core.security import AccessTokenClaims, TokenError, get_verifier
 from app.gateways.payment import PaymentGateway
-from app.permissions.policy import can_buy_plans, can_manage_billing, is_billing_contact
+from app.permissions.policy import can_buy_courses, can_buy_plans, can_manage_billing, is_billing_contact
 from app.services.rate_limiter import RateLimiter
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -93,6 +93,7 @@ RequireBillingAdmin = Annotated[AccessTokenClaims, Depends(_require(can_manage_b
 RequireBillingContact = Annotated[
     AccessTokenClaims, Depends(_require(lambda a: is_billing_contact(a) or can_manage_billing(a), "Only an institution head, an employer admin or a billing manager can do this.", "PERMISSION_DENIED"))
 ]
+RequireLearner = Annotated[AccessTokenClaims, Depends(_require(can_buy_courses, "Only self-registered learners buy courses here.", "LEARNERS_ONLY"))]
 RequireEmployerAdmin = Annotated[AccessTokenClaims, Depends(_require(can_buy_plans, "Only someone allowed to buy plans for their company can do this.", "EMPLOYER_ADMINS_ONLY"))]
 
 

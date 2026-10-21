@@ -44,13 +44,15 @@ def can_manage_exams(auth: AccessTokenClaims) -> bool:
     return auth.can(EXAMS_MANAGE)
 
 
-def _monitors(auth: AccessTokenClaims, kind: str) -> bool:
-    return auth.organization_id is not None and auth.organization_type == kind and auth.has_scope(MONITOR)
+def _monitors(auth: AccessTokenClaims, kind: str, action: str = "view") -> bool:
+    """``action``: ``view`` (watch sessions, read cases) or ``update`` (warn/pause/stop a session, decide a case) — the
+    Live proctoring page's cells for institution staff; company roles hold the coarse key."""
+    return auth.organization_id is not None and auth.organization_type == kind and auth.can_act(f"proctoring.{action}", MONITOR)
 
 
-def is_institution_staff(auth: AccessTokenClaims) -> bool:
-    """Watches their own institution's students' sessions on platform tests."""
-    return _monitors(auth, "institution")
+def is_institution_staff(auth: AccessTokenClaims, action: str = "view") -> bool:
+    """Watches (or acts on) their own institution's students' sessions on platform tests."""
+    return _monitors(auth, "institution", action)
 
 
 def is_employer_member(auth: AccessTokenClaims) -> bool:
@@ -58,13 +60,18 @@ def is_employer_member(auth: AccessTokenClaims) -> bool:
     return _monitors(auth, "employer")
 
 
-def can_monitor(auth: AccessTokenClaims, *, student_organization_id: int | None, test_owner_id: int | None) -> bool:
-    """See a live session, warn/pause/resume/terminate it, and review its case."""
+def can_monitor(auth: AccessTokenClaims, *, student_organization_id: int | None, test_owner_id: int | None, action: str = "view") -> bool:
+    """See a live session and its case (``view``); warn/pause/resume/terminate it or decide the case (``update``)."""
     if can_manage_exams(auth):
         return True
     if test_owner_id is not None:
         return is_employer_member(auth) and auth.organization_id == test_owner_id
-    return is_institution_staff(auth) and auth.organization_id == student_organization_id
+    return is_institution_staff(auth, action) and auth.organization_id == student_organization_id
+
+
+def can_appeal(auth: AccessTokenClaims) -> bool:
+    """A student appealing their own integrity decision: the Exam reviews page's Create cell."""
+    return auth.can_act("exam_reviews.create", TAKE)
 
 
 def can_decide_appeals(auth: AccessTokenClaims) -> bool:
