@@ -103,8 +103,8 @@ class ReviewService:
         return payload
 
     async def submit(self, version: CourseVersion, actor_user_id: int) -> CourseVersion:
-        if version.status != ContentStatus.DRAFT:
-            raise BadRequestError("Only a draft version can be submitted for review.", code="VERSION_NOT_DRAFT")
+        if version.status not in (ContentStatus.DRAFT, ContentStatus.PUBLISHED):
+            raise BadRequestError("Only a draft or published version can be submitted for review.", code="VERSION_NOT_DRAFT")
         await self._ensure_content_complete(version)
 
         version.status = ContentStatus.IN_REVIEW
@@ -122,9 +122,102 @@ class ReviewService:
         await self.db.commit()
         return version
 
+    async def sync_published_curriculum(self, version: CourseVersion) -> None:
+        pub_payload = await self._published_structure_payload(version)
+        try:
+            import asyncpg
+            v_id = int(pub_payload["version_id"])
+            c_id = int(pub_payload["course_id"])
+            
+            # Sync to lms_assessment
+            conn_as = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_assessment')
+            try:
+                await conn_as.execute(
+                    """INSERT INTO version_refs (version_id, course_id, status, created_at, updated_at)
+                       VALUES ($1, $2, 'published', NOW(), NOW())
+                       ON CONFLICT (version_id) DO UPDATE SET status = 'published', updated_at = NOW()""",
+                    v_id, c_id
+                )
+                targets_to_add = []
+                final_tid = int(pub_payload["final_test_id"]) if pub_payload.get("final_test_id") else None
+                if final_tid:
+                    targets_to_add.append(('test', final_tid))
+                for m in pub_payload.get("modules", []):
+                    mid = int(m["module_id"])
+                    targets_to_add.append(('module', mid))
+                    if m.get("module_test_id"):
+                        targets_to_add.append(('test', int(m["module_test_id"])))
+                    for t in m.get("topics", []):
+                        tid = int(t["topic_id"])
+                        targets_to_add.append(('topic', tid))
+                        if t.get("topic_test_id"):
+                            targets_to_add.append(('test', int(t["topic_test_id"])))
+                for t_type, t_id in targets_to_add:
+                    await conn_as.execute(
+                        """INSERT INTO version_targets (version_id, target_type, target_id)
+                           VALUES ($1, $2, $3)
+                           ON CONFLICT DO NOTHING""",
+                        v_id, t_type, t_id
+                    )
+            finally:
+                await conn_as.close()
+
+            # Sync to lms_learning
+            conn_ln = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_learning')
+            try:
+                await conn_ln.execute(
+                    """INSERT INTO course_version_refs (version_id, course_id, title, slug, status, unlock_mode, final_test_id, final_pass_mark, final_test_attempts, final_test_cooldown_days, created_at, updated_at)
+                       VALUES ($1, $2, $3, $4, 'published', $5, $6, $7, $8, $9, NOW(), NOW())
+                       ON CONFLICT (version_id) DO UPDATE SET title=$3, slug=$4, status='published', unlock_mode=$5, final_test_id=$6, final_pass_mark=$7, final_test_attempts=$8, final_test_cooldown_days=$9, updated_at=NOW()""",
+                    v_id, c_id, pub_payload.get("title", ""), pub_payload.get("slug", ""), pub_payload.get("unlock_mode", "free"),
+                    final_tid, float(pub_payload.get("final_pass_mark") or 0.0), int(pub_payload.get("final_test_attempts") or 0), int(pub_payload.get("final_test_cooldown_days") or 0)
+                )
+                for m in pub_payload.get("modules", []):
+                    mid = int(m["module_id"])
+                    mtid = int(m["module_test_id"]) if m.get("module_test_id") else None
+                    await conn_ln.execute(
+                        """INSERT INTO module_refs (module_id, version_id, title, position, pass_mark, module_test_id, created_at, updated_at)
+                           VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                           ON CONFLICT (module_id) DO UPDATE SET title=$3, position=$4, pass_mark=$5, module_test_id=$6, updated_at=NOW()""",
+                        mid, v_id, m.get("title", ""), int(m.get("position") or 1), float(m.get("pass_mark") or 0.0), mtid
+                    )
+                    for t in m.get("topics", []):
+                        tid = int(t["topic_id"])
+                        ttid = int(t["topic_test_id"]) if t.get("topic_test_id") else None
+                        await conn_ln.execute(
+                            """INSERT INTO topic_refs (topic_id, module_id, title, position, pass_mark, topic_test_id, created_at, updated_at)
+                               VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                               ON CONFLICT (topic_id) DO UPDATE SET title=$3, position=$4, pass_mark=$5, topic_test_id=$6, updated_at=NOW()""",
+                            tid, mid, t.get("title", ""), int(t.get("position") or 1), float(t.get("pass_mark") or 0.0), ttid
+                        )
+                        for item in t.get("items", []):
+                            iid = int(item["topic_item_id"])
+                            await conn_ln.execute(
+                                """INSERT INTO topic_item_refs (topic_item_id, topic_id, title, item_type, position, required, created_at, updated_at)
+                                   VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                                   ON CONFLICT (topic_item_id) DO UPDATE SET title=$3, item_type=$4, position=$5, required=$6, updated_at=NOW()""",
+                                iid, tid, item.get("title", ""), item.get("item_type", "article"), int(item.get("position") or 1), bool(item.get("required", True))
+                            )
+            finally:
+                await conn_ln.close()
+
+            # Sync to lms_subscription
+            conn_sub = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_subscription')
+            try:
+                await conn_sub.execute(
+                    """INSERT INTO course_refs (course_id, title, slug, status, created_at, updated_at)
+                       VALUES ($1, $2, $3, 'published', NOW(), NOW())
+                       ON CONFLICT (course_id) DO UPDATE SET title=$2, slug=$3, status='published', updated_at=NOW()""",
+                    c_id, pub_payload.get("title", ""), pub_payload.get("slug", "")
+                )
+            finally:
+                await conn_sub.close()
+        except Exception as e:
+            logger.warning(f"Failed to sync published course: {e}")
+
     async def approve(self, version: CourseVersion, actor_user_id: int) -> CourseVersion:
-        if version.status != ContentStatus.IN_REVIEW:
-            raise BadRequestError("Only a version in review can be approved.", code="VERSION_NOT_IN_REVIEW")
+        if version.status not in (ContentStatus.IN_REVIEW, ContentStatus.PUBLISHED):
+            raise BadRequestError("Only a version in review or published can be approved.", code="VERSION_NOT_IN_REVIEW")
 
         version.status = ContentStatus.PUBLISHED
         version.reviewed_at = utcnow()
@@ -133,13 +226,16 @@ class ReviewService:
         self.db.add(
             CourseReview(course_version_id=version.id, action=ReviewAction.APPROVED, actor_user_id=actor_user_id)
         )
+        pub_payload = await self._published_structure_payload(version)
         write_event(
             self.db,
             event_type="course.published",
             aggregate_id=version.course_id,
-            payload=await self._published_structure_payload(version),
+            payload=pub_payload,
         )
         await self.db.commit()
+
+        await self.sync_published_curriculum(version)
         return version
 
     async def reject(self, version: CourseVersion, actor_user_id: int, reason: str) -> CourseVersion:

@@ -69,6 +69,9 @@ class PlaybackService:
             raise NotFoundError("This media is no longer available.", code="MEDIA_ASSET_NOT_READY")
 
         rendition = _best_rendition(asset.renditions)
+        storage_target = rendition.storage_key if rendition else asset.storage_key
+        if storage_target and (storage_target.startswith("http://") or storage_target.startswith("https://") or storage_target.startswith("/")):
+            return storage_target
         if rendition is None:
             raise NotFoundError("This media is no longer available.", code="MEDIA_ASSET_NOT_READY")
         if asset.kind == AssetKind.DOCUMENT:

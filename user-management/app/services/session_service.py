@@ -123,7 +123,7 @@ class SessionService:
                 scopes=permissions,
                 must_change_password=user.must_change_password,
                 mfa_enabled=mfa_enabled,
-                mfa_setup_required=not mfa_enabled and user.role in self.settings.MFA_REQUIRED_ROLES,
+                mfa_setup_required=not mfa_enabled and user.role != "student" and user.role in self.settings.MFA_REQUIRED_ROLES,
             ),
         )
 

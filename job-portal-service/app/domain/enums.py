@@ -23,6 +23,7 @@ class JobStatus(StrEnum):
 
 class EmploymentType(StrEnum):
     FULL_TIME = "full_time"
+    PART_TIME = "part_time"
     INTERNSHIP = "internship"
     CONTRACT = "contract"
 

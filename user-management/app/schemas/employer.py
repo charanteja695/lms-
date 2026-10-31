@@ -35,7 +35,7 @@ RegistrationNumber = text(50, examples=["U72900TG2015PTC098765"])
 
 class EmployerCreate(RequestSchema):
     name: EmployerName  # type: ignore[valid-type]
-    code: InstitutionCode = Field(description="Short unique code, stored in upper case", examples=["ACME-HYD"])
+    code: InstitutionCode | None = Field(default=None, description="Short unique code, stored in upper case", examples=["ACME-HYD"])
     industry: Industry | None = None  # type: ignore[valid-type]
     admin_user_id: UserId | None = Field(
         default=None,

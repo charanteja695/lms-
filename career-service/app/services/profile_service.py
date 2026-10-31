@@ -215,4 +215,35 @@ class ProfileService:
         return views
 
     async def user_ref(self, user_id: int) -> UserRef | None:
-        return await self.db.get(UserRef, user_id)
+        ref = await self.db.get(UserRef, user_id)
+        if ref is not None:
+            return ref
+        try:
+            import asyncpg
+            conn = await asyncpg.connect("postgresql://lms:lms@localhost:5432/lms_user_management")
+            try:
+                row = await conn.fetchrow("""
+                    SELECT u.public_id, u.first_name, u.last_name, u.email, u.role,
+                           (u.status = 'active') as active, i.public_id as inst_pub_id
+                    FROM users u
+                    LEFT JOIN institutions i ON i.id = u.institution_id
+                    WHERE u.public_id = $1 AND u.deleted_at IS NULL
+                """, user_id)
+                if row:
+                    ref = UserRef(
+                        user_id=row["public_id"],
+                        first_name=str(row["first_name"] or "")[:100],
+                        last_name=str(row["last_name"] or "")[:100],
+                        email=str(row["email"])[:320] if row["email"] else None,
+                        role=str(row["role"] or "")[:20],
+                        organization_id=row["inst_pub_id"],
+                        active=row["active"],
+                    )
+                    self.db.add(ref)
+                    await self.db.flush()
+                    return ref
+            finally:
+                await conn.close()
+        except Exception:
+            pass
+        return None

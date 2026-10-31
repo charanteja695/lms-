@@ -10,7 +10,7 @@ from app.core.time import utcnow
 from app.domain.enums import WorkKind
 from app.matching.model import Candidate, Preferences
 from app.models.match import CandidatePreference
-from app.models.refs import CandidateProfile, CourseRef
+from app.models.refs import CandidateProfile, CourseRef, UserRef
 from app.services import work_service
 
 
@@ -21,15 +21,70 @@ def _int(value: Any) -> int | None:
         return None
 
 
-def to_candidate(profile: CandidateProfile) -> Candidate:
+def to_candidate(
+    profile: CandidateProfile | None,
+    user_id: int | None = None,
+    organization_id: int | None = None,
+) -> Candidate:
+    if profile is None:
+        return Candidate(user_id=user_id or 0, organization_id=organization_id or 0)
     facts = profile.facts or {}
-    education = tuple(" ".join(str(x) for x in (e.get("degree"), e.get("field")) if x) for e in facts.get("education") or [])
+    edu_list = facts.get("education") or []
+    education = tuple(" ".join(str(x) for x in (e.get("degree"), e.get("field") or e.get("field_of_study")) if x) for e in edu_list)
+    degrees = tuple(str(e.get("degree")).strip() for e in edu_list if e.get("degree"))
+
+    cgpa = None
+    if facts.get("cgpa") not in (None, ""):
+        try:
+            cgpa = float(facts["cgpa"])
+        except (ValueError, TypeError):
+            cgpa = None
+    if cgpa is None:
+        for e in edu_list:
+            grade = e.get("grade") or e.get("cgpa")
+            if grade not in (None, ""):
+                try:
+                    cgpa = float(str(grade).split("/")[0].strip())
+                    break
+                except (ValueError, TypeError):
+                    pass
+
+    branch = str(facts["branch"]).strip() if facts.get("branch") else None
+    if not branch:
+        for e in edu_list:
+            f = e.get("field") or e.get("field_of_study")
+            if f:
+                branch = str(f).strip()
+                break
+
+    grad_year = _int(facts.get("graduation_year"))
+    if grad_year is None:
+        for e in edu_list:
+            end = str(e.get("end_date") or e.get("end_year") or "")
+            if len(end) >= 4 and end[:4].isdigit():
+                grad_year = int(end[:4])
+                break
+
+    backlogs = _int(facts.get("backlogs"))
+
     return Candidate(
-        user_id=profile.user_id, organization_id=profile.organization_id, skills=tuple(facts.get("skills") or ()), technologies=tuple(facts.get("technologies") or ()),
-        job_titles=tuple(facts.get("job_titles") or ()), experience_months=int(facts.get("experience_months") or 0), graduation_year=_int(facts.get("graduation_year")),
+        user_id=profile.user_id,
+        organization_id=profile.organization_id or organization_id or 0,
+        skills=tuple(facts.get("skills") or ()),
+        technologies=tuple(facts.get("technologies") or ()),
+        job_titles=tuple(facts.get("job_titles") or ()),
+        experience_months=int(facts.get("experience_months") or 0),
+        graduation_year=grad_year,
         certificate_course_ids=frozenset(c for c in (_int(x) for x in facts.get("certificates") or []) if c is not None),
         scores={c: float(s["best_percent"]) for s in facts.get("scores") or [] if (c := _int(s.get("course_id"))) is not None and s.get("best_percent") is not None},
-        education=tuple(e for e in education if e), location=facts.get("location"), target_roles=tuple(facts.get("target_roles") or ()), headline=facts.get("headline"),
+        education=tuple(e for e in education if e),
+        location=facts.get("location"),
+        target_roles=tuple(facts.get("target_roles") or ()),
+        headline=facts.get("headline"),
+        cgpa=cgpa,
+        branch=branch,
+        degrees=degrees,
+        backlogs=backlogs,
     )
 
 
@@ -46,12 +101,23 @@ class CandidateService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    async def profile(self, user_id: int) -> CandidateProfile | None:
-        return await self.db.get(CandidateProfile, user_id)
+    async def profile(self, user_id: int, organization_id: int | None = None) -> CandidateProfile | None:
+        row = await self.db.get(CandidateProfile, user_id)
+        if row is None:
+            ref = await self.db.get(UserRef, user_id)
+            org_id = organization_id or (ref.organization_id if ref else None)
+            row = CandidateProfile(user_id=user_id, organization_id=org_id, revision=0, facts={})
+            self.db.add(row)
+            try:
+                await self.db.flush()
+            except Exception:
+                await self.db.rollback()
+                row = await self.db.get(CandidateProfile, user_id)
+        return row
 
-    async def candidate(self, user_id: int) -> Candidate | None:
-        profile = await self.profile(user_id)
-        return to_candidate(profile) if profile else None
+    async def candidate(self, user_id: int, organization_id: int | None = None) -> Candidate:
+        profile = await self.profile(user_id, organization_id)
+        return to_candidate(profile, user_id=user_id, organization_id=organization_id)
 
     async def preferences(self, user_id: int) -> CandidatePreference | None:
         return await self.db.get(CandidatePreference, user_id)

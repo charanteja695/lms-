@@ -67,8 +67,10 @@ class ResumeService:
         return row
 
     # ------------------------------------------------------------------ lookup
-    async def get(self, user_id: int, public_id: int) -> Resume:
-        resume = (await self.db.execute(select(Resume).where(Resume.public_id == public_id, Resume.user_id == user_id, Resume.deleted_at.is_(None)))).scalar_one_or_none()
+    async def get(self, user_id: int | str, public_id: int | str) -> Resume:
+        u_id = int(str(user_id))
+        p_id = int(str(public_id))
+        resume = (await self.db.execute(select(Resume).where(Resume.public_id == p_id, Resume.user_id == u_id, Resume.deleted_at.is_(None)))).scalar_one_or_none()
         if resume is None:
             raise NotFoundError("Resume not found.", code="RESUME_NOT_FOUND")
         return resume

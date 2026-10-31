@@ -109,13 +109,25 @@ async def _drive_out(db: DbSession, drive: PlacementDrive) -> DriveOut:
 
 
 @drives.post(
-    "", response_model=DriveResponse, status_code=201, summary="Invite a company to a placement drive (institution head)",
+    "", response_model=DriveResponse, status_code=201, summary="Invite a company to a placement drive (institution head or admin)",
     description="The company must be verified. Once it accepts, its jobs can be attached; they are then visible only to this institution's students, its staff and its head.",
     responses=errors(*AUTHENTICATED, 422), dependencies=[WriteRateLimit],
 )
-async def propose(body: DriveCreate, auth: RequireInstitutionHead, db: DbSession, settings: SettingsDep) -> DriveResponse:
-    drive = await DriveService(db, settings).propose(auth, body.employer_id, title=body.title, description=body.description, drive_date=body.drive_date)
-    return DriveResponse(message="Invitation sent.", drive=await _drive_out(db, drive))
+async def propose(body: DriveCreate, auth: CurrentAuth, db: DbSession, settings: SettingsDep) -> DriveResponse:
+    if not (is_institution_head(auth) or can_manage_careers(auth)):
+        raise PermissionDeniedError()
+    drive = await DriveService(db, settings).propose(
+        auth,
+        body.employer_id,
+        title=body.title,
+        description=body.description,
+        drive_date=body.drive_date,
+        institution_org_id=body.institution_id,
+        status=body.status,
+        job_ids=body.job_ids,
+        deadline_date=body.deadline_date,
+    )
+    return DriveResponse(message="Drive created successfully.", drive=await _drive_out(db, drive))
 
 
 @drives.get("", response_model=DrivePage, summary="Placement drives I am part of", responses=errors(*AUTHENTICATED))

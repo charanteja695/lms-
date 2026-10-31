@@ -36,9 +36,9 @@ async def _present(
     if not jobs:
         return []
     candidates = CandidateService(db)
-    profile = await candidates.profile(auth.user_id)
-    candidate = to_candidate(profile) if profile else None
-    courses = await candidates.course_titles(None) if candidate else {}
+    profile = await candidates.profile(auth.user_id, auth.organization_id)
+    candidate = to_candidate(profile, user_id=auth.user_id, organization_id=auth.organization_id)
+    courses = await candidates.course_titles(None)
     names = await company_names(db, {j.employer_org_id for j in jobs})
     job_service = JobService(db, settings)
     if matches is None:
@@ -50,13 +50,9 @@ async def _present(
     }
     out: list[CandidateJobOut] = []
     for job in jobs:
-        eligible: bool | None = None
-        reasons: list[str] = []
-        if candidate is not None:
-            verdict = eligibility.check(await job_service.spec(job), candidate, course_titles=courses)
-            eligible, reasons = verdict.eligible, verdict.reasons
-        else:
-            eligible, reasons = False, ["Build your skill profile (it needs a certificate or a passed assessment) to see if you are eligible."]
+        spec = await job_service.spec(job)
+        verdict = eligibility.check(spec, candidate, course_titles=courses)
+        eligible, reasons = verdict.eligible, verdict.reasons
         match = matches.get(job.id)
         out.append(
             candidate_job_out(

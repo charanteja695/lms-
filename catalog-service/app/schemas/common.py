@@ -12,7 +12,7 @@ MAX_LIST_WINDOW = 10_000
 
 
 class FilterQuery(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     search_text: text(100, min_length=2) | None = Field(  # type: ignore[valid-type]
         default=None, description="Case-insensitive 'contains' search over title, at least 2 characters"

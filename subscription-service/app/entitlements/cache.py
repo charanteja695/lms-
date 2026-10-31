@@ -22,11 +22,12 @@ async def sync_entitlement(redis: Redis, *, key_prefix: str, subscription: Subsc
     key = _key(key_prefix, subscription.organization_id, subscription.course_id)
     mapping: dict[str, Any] = {
         "subscription_id": str(subscription.public_id),
-        "seats_total": subscription.seats_total,
-        "seats_used": subscription.seats_used,
+        "seats_total": str(subscription.seats_total),
+        "seats_used": str(subscription.seats_used),
         "expires_at": subscription.ends_at.isoformat(),
     }
-    await redis.hset(key, mapping=mapping)  # type: ignore[misc]  # redis-py's sync/async overload confuses mypy here
+    for field, val in mapping.items():
+        await redis.hset(key, field, str(val))
     await redis.expireat(key, int(subscription.ends_at.timestamp()))
 
 

@@ -82,6 +82,13 @@ class Settings(BaseSettings):
     # --- Background worker (python -m app.worker: outbox relay + processing + inbound consumer) ---
     WORKER_POLL_SECONDS: float = Field(default=2.0, gt=0)
 
+    # --- Cloudinary ---
+    CLOUDINARY_CLOUD_NAME: str | None = None
+    CLOUDINARY_API_KEY: str | None = None
+    CLOUDINARY_API_SECRET: SecretStr | None = None
+    CLOUDINARY_URL: str | None = None
+    STORAGE_LOCAL_DIR: str = "media_storage"
+
     # --- AWS S3 (the only storage backend this service targets) ---
     AWS_REGION: str = "ap-south-1"
     AWS_ACCESS_KEY_ID: SecretStr | None = None

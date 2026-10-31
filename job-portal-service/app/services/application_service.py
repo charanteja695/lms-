@@ -89,7 +89,7 @@ class ApplicationService:
         return list((await self.db.execute(select(ApplicationStage).where(ApplicationStage.application_id == application.id).order_by(ApplicationStage.created_at, ApplicationStage.id))).scalars())
 
     # ------------------------------------------------------------------ applying
-    async def apply(self, auth: AccessTokenClaims, job_public_id: int, *, resume_id: int, cover_note: str | None, career: CareerClient) -> Application:
+    async def apply(self, auth: AccessTokenClaims, job_public_id: int, *, resume_id: int | None = None, cover_note: str | None = None, answers: dict[str, Any] | None = None, career: CareerClient) -> Application:
         """Apply with a resume. Checks, in order: the job is open and visible, the student has a verified skill profile, they are eligible, they
         have not applied. Then the resume is frozen by career-service (outside any transaction) and the application is created."""
         candidates = CandidateService(self.db)
@@ -102,17 +102,38 @@ class ApplicationService:
             if job.status in {JobStatus.PAUSED, JobStatus.CLOSED}:
                 raise ConflictError("This job is not accepting applications.", code="JOB_NOT_OPEN")
             raise NotFoundError("Job not found.", code="JOB_NOT_FOUND")
-        profile = await candidates.profile(auth.user_id)
-        candidate = to_candidate(profile) if profile else None
-        if candidate is None or not (candidate.certificate_course_ids or candidate.scores):
-            raise ConflictError(
-                "Matching needs a verified skill profile: finish a course (a certificate) or pass an assessment first, then build your profile.", code="PROFILE_NOT_VERIFIED"
-            )
+        profile = await candidates.profile(auth.user_id, auth.organization_id)
+        candidate = to_candidate(profile, user_id=auth.user_id, organization_id=auth.organization_id)
         spec = await self.jobs.spec(job)
         courses = await candidates.course_titles(None)
         verdict = eligibility.check(spec, candidate, course_titles=courses)
         if not verdict.eligible:
             raise _not_eligible(verdict.reasons)
+        # Check application config (open date, resume required, custom questions)
+        app_config = job.application_config or {}
+        open_date_val = app_config.get("open_date")
+        if open_date_val:
+            try:
+                from datetime import datetime, timezone
+                od = datetime.fromisoformat(str(open_date_val).replace("Z", "+00:00"))
+                if od > utcnow():
+                    raise ConflictError("Applications for this job are not open yet.", code="JOB_NOT_OPEN")
+            except (ValueError, TypeError):
+                pass
+
+        resume_required = app_config.get("resume_required", True)
+        if resume_required and not resume_id:
+            raise ValidationFailedError(details=[{"field": "resume_id", "code": "REQUIRED", "message": "A resume is required to apply for this job"}])
+
+        questions = app_config.get("questions") or []
+        answers_dict = answers or {}
+        for q in questions:
+            if q.get("required"):
+                qid = q.get("id")
+                ans = answers_dict.get(qid)
+                if ans is None or str(ans).strip() == "":
+                    raise ValidationFailedError(details=[{"field": f"answers.{qid}", "code": "REQUIRED", "message": f"Answer to '{q.get('question')}' is required"}])
+
         existing = (await self.db.execute(select(Application.public_id).where(Application.job_id == job.id, Application.user_id == auth.user_id))).scalar_one_or_none()
         if existing is not None:
             raise ConflictError("You have already applied to this job.", code="ALREADY_APPLIED")
@@ -123,17 +144,41 @@ class ApplicationService:
         else:
             match_score, explanation = match.score, list(match.explanation)
         await self.db.commit()  # nothing is held open across the call to career-service
-        try:
-            snapshot = await career.snapshot(resume_id=resume_id, user_id=auth.user_id, label=f"Applied to {job.title}"[:120])
-        except Rejected as exc:
-            raise ValidationFailedError(details=[{"field": "resume_id", "code": "RESUME_NOT_FOUND", "message": "That is not one of your resumes"}]) from exc
-        except Unavailable as exc:
-            raise ConflictError("Your resume could not be attached right now. Please try again in a moment.", code="RESUME_UNAVAILABLE") from exc
+        if resume_id:
+            try:
+                snapshot = await career.snapshot(resume_id=resume_id, user_id=auth.user_id, label=f"Applied to {job.title}"[:120])
+            except Rejected as exc:
+                raise ValidationFailedError(details=[{"field": "resume_id", "code": "RESUME_NOT_FOUND", "message": "That is not one of your resumes"}]) from exc
+            except Unavailable as exc:
+                raise ConflictError("Your resume could not be attached right now. Please try again in a moment.", code="RESUME_UNAVAILABLE") from exc
+        else:
+            class DummySnapshot:
+                version_no = 0
+                document = {}
+            snapshot = DummySnapshot()
+            resume_id = 0
+
         application = Application(
             public_id=new_public_id(), job_id=job.id, employer_org_id=job.employer_org_id, user_id=auth.user_id, organization_id=auth.organization_id, status=S.APPLIED, status_changed_at=utcnow(),
             cover_note=cover_note, resume_id=resume_id, resume_version_no=snapshot.version_no, resume_snapshot=snapshot.document, match_score=match_score, match_explanation=explanation,
-            assessment_revision=0,
+            assessment_revision=0, answers=answers_dict,
         )
+        # Ensure UserRef exists
+        user_ref = await self.db.get(UserRef, auth.user_id)
+        if user_ref is None:
+            personal = (snapshot.document or {}).get("personal") or {}
+            p_name = personal.get("name", "")
+            parts = p_name.split(" ", 1)
+            self.db.add(UserRef(
+                user_id=auth.user_id,
+                first_name=(parts[0] if parts else "")[:100],
+                last_name=(parts[1] if len(parts) > 1 else "")[:100],
+                email=(personal.get("email") or "")[:320] or None,
+                role="student",
+                organization_id=auth.organization_id,
+                active=True,
+            ))
+            await self.db.flush()
         self.db.add(application)
         try:
             await self.db.flush()
@@ -320,7 +365,12 @@ class ApplicationService:
     def _search(q: str | None) -> ColumnElement[bool] | None:
         if not q or not q.strip():
             return None
-        return func.lower(UserRef.first_name + " " + UserRef.last_name).like(contains_pattern(q.strip().lower()), escape=LIKE_ESCAPE)
+        from sqlalchemy import or_
+        pattern = contains_pattern(q.strip().lower())
+        return or_(
+            func.lower(UserRef.first_name + " " + UserRef.last_name).like(pattern, escape=LIKE_ESCAPE),
+            func.lower(UserRef.email).like(pattern, escape=LIKE_ESCAPE),
+        )
 
     async def list_for_job(
         self, job: Job, *, statuses: list[str] | None, min_score: int | None, sort: str, q: str | None, page: int, per_page: int
@@ -333,7 +383,7 @@ class ApplicationService:
         search = self._search(q)
         if search is not None:
             stmt = stmt.where(search)
-        order = {"screen": (Application.screen_score.desc().nullslast(),), "match": (Application.match_score.desc().nullslast(),)}.get(sort, (Application.created_at.desc(),))
+        order = {"screen": (Application.screen_score.desc().nullslast(),), "match": (Application.match_score.desc().nullslast(),), "date": (Application.created_at.desc(),), "recent": (Application.created_at.desc(),)}.get(sort, (Application.created_at.desc(),))
         total = int((await self.db.execute(select(func.count()).select_from(stmt.order_by(None).subquery()))).scalar_one())
         rows = (await self.db.execute(stmt.order_by(*order, Application.id).limit(per_page).offset((page - 1) * per_page))).all()
         return [(a, u) for a, u in rows], total

@@ -16,6 +16,7 @@ from app.api.deps import (
 )
 from app.api.responses import errors
 from app.api.v1.endpoints.jobs import JobServiceDep
+from app.core.config import Settings
 from app.core.exceptions import PermissionDeniedError
 from app.models.job import JobType
 from app.permissions import capabilities, policies
@@ -130,14 +131,34 @@ async def create_user(
     return UserCreatedResponse(
         message="User created successfully.",
         user=UserOut.from_model(user, auth.user),
-        credentials=credentials_out(prepared),
+        credentials=credentials_out(prepared, service.settings),
     )
 
 
-def credentials_out(prepared: PreparedUser) -> CredentialsOut:
+def credentials_out(prepared: PreparedUser, settings: Settings | None = None) -> CredentialsOut:
     if prepared.password_generated:
-        return CredentialsOut(delivery="temporary_password", temporary_password=prepared.password)
-    return CredentialsOut(delivery="initial_password" if prepared.password else "email_link")
+        return CredentialsOut(
+            delivery="temporary_password",
+            temporary_password=prepared.password,
+            message="Temporary password generated. Share it securely with the user."
+        )
+    if prepared.password:
+        return CredentialsOut(
+            delivery="initial_password",
+            message="Initial password set. Share it securely with the user."
+        )
+    email_sent = bool(settings and settings.EMAIL_BACKEND != "console")
+    setup_link = (
+        f"{settings.frontend_url(settings.FRONTEND_ACCOUNT_SETUP_PATH)}?token={prepared.setup_token}"
+        if settings and prepared.setup_token
+        else None
+    )
+    return CredentialsOut(
+        delivery="email_link",
+        email_sent=email_sent,
+        setup_link=setup_link,
+        message="An account set-up email has been queued." if email_sent else "Email delivery is in console mode. Use the setup link below.",
+    )
 
 
 @router.get(

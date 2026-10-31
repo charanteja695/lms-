@@ -81,12 +81,51 @@ class IssueService:
             logger.info("A pass for a course that already has a live certificate; keeping the existing one")
             return live
 
+        org_id = int(payload["organization_id"]) if payload.get("organization_id") else None
         user = await self.db.get(UserRef, student_id)
+        if user is None:
+            try:
+                import asyncpg
+                conn = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_user_management')
+                row = await conn.fetchrow('SELECT public_id, first_name, last_name FROM users WHERE public_id = $1', student_id)
+                await conn.close()
+                if row:
+                    user = UserRef(user_id=row['public_id'], first_name=row['first_name'] or '', last_name=row['last_name'] or '', organization_id=org_id)
+                    self.db.add(user)
+                    await self.db.flush()
+            except Exception as e:
+                logger.warning(f"Failed to populate user_ref: {e}")
+                await self.db.rollback()
+
         course = await self.db.get(CourseRef, course_id)
+        if course is None:
+            try:
+                import asyncpg
+                conn = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_catalog')
+                row = await conn.fetchrow('SELECT public_id, title FROM courses WHERE public_id = $1', course_id)
+                await conn.close()
+                if row:
+                    course = CourseRef(course_id=row['public_id'], title=row['title'])
+                    self.db.add(course)
+                    await self.db.flush()
+            except Exception:
+                pass
         organization_id = int(payload["organization_id"]) if payload.get("organization_id") else None
         institution = await self.db.get(InstitutionRef, organization_id) if organization_id else None
+        if institution is None and organization_id:
+            try:
+                import asyncpg
+                conn = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_user_management')
+                row = await conn.fetchrow('SELECT public_id, name FROM institutions WHERE public_id = $1', organization_id)
+                await conn.close()
+                if row:
+                    institution = InstitutionRef(organization_id=row['public_id'], name=row['name'])
+                    self.db.add(institution)
+                    await self.db.flush()
+            except Exception:
+                pass
         template_id, snapshot = await TemplateService(self.db).resolve(course_id, self.settings.CERTIFICATE_DEFAULT_ACCENT_COLOR)
-        percent = float(payload.get("percent") or 0.0)
+        percent = float(payload.get("percent") if payload.get("percent") is not None else (payload.get("score_percent") or 0.0))
         passed_at = payload.get("passed_at")
         completion = datetime.strptime(passed_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC) if passed_at else utcnow()
 

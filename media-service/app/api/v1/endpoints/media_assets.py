@@ -1,10 +1,21 @@
-from typing import Annotated
+import logging
+import re
+from pathlib import Path
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+import anyio
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
+from fastapi.responses import RedirectResponse, Response, StreamingResponse
 from lms_common.envelopes import PageContext, SortOrder
 
 from app.api.deps import AssetIdParam, CurrentAuth, DbSession, RequireAuthor, SettingsDep, rate_limit
 from app.api.responses import errors
+from app.core.exceptions import BadRequestError, NotFoundError
+from app.core.ids import new_public_id
+from app.db.session import commit_or_conflict
+from app.domain.enums import AssetKind, AssetStatus
+from app.models.media_asset import MediaAsset
+from app.models.rendition import Rendition
 from app.schemas.common import AssetListQuery
 from app.schemas.media_asset import (
     MediaAssetListResponse,
@@ -18,9 +29,305 @@ from app.schemas.media_asset import (
 )
 from app.services.media_asset_service import MediaAssetService
 
+logger = logging.getLogger("app.media")
 router = APIRouter(prefix="/media", tags=["Media"])
 
 _upload_rate_limit = rate_limit("media_upload", "UPLOAD_URL_RATE_LIMIT_PER_HOUR", 3_600)
+
+
+@router.post(
+    "/videos",
+    response_model=dict[str, Any],
+    status_code=201,
+    summary="Direct upload for video lessons",
+    description="Uploads video via multipart/form-data. Uses Cloudinary if configured; falls back to streaming storage.",
+    responses=errors(400, 401, 403, 422),
+)
+async def upload_video(
+    auth: RequireAuthor,
+    db: DbSession,
+    settings: SettingsDep,
+    file: UploadFile = File(...),
+    title: Annotated[str | None, Form()] = None,
+    description: Annotated[str | None, Form()] = None,
+    course_id: Annotated[str | None, Form()] = None,
+    module_id: Annotated[str | None, Form()] = None,
+    topic_id: Annotated[str | None, Form()] = None,
+    duration_seconds: Annotated[int | None, Form()] = None,
+    context_type: Annotated[str | None, Form()] = "topic",
+    context_id: Annotated[str | None, Form()] = None,
+) -> dict[str, Any]:
+    filename = file.filename or "video.mp4"
+    lower_name = filename.lower()
+    valid_exts = (".mp4", ".webm", ".mov", ".mkv", ".m4v", ".avi")
+    if not (any(lower_name.endswith(ext) for ext in valid_exts) or (file.content_type and file.content_type.startswith("video/"))):
+        raise BadRequestError("Only video files (.mp4, .webm, .mov, .mkv) are allowed.", code="INVALID_VIDEO_FORMAT")
+
+    storage_dir = Path(settings.STORAGE_LOCAL_DIR) / "videos"
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    asset_public_id = new_public_id()
+    safe_name = "".join(c for c in filename if c.isalnum() or c in " ._-")[:100] or "video.mp4"
+    temp_target = storage_dir / f"{asset_public_id}_{safe_name}"
+
+    total_bytes = 0
+    chunk_size = 1024 * 1024  # 1 MB chunk streaming to prevent excessive memory usage
+    with open(temp_target, "wb") as out_f:
+        while True:
+            chunk = await file.read(chunk_size)
+            if not chunk:
+                break
+            total_bytes += len(chunk)
+            if total_bytes > settings.MAX_UPLOAD_BYTES:
+                out_f.close()
+                temp_target.unlink(missing_ok=True)
+                raise BadRequestError(f"Video file exceeds {settings.MAX_UPLOAD_BYTES} bytes limit.", code="FILE_TOO_LARGE")
+            out_f.write(chunk)
+
+    cloudinary_configured = bool(
+        settings.CLOUDINARY_URL
+        or (settings.CLOUDINARY_CLOUD_NAME and settings.CLOUDINARY_API_KEY and settings.CLOUDINARY_API_SECRET)
+    )
+    cloudinary_public_id = None
+    playback_url = None
+    detected_duration = duration_seconds or 0
+
+    if cloudinary_configured:
+        try:
+            import cloudinary
+            import cloudinary.uploader
+
+            if settings.CLOUDINARY_URL:
+                cloudinary.config(cloudinary_url=settings.CLOUDINARY_URL)
+            else:
+                cloudinary.config(
+                    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+                    api_key=settings.CLOUDINARY_API_KEY,
+                    api_secret=settings.CLOUDINARY_API_SECRET.get_secret_value() if settings.CLOUDINARY_API_SECRET else None,
+                    secure=True,
+                )
+
+            # Use chunked upload specifically for large videos (> 20 MB)
+            result = await anyio.to_thread.run_sync(
+                lambda: cloudinary.uploader.upload_large(
+                    str(temp_target),
+                    resource_type="video",
+                    folder="lms/videos",
+                    chunk_size=6_000_000,
+                )
+            )
+            playback_url = result.get("secure_url") or result.get("url")
+            cloudinary_public_id = result.get("public_id")
+            if result.get("duration"):
+                detected_duration = int(round(float(result["duration"])))
+        except Exception as e:
+            logger.warning(f"Cloudinary upload failed ({e}); falling back to local media streaming.")
+            playback_url = None
+
+    if not playback_url:
+        playback_url = f"/api/v1/media/stream/{asset_public_id}"
+
+    resolved_context_id = None
+    if context_id and context_id.isdigit():
+        resolved_context_id = int(context_id)
+    elif topic_id and topic_id.isdigit():
+        resolved_context_id = int(topic_id)
+
+    asset = MediaAsset(
+        public_id=asset_public_id,
+        kind=AssetKind.VIDEO,
+        original_filename=filename,
+        content_type=file.content_type or "video/mp4",
+        byte_size=total_bytes,
+        storage_key=playback_url,
+        status=AssetStatus.READY,
+        duration_seconds=detected_duration,
+        context_type=context_type,
+        context_id=resolved_context_id,
+        created_by=auth.user_id,
+    )
+    db.add(asset)
+    await db.flush()
+
+    rendition = Rendition(
+        media_asset_id=asset.id,
+        label="source",
+        storage_key=playback_url,
+        byte_size=total_bytes,
+    )
+    db.add(rendition)
+    await commit_or_conflict(db)
+
+    return {
+        "message": "Video uploaded successfully.",
+        "asset": {
+            "asset_id": str(asset.public_id),
+            "kind": "video",
+            "status": "ready",
+            "original_filename": asset.original_filename,
+            "byte_size": asset.byte_size,
+            "playback_url": asset.storage_key,
+            "public_id": cloudinary_public_id or str(asset.public_id),
+            "duration_seconds": asset.duration_seconds,
+        },
+        "url": asset.storage_key,
+        "public_id": cloudinary_public_id or str(asset.public_id),
+        "duration_seconds": asset.duration_seconds,
+    }
+
+
+
+@router.post(
+    "/documents",
+    response_model=dict[str, Any],
+    status_code=201,
+    summary="Direct upload for document and PDF lessons",
+    description="Uploads PDF/documents via multipart/form-data.",
+    responses=errors(400, 401, 403, 422),
+)
+async def upload_document(
+    auth: RequireAuthor,
+    db: DbSession,
+    settings: SettingsDep,
+    file: UploadFile = File(...),
+    title: Annotated[str | None, Form()] = None,
+    description: Annotated[str | None, Form()] = None,
+    course_id: Annotated[str | None, Form()] = None,
+    module_id: Annotated[str | None, Form()] = None,
+    topic_id: Annotated[str | None, Form()] = None,
+    context_type: Annotated[str | None, Form()] = "topic",
+    context_id: Annotated[str | None, Form()] = None,
+) -> dict[str, Any]:
+    filename = file.filename or "document.pdf"
+    storage_dir = Path(settings.STORAGE_LOCAL_DIR) / "documents"
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    asset_public_id = new_public_id()
+    safe_name = "".join(c for c in filename if c.isalnum() or c in " ._-")[:100] or "document.pdf"
+    temp_target = storage_dir / f"{asset_public_id}_{safe_name}"
+
+    total_bytes = 0
+    chunk_size = 1024 * 1024
+    with open(temp_target, "wb") as out_f:
+        while True:
+            chunk = await file.read(chunk_size)
+            if not chunk:
+                break
+            total_bytes += len(chunk)
+            out_f.write(chunk)
+
+    playback_url = f"/api/v1/media/stream/{asset_public_id}"
+    resolved_context_id = None
+    if context_id and context_id.isdigit():
+        resolved_context_id = int(context_id)
+    elif topic_id and topic_id.isdigit():
+        resolved_context_id = int(topic_id)
+
+    asset = MediaAsset(
+        public_id=asset_public_id,
+        kind=AssetKind.DOCUMENT,
+        original_filename=filename,
+        content_type=file.content_type or "application/pdf",
+        byte_size=total_bytes,
+        storage_key=playback_url,
+        status=AssetStatus.READY,
+        duration_seconds=0,
+        context_type=context_type,
+        context_id=resolved_context_id,
+        created_by=auth.user_id,
+    )
+    db.add(asset)
+    await db.flush()
+
+    rendition = Rendition(
+        media_asset_id=asset.id,
+        label="source",
+        storage_key=playback_url,
+        byte_size=total_bytes,
+    )
+    db.add(rendition)
+    await commit_or_conflict(db)
+
+    return {
+        "message": "Document uploaded successfully.",
+        "asset": {
+            "asset_id": str(asset.public_id),
+            "kind": "pdf",
+            "status": "ready",
+            "original_filename": asset.original_filename,
+            "byte_size": asset.byte_size,
+            "playback_url": asset.storage_key,
+            "public_id": str(asset.public_id),
+            "duration_seconds": 0,
+        },
+        "url": asset.storage_key,
+        "public_id": str(asset.public_id),
+        "duration_seconds": 0,
+    }
+
+
+@router.get(
+    "/stream/{asset_id}",
+    summary="Stream video with HTTP Range support",
+    responses=errors(404),
+)
+async def stream_media(asset_id: AssetIdParam, db: DbSession, settings: SettingsDep, request: Request) -> Response:
+    asset = await MediaAssetService(db, settings).get(asset_id)
+    if not asset or asset.archived_at is not None:
+        raise NotFoundError("Video not found or archived.", code="MEDIA_NOT_FOUND")
+
+    # If it is an external URL (e.g. Cloudinary), redirect immediately
+    if asset.storage_key.startswith("http://") or asset.storage_key.startswith("https://"):
+        return RedirectResponse(asset.storage_key, status_code=307)
+
+    storage_dir = Path(settings.STORAGE_LOCAL_DIR) / "videos"
+    matching = list(storage_dir.glob(f"{asset.public_id}_*"))
+    if not matching or not matching[0].exists():
+        raise NotFoundError("Video file not found on disk.", code="FILE_NOT_FOUND")
+
+    file_path = matching[0]
+    file_size = file_path.stat().st_size
+    content_type = asset.content_type or "video/mp4"
+    range_header = request.headers.get("range")
+
+    if range_header:
+        match = re.match(r"bytes=(\d+)-(\d*)", range_header)
+        if match:
+            start = int(match.group(1))
+            end = int(match.group(2)) if match.group(2) else file_size - 1
+            start = max(0, start)
+            end = min(file_size - 1, end)
+            content_length = end - start + 1
+
+            def chunk_generator():
+                with open(file_path, "rb") as f:
+                    f.seek(start)
+                    remaining = content_length
+                    while remaining > 0:
+                        read_len = min(64 * 1024, remaining)
+                        data = f.read(read_len)
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+
+            headers = {
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(content_length),
+                "Content-Type": content_type,
+            }
+            return StreamingResponse(chunk_generator(), status_code=206, headers=headers)
+
+    def full_generator():
+        with open(file_path, "rb") as f:
+            while chunk := f.read(64 * 1024):
+                yield chunk
+
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Length": str(file_size),
+        "Content-Type": content_type,
+    }
+    return StreamingResponse(full_generator(), status_code=200, headers=headers)
 
 
 @router.post(

@@ -48,7 +48,7 @@ from app.services.outbox import write_event
 logger = logging.getLogger(__name__)
 
 OPEN_STATUSES = (AttemptStatus.NOT_STARTED, AttemptStatus.IN_PROGRESS, AttemptStatus.PAUSED)
-_DENIED_AS_FORBIDDEN = {"NOT_ENROLLED", "NOT_ELIGIBLE_FOR_FINAL", "NOT_INVITED"}
+_DENIED_AS_FORBIDDEN = {"NOT_ENROLLED", "NOT_ELIGIBLE_FOR_FINAL", "NOT_INVITED", "MODULE_PREREQUISITES_NOT_MET"}
 
 
 def attempt_event_payload(attempt: Attempt, test: Test) -> dict[str, Any]:

@@ -9,9 +9,13 @@ from app.schemas.types import PublicIdOut, Timestamp, id_field, text
 
 class DriveCreate(RequestSchema):
     employer_id: id_field("Employer", "1755000000007004")  # type: ignore[valid-type]
+    institution_id: id_field("Institution", "1755000000007001") | None = None  # type: ignore[valid-type]
     title: text(160, min_length=3)  # type: ignore[valid-type]
     description: text(1_000) | None = None  # type: ignore[valid-type]
     drive_date: date | None = None
+    deadline_date: date | None = None
+    status: str | None = None
+    job_ids: list[str] | None = None
 
 
 class DriveRespond(RequestSchema):

@@ -1,10 +1,15 @@
+from app.services.review_service import ReviewService
 from typing import Annotated
 
 from fastapi import APIRouter, Query
-from lms_common.envelopes import PageContext, SortOrder
+from lms_common.envelopes import PageContext, SortOrder, SuccessResponse
 
 from app.api.deps import CourseIdParam, CurrentAuth, DbSession, RequireAuthor
 from app.api.responses import errors
+from app.core.exceptions import PermissionDeniedError
+from app.core.time import utcnow
+from app.domain.enums import ContentStatus, ReviewAction
+from app.models.review import CourseReview
 from app.schemas.course import (
     CourseCreate,
     CourseListQuery,
@@ -14,6 +19,7 @@ from app.schemas.course import (
     CourseUpdate,
 )
 from app.services.course_service import CourseService
+from app.services.outbox import write_event
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
 
@@ -38,7 +44,9 @@ async def create_course(data: CourseCreate, auth: RequireAuthor, db: DbSession) 
     responses=errors(401, 422),
 )
 async def list_courses(query: Annotated[CourseListQuery, Query()], auth: CurrentAuth, db: DbSession) -> CourseListResponse:
-    courses, total, is_exact = await CourseService(db).list_courses(query)
+    is_admin = auth.role in ("super_admin", "admin") or auth.can("content.author")
+    published_only = query.published_only or not is_admin
+    courses, total, is_exact = await CourseService(db).list_courses(query, published_only=published_only)
     return CourseListResponse(
         message="Courses retrieved successfully.",
         courses=[CourseOut.model_validate(course) for course in courses],
@@ -76,3 +84,109 @@ async def update_course(course_id: CourseIdParam, data: CourseUpdate, auth: Requ
     course = await service.get(course_id)
     course = await service.update(course, data)
     return CourseResponse(message="Course updated successfully.", course=CourseOut.model_validate(course))
+
+
+@router.delete(
+    "/{course_id}",
+    response_model=SuccessResponse,
+    summary="Delete / archive a course",
+    description="Archives a course so it no longer appears in the active catalogue. Requires content.author.",
+    responses=errors(401, 403, 404),
+)
+async def delete_course(course_id: CourseIdParam, auth: RequireAuthor, db: DbSession) -> SuccessResponse:
+    service = CourseService(db)
+    course = await service.get(course_id)
+    await service.delete(course)
+    return SuccessResponse(message="Course archived successfully.")
+
+
+@router.post(
+    "/{course_id}/publish",
+    response_model=CourseResponse,
+    summary="Publish a course",
+    description="Publishes the course so institutions can request access. Requires admin or content.author.",
+    responses=errors(401, 403, 404),
+)
+async def publish_course(course_id: CourseIdParam, auth: CurrentAuth, db: DbSession) -> CourseResponse:
+    if not (auth.role in ("super_admin", "admin") or auth.can("content.author")):
+        raise PermissionDeniedError()
+    service = CourseService(db)
+    course = await service.get(course_id)
+
+    target_version = None
+    for v in course.versions:
+        if v.status in (ContentStatus.DRAFT, ContentStatus.IN_REVIEW):
+            target_version = v
+            break
+    if target_version is None and course.versions:
+        target_version = sorted(course.versions, key=lambda x: x.version_number, reverse=True)[0]
+
+    if target_version is not None:
+        target_version.status = ContentStatus.PUBLISHED
+        target_version.published_at = utcnow()
+        target_version.reviewed_by = auth.user_id
+        target_version.reviewed_at = utcnow()
+        db.add(CourseReview(course_version_id=target_version.id, action=ReviewAction.APPROVED, actor_user_id=auth.user_id))
+        write_event(
+            db,
+            event_type="course.published",
+            aggregate_id=course.id,
+            payload={
+                "course_id": str(course.public_id),
+                "version_id": str(target_version.public_id),
+                "title": course.title,
+                "slug": course.slug,
+            },
+        )
+        await db.commit()
+        await ReviewService(db).sync_published_curriculum(target_version)
+
+        try:
+            import asyncpg
+            conn = await asyncpg.connect("postgresql://lms:lms@localhost:5432/lms_subscription")
+            try:
+                await conn.execute("""
+                    INSERT INTO course_refs (course_id, title, slug, status, created_at, updated_at)
+                    VALUES ($1, $2, $3, 'published', NOW(), NOW())
+                    ON CONFLICT (course_id) DO UPDATE SET title = EXCLUDED.title, slug = EXCLUDED.slug, status = 'published', updated_at = NOW()
+                """, course.public_id, course.title, course.slug)
+            finally:
+                await conn.close()
+        except Exception:
+            pass
+
+    return CourseResponse(message="Course published successfully.", course=CourseOut.model_validate(await service.get(course_id)))
+
+
+@router.post(
+    "/{course_id}/unpublish",
+    response_model=CourseResponse,
+    summary="Unpublish a course to draft",
+    description="Reverts a published course to draft. Requires admin or content.author.",
+    responses=errors(401, 403, 404),
+)
+async def unpublish_course(course_id: CourseIdParam, auth: CurrentAuth, db: DbSession) -> CourseResponse:
+    if not (auth.role in ("super_admin", "admin") or auth.can("content.author")):
+        raise PermissionDeniedError()
+    service = CourseService(db)
+    course = await service.get(course_id)
+
+    for v in course.versions:
+        if v.status == ContentStatus.PUBLISHED:
+            v.status = ContentStatus.DRAFT
+
+    await db.commit()
+
+    try:
+        import asyncpg
+        conn = await asyncpg.connect("postgresql://lms:lms@localhost:5432/lms_subscription")
+        try:
+            await conn.execute("""
+                UPDATE course_refs SET status = 'retired', updated_at = NOW() WHERE course_id = $1
+            """, course.public_id)
+        finally:
+            await conn.close()
+    except Exception:
+        pass
+
+    return CourseResponse(message="Course reverted to draft.", course=CourseOut.model_validate(await service.get(course_id)))

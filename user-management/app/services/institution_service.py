@@ -214,14 +214,27 @@ class InstitutionService:
                 )
             admin = await self._require_active_admin(data.admin_user_id)
 
-        if await self.institutions.code_taken(data.code):
+        code = getattr(data, "code", None)
+        if not code:
+            import random, re, string
+            clean = re.sub(r"[^A-Z0-9]", "", (data.name or "COMP").upper())[:6] or "COMP"
+            for _ in range(10):
+                suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+                candidate = f"{clean}-{suffix}"[:20]
+                if not await self.institutions.code_taken(candidate):
+                    code = candidate
+                    break
+            else:
+                code = f"{clean}-{new_public_id()}"[:20]
+
+        if await self.institutions.code_taken(code):
             raise ConflictError(details=[_DUPLICATE_CODE])
 
         institution = Institution(
             id=uuid7(),
             public_id=new_public_id(),
             name=data.name,
-            code=data.code,
+            code=code,
             org_type=self.org_type,
             institution_type=getattr(data, "type", None),
             industry=getattr(data, "industry", None),

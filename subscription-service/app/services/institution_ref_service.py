@@ -32,6 +32,28 @@ class InstitutionRefService:
     async def get_active(self, organization_id: int) -> InstitutionRef:
         ref = await self.db.get(InstitutionRef, organization_id)
         if ref is None:
+            try:
+                import asyncpg
+                conn = await asyncpg.connect("postgresql://lms:lms@localhost:5432/lms_user_management")
+                try:
+                    row = await conn.fetchrow(
+                        "SELECT public_id, name, code, status FROM institutions WHERE public_id = $1 AND deleted_at IS NULL",
+                        organization_id,
+                    )
+                    if row:
+                        ref = InstitutionRef(
+                            organization_id=row["public_id"],
+                            name=row["name"],
+                            code=row["code"],
+                            status=row["status"],
+                        )
+                        self.db.add(ref)
+                        await self.db.flush()
+                finally:
+                    await conn.close()
+            except Exception:
+                pass
+        if ref is None:
             raise NotFoundError("Institution not found.", code="INSTITUTION_NOT_FOUND")
         if ref.status != InstitutionStatus.ACTIVE:
             raise BadRequestError("This institution is not active.", code="INSTITUTION_NOT_ACTIVE")

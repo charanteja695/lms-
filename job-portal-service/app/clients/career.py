@@ -35,6 +35,7 @@ class CareerClient:
         if response.status_code in (408, 429) or response.status_code >= 500:
             raise Unavailable(f"career-service answered {response.status_code}")
         if response.status_code >= 400:
+            print(f"[DEBUG CAREER SNAPSHOT] URL: {response.request.url} Status: {response.status_code} Response: {response.text}")
             raise Rejected(f"career-service answered {response.status_code}", status=response.status_code)
         body = response.json()
         return ResumeSnapshot(resume_id=resume_id, version_no=int(body["version_no"]), title=str(body["title"]), document=dict(body["document"]), ats_score=body.get("ats_score"))

@@ -34,9 +34,22 @@ class EligibilityIn(RequestSchema):
     graduation_years: GraduationYears | None = None
     certificate_course_ids: Annotated[list[CourseId], Field(max_length=10)] = Field(default_factory=list)  # type: ignore[valid-type]
     min_scores: Annotated[list[MinScore], Field(max_length=10)] = Field(default_factory=list)
+    min_cgpa: float | None = Field(default=None, ge=0.0, le=10.0, description="Minimum CGPA required (0.00 to 10.00)")
+    degrees: Annotated[list[str], Field(max_length=50)] = Field(default_factory=list, description="Eligible degrees")
+    branches: Annotated[list[str], Field(max_length=50)] = Field(default_factory=list, description="Eligible branches/departments")
+    max_backlogs: int | None = Field(default=None, ge=0, le=50, description="Maximum active backlogs allowed")
+    min_experience_months: int | None = Field(default=None, ge=0, le=600, description="Minimum experience in months")
+    required_skills: Annotated[list[str], Field(max_length=50)] = Field(default_factory=list)
+    required_certifications: Annotated[list[str], Field(max_length=50)] = Field(default_factory=list)
     institution_ids: Annotated[list[id_field("Institution", "1755000000007003")], Field(max_length=200)] = Field(  # type: ignore[valid-type]
         default_factory=list, description="Empty: open to every institution. Otherwise the job is restricted to these institutions' students"
     )
+    department: str | None = Field(default=None, description="Department or Industry")
+    contact_email: str | None = Field(default=None, description="Contact email")
+    application_url: str | None = Field(default=None, description="External job application URL")
+    salary_period: str | None = Field(default="annual", description="Salary period: annual, monthly, hourly")
+    is_negotiable: bool = Field(default=False, description="Whether salary is negotiable")
+    salary_disclosed: bool = Field(default=True, description="Whether salary is disclosed")
 
 
 class AssessmentStage(RequestSchema):
@@ -58,7 +71,8 @@ class PipelineIn(RequestSchema):
 
 class JobFields(RequestSchema):
     title: text(160, min_length=3)  # type: ignore[valid-type]
-    description: multiline_text(8_000, min_length=1)  # type: ignore[valid-type]
+    description: multiline_text(30_000, min_length=1)  # type: ignore[valid-type]
+    job_code: str | None = None
     employment_type: EmploymentType = EmploymentType.FULL_TIME
     location_type: LocationType = LocationType.ONSITE
     locations: Annotated[list[text(80)], Field(max_length=10)] = Field(default_factory=list)  # type: ignore[valid-type]
@@ -75,6 +89,25 @@ class JobFields(RequestSchema):
     deadline_at: AwareDatetime | None = None
     eligibility: EligibilityIn = Field(default_factory=EligibilityIn)
     pipeline: PipelineIn = Field(default_factory=PipelineIn)
+    job_details: dict[str, Any] = Field(default_factory=dict)
+    hiring_process: list[dict[str, Any]] = Field(default_factory=list)
+    application_config: dict[str, Any] = Field(default_factory=dict)
+    banner_text: str | None = None
+    banner_type: str | None = Field(default="info", description="info or warning")
+    experience_level: str | None = Field(default=None, description="fresher, junior, mid, senior, lead")
+    experience_level_description: str | None = None
+    remote_eligible: bool = False
+    about_job: str | None = None
+    responsibilities: list[str] = Field(default_factory=list)
+    minimum_qualifications: list[str] = Field(default_factory=list)
+    preferred_qualifications: list[str] = Field(default_factory=list)
+    perks: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _fallback_about_job(self) -> "JobOut":
+        if not self.about_job and self.description:
+            self.about_job = self.description
+        return self
 
     @model_validator(mode="after")
     def _consistent(self) -> "JobFields":
@@ -97,7 +130,8 @@ class JobUpdate(RequestSchema):
     """Any subset of the job's fields. A job that is pending approval cannot be edited (withdraw the submission first)."""
 
     title: text(160, min_length=3) | None = None  # type: ignore[valid-type]
-    description: multiline_text(8_000) | None = None  # type: ignore[valid-type]
+    description: multiline_text(30_000) | None = None  # type: ignore[valid-type]
+    job_code: str | None = None
     employment_type: EmploymentType | None = None
     location_type: LocationType | None = None
     locations: Annotated[list[text(80)], Field(max_length=10)] | None = None  # type: ignore[valid-type]
@@ -114,6 +148,19 @@ class JobUpdate(RequestSchema):
     deadline_at: AwareDatetime | None = None
     eligibility: EligibilityIn | None = None
     pipeline: PipelineIn | None = None
+    job_details: dict[str, Any] | None = None
+    hiring_process: list[dict[str, Any]] | None = None
+    application_config: dict[str, Any] | None = None
+    banner_text: str | None = None
+    banner_type: str | None = None
+    experience_level: str | None = None
+    experience_level_description: str | None = None
+    remote_eligible: bool | None = None
+    about_job: str | None = None
+    responsibilities: list[str] | None = None
+    minimum_qualifications: list[str] | None = None
+    preferred_qualifications: list[str] | None = None
+    perks: list[str] | None = None
 
 
 class ReasonRequest(RequestSchema):
@@ -142,6 +189,9 @@ class JobOut(ResponseSchema):
     job_id: PublicIdOut
     employer_id: PublicIdOut
     company_name: str | None = None
+    company_website: str | None = None
+    company_about: str | None = None
+    job_code: str | None = None
     title: str
     description: str
     employment_type: str
@@ -163,6 +213,25 @@ class JobOut(ResponseSchema):
     status: str
     published_at: Timestamp | None
     created_at: Timestamp
+    job_details: dict[str, Any] = Field(default_factory=dict)
+    hiring_process: list[dict[str, Any]] = Field(default_factory=list)
+    application_config: dict[str, Any] = Field(default_factory=dict)
+    banner_text: str | None = None
+    banner_type: str | None = Field(default="info", description="info or warning")
+    experience_level: str | None = Field(default=None, description="fresher, junior, mid, senior, lead")
+    experience_level_description: str | None = None
+    remote_eligible: bool = False
+    about_job: str | None = None
+    responsibilities: list[str] = Field(default_factory=list)
+    minimum_qualifications: list[str] = Field(default_factory=list)
+    preferred_qualifications: list[str] = Field(default_factory=list)
+    perks: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _fallback_about_job(self) -> "JobOut":
+        if not self.about_job and self.description:
+            self.about_job = self.description
+        return self
 
 
 class EmployerJobOut(JobOut):

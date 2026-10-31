@@ -14,8 +14,9 @@ ApplicationId = id_field("Application", "1755000000060001")
 
 # ---------------------------------------------------------------- requests
 class ApplyRequest(RequestSchema):
-    resume_id: id_field("Resume", "1755000000050001")  # type: ignore[valid-type]
+    resume_id: id_field("Resume", "1755000000050001") | None = None  # type: ignore[valid-type]
     cover_note: multiline_text(2_000) | None = None  # type: ignore[valid-type]
+    answers: dict[str, Any] | None = None
 
 
 class WithdrawRequest(RequestSchema):
@@ -148,11 +149,19 @@ class CandidateSummary(ResponseSchema):
     user_id: PublicIdOut
     name: str
     email: str | None
+    phone: str | None = None
+    roll_number: str | None = None
+    institution_name: str | None = None
+    branch: str | None = None
+    graduation_year: int | None = None
+    cgpa: float | None = None
 
 
 class RecruiterApplicationOut(ResponseSchema):
     application_id: PublicIdOut
     job_id: PublicIdOut
+    job_title: str | None = None
+    company_name: str | None = None
     candidate: CandidateSummary
     status: str
     match_score: int | None
@@ -173,6 +182,8 @@ class RecruiterApplicationDetail(RecruiterApplicationOut):
     history: list[StageOut]
     notes: list[dict[str, Any]]
     offer: OfferOut | None = None
+    answers: dict[str, Any] = Field(default_factory=dict)
+    questions: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class RecruiterApplicationResponse(SuccessResponse):
@@ -266,6 +277,8 @@ class MatchedJob(ResponseSchema):
 
 class FunnelResponse(SuccessResponse):
     job_id: PublicIdOut
+    job_title: str | None = None
+    company_name: str | None = None
     by_status: dict[str, int]
     stages: list[dict[str, Any]] = Field(default_factory=list, description="This job's working tabs ({key, label, statuses, count}); filter the applicants list by `statuses`")
     total: int

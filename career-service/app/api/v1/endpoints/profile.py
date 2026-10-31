@@ -16,12 +16,21 @@ from app.api.deps import (
     WriteRateLimit,
 )
 from app.api.responses import AUTHENTICATED, errors
-from app.core.exceptions import NotFoundError, PayloadTooLargeError, PermissionDeniedError
+from app.core.exceptions import (
+    AiDisabledError,
+    AiQuotaExceededError,
+    AiUnavailableError,
+    NotFoundError,
+    PayloadTooLargeError,
+    PermissionDeniedError,
+)
 from app.domain.enums import ItemKind
 from app.importing.extract import extract_text
+from app.importing.parser import parse_resume_fallback
 from app.importing.summary import item_label
 from app.models.profile import Profile
 from app.permissions.policy import can_view_student_profile
+from app.permissions.roles import Role
 from app.schemas.resume import (
     BulkItemsCreate,
     ImportedItem,
@@ -102,7 +111,7 @@ async def add_item(body: ItemCreate, auth: RequireStudent, db: DbSession, settin
     "/import", response_model=ImportResponse, summary="Read an old resume or LinkedIn PDF into proposed entries",
     description="Upload a PDF, Word (.docx) or text file. The AI reads it into profile entries; each is checked (valid fields, no fact the file does not "
     "contain) and **nothing is saved** — send the ones the student keeps to `POST /profile/items/bulk`. The file itself is not stored.",
-    responses=errors(*AUTHENTICATED, 413, 422, 503), dependencies=[AiRateLimit],
+    responses=errors(*AUTHENTICATED, 413, 422, 503), dependencies=[WriteRateLimit],
 )
 async def import_resume(file: UploadFile, auth: RequireStudent, db: DbSession, settings: SettingsDep, gateway: GatewayDep) -> ImportResponse:
     content = await file.read(settings.MAX_IMPORT_BYTES + 1)
@@ -110,9 +119,25 @@ async def import_resume(file: UploadFile, auth: RequireStudent, db: DbSession, s
         raise PayloadTooLargeError(f"The file is larger than {settings.MAX_IMPORT_BYTES // (1024 * 1024)} MB.", code="FILE_TOO_LARGE")
     text = extract_text(content)[: settings.MAX_IMPORT_TEXT_CHARS]
     await db.commit()  # no transaction is held open across the model call
-    fields, items, skipped = await AiService(settings, gateway).read_resume(organization_id=auth.organization_id, user_id=auth.user_id, text=text)
+    ai_used = False
+    fields: dict[str, str | None] = {}
+    items: list[dict[str, Any]] = []
+    skipped = 0
+    try:
+        fields, items, skipped = await AiService(settings, gateway).read_resume(organization_id=auth.organization_id, user_id=auth.user_id, text=text)
+        ai_used = True
+    except Exception:
+        fields, items, skipped = parse_resume_fallback(text)
+        ai_used = False
     proposed = [ImportedItem(kind=i["kind"], data=i["data"], label=item_label(ItemKind(i["kind"]), i["data"])) for i in items]
-    message = f"Found {len(proposed)} entries. Choose the ones to add." if proposed else "No entries could be read from this file."
+    if proposed:
+        message = (
+            f"Found {len(proposed)} entries. Choose the ones to add."
+            if ai_used
+            else f"Extracted {len(proposed)} entries from your document. Choose the ones to add."
+        )
+    else:
+        message = "File processed successfully. No entries were auto-detected; you can proceed and fill them in the editor."
     return ImportResponse(message=message, profile=ImportedProfile(**fields), items=proposed, skipped=skipped)
 
 
@@ -159,5 +184,18 @@ async def student_profile(user_id: UserIdParam, auth: CurrentAuth, db: DbSession
         raise NotFoundError("Student not found.", code="STUDENT_NOT_FOUND")
     organization_id = ref.organization_id if ref else profile.organization_id if profile else None
     if not can_view_student_profile(auth, student_user_id=user_id, student_organization_id=organization_id):
-        raise PermissionDeniedError()
+        if auth.role == Role.STUDENT:
+            raise PermissionDeniedError(
+                "You do not have permission to view other students' profiles.",
+                code="PERMISSION_DENIED",
+            )
+        if auth.organization_id is not None and organization_id is not None and auth.organization_id != organization_id:
+            raise PermissionDeniedError(
+                "The student belongs to a different institution.",
+                code="DIFFERENT_INSTITUTION",
+            )
+        raise PermissionDeniedError(
+            "You do not have permission to view this student's profile.",
+            code="PERMISSION_DENIED",
+        )
     return await _profile_response(service, user_id, profile)

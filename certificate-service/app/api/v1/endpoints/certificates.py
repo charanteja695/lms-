@@ -1,3 +1,4 @@
+from sqlalchemy import select
 import csv
 import io
 from collections.abc import Iterator
@@ -18,7 +19,7 @@ from app.api.deps import (
     SettingsDep,
 )
 from app.api.responses import AUTHENTICATED, errors
-from app.core.exceptions import PermissionDeniedError
+from app.core.exceptions import ConflictError, PermissionDeniedError
 from app.domain.enums import CertificateStatus, PdfStatus
 from app.models.certificate import Certificate
 from app.permissions.policy import can_manage_certificates, is_institution_staff, is_student
@@ -68,6 +69,60 @@ def _staff_out(certificate: Certificate, settings: SettingsDep) -> StaffCertific
     out.linkedin_add_url = linkedin_add_url(certificate, settings)
     return out
 
+
+
+
+class IssueFromPassIn(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    student_user_id: int
+    course_id: int
+    attempt_id: int
+    version_id: int | None = None
+    enrollment_id: int | None = None
+    organization_id: int | None = None
+    test_id: int | None = None
+    percent: float | None = None
+    score_percent: float | None = None
+    passed_at: str | None = None
+
+
+@router.post(
+    "/certificates/issue-from-pass",
+    response_model=CertificateResponse,
+    summary="Issue certificate from test pass event",
+    responses=errors(*AUTHENTICATED),
+)
+async def issue_from_pass(
+    data: IssueFromPassIn,
+    db: DbSession,
+    settings: SettingsDep,
+) -> CertificateResponse:
+    payload = data.model_dump()
+    if payload.get("score_percent") is not None and payload.get("percent") is None:
+        payload["percent"] = payload["score_percent"]
+    cert = await IssueService(db, settings).issue_from_pass(payload)
+    if cert is None:
+        existing = (
+            await db.execute(
+                select(Certificate).where(
+                    Certificate.student_user_id == data.student_user_id,
+                    Certificate.course_id == data.course_id,
+                    Certificate.status == CertificateStatus.ISSUED,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            return CertificateResponse(
+                message="Certificate already issued.",
+                certificate=_out(existing, settings),
+            )
+        raise ConflictError("Unable to issue certificate")
+    await db.commit()
+    return CertificateResponse(
+        message="Certificate issued successfully.",
+        certificate=_out(cert, settings),
+    )
 
 @router.get(
     "/certificates",

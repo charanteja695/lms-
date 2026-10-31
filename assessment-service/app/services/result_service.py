@@ -118,6 +118,30 @@ class ResultService:
         }
         self.db.add(AttemptEvent(attempt_id=attempt.id, event_type="released", detail={"result": attempt.result, "revision": attempt.finalize_revision}))
         write_event(self.db, event_type="attempt.finalized", aggregate_type="attempt", aggregate_id=attempt.id, payload=payload)
+        # Direct sync to learning-service assessment_results
+        if test.kind in (TestKind.TOPIC, TestKind.MODULE) and attempt.enrollment_id:
+            try:
+                import asyncpg, uuid as _uuid
+                conn_learn = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_learning')
+                enr_uuid = await conn_learn.fetchval('SELECT id FROM enrollments WHERE public_id = $1', attempt.enrollment_id)
+                if enr_uuid:
+                    passed_bool = (attempt.result == AttemptResult.PASSED)
+                    existing_ar = await conn_learn.fetchrow('SELECT id, passed FROM assessment_results WHERE enrollment_id = $1 AND test_id = $2', enr_uuid, test.public_id)
+                    if existing_ar is None:
+                        await conn_learn.execute(
+                            '''INSERT INTO assessment_results (id, enrollment_id, test_id, passed, percent, attempt_id, revision, created_at, updated_at)
+                               VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())''',
+                            _uuid.uuid4(), enr_uuid, test.public_id, passed_bool, float(attempt.percent or 0.0), attempt.public_id, attempt.finalize_revision
+                        )
+                    elif not existing_ar['passed'] or passed_bool:
+                        await conn_learn.execute(
+                            '''UPDATE assessment_results SET passed = $1, percent = $2, attempt_id = $3, revision = $4, updated_at = NOW()
+                               WHERE id = $5''',
+                            passed_bool, float(attempt.percent or 0.0), attempt.public_id, attempt.finalize_revision, existing_ar['id']
+                        )
+                await conn_learn.close()
+            except Exception as e:
+                logger.warning(f"Failed to sync assessment result to learning-service: {e}")
         if test.kind == TestKind.FINAL:
             await self._course_events(attempt, test, base, previous_result)
         await self._mark_stats_dirty(test.public_id)
@@ -140,6 +164,25 @@ class ResultService:
                     )
                 )
             ).scalar_one()
+            try:
+                import httpx
+                course_id = base.get("course_id") or base.get("target_id")
+                cert_payload = {
+                    "student_user_id": attempt.user_id,
+                    "course_id": int(course_id) if course_id else 0,
+                    "attempt_id": attempt.public_id,
+                    "version_id": attempt.version_id,
+                    "enrollment_id": attempt.enrollment_id,
+                    "organization_id": attempt.organization_id,
+                    "test_id": test.public_id,
+                    "score_percent": float(attempt.percent or 0.0),
+                    "percent": float(attempt.percent or 0.0),
+                    "passed_at": _iso(attempt.results_visible_at),
+                }
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    await client.post("http://127.0.0.1:8009/api/v1/certificates/issue-from-pass", json=cert_payload)
+            except Exception as e:
+                logger.warning(f"Failed to trigger certificate issuance: {e}")
             write_event(
                 self.db,
                 event_type="course.passed",

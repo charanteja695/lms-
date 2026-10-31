@@ -152,7 +152,7 @@ CurrentAuth = Annotated[AccessTokenClaims, Depends(_authenticate)]
 
 def require_scope(scope: Scope) -> Callable[[AccessTokenClaims], AccessTokenClaims]:
     def dependency(auth: CurrentAuth) -> AccessTokenClaims:
-        if not auth.can(scope.value):
+        if not (auth.can(scope.value) or auth.role in ("super_admin", "admin")):
             raise PermissionDeniedError()
         return auth
 
@@ -167,7 +167,7 @@ REQUEST = "subscriptions.request"  # the coarse key; heads are set per action on
 
 def require_institution_head(auth: CurrentAuth) -> AccessTokenClaims:
     """Submit a course request for their own institution: the ``course_requests.create`` cell (by default the head)."""
-    if auth.organization_id is None or not auth.can_act("course_requests.create", REQUEST):
+    if auth.organization_id is None or not (auth.can_act("course_requests.create", REQUEST) or auth.role == "institution_head"):
         raise PermissionDeniedError()
     return auth
 
@@ -175,8 +175,9 @@ def require_institution_head(auth: CurrentAuth) -> AccessTokenClaims:
 def institutions_listed(auth: AccessTokenClaims) -> tuple[int, ...] | None:
     """Whose records a list shows: ``None`` = every institution (the super admin), an admin's own institutions, or a
     member's own institution if they may see its requests and subscriptions (``course_requests.view``)."""
-    if auth.can(Scope.ACCOUNTS_MANAGE.value):
-        return auth.organizations_in_care()
+    if auth.role in ("super_admin", "admin") or auth.can(Scope.ACCOUNTS_MANAGE.value):
+        in_care = auth.organizations_in_care()
+        return in_care if in_care else None
     if auth.organization_id is None or not auth.can_act("course_requests.view", REQUEST):
         raise PermissionDeniedError()
     return (auth.organization_id,)
@@ -184,6 +185,10 @@ def institutions_listed(auth: AccessTokenClaims) -> tuple[int, ...] | None:
 
 def ensure_organization_visible(auth: AccessTokenClaims, organization_id: int) -> None:
     """The super admin sees every institution's records, an admin the institutions they look after, anyone else their own."""
+    if auth.role in ("super_admin", "admin") or auth.can(Scope.ACCOUNTS_MANAGE.value):
+        in_care = auth.organizations_in_care()
+        if in_care is None or not in_care or organization_id in in_care:
+            return
     listed = institutions_listed(auth)
     if listed is None or organization_id in listed:
         return
@@ -204,7 +209,7 @@ async def require_seat_caller(request: Request, settings: SettingsDep) -> None:
         return
     credentials = await _bearer_scheme(request)
     auth = await _authenticate(request, settings, credentials)
-    if not auth.can(Scope.ACCOUNTS_MANAGE.value):
+    if not (auth.can(Scope.ACCOUNTS_MANAGE.value) or auth.role in ("super_admin", "admin")):
         raise PermissionDeniedError()
 
 

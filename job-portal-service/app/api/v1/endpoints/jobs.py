@@ -4,7 +4,7 @@ The super admin (careers manager) runs hiring: they post a job for any company (
 submit opens at once (no approval step for their own posting). A company's own team, where one exists, works on its own jobs.
 """
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
 from lms_common.envelopes import PageContext, SortOrder
@@ -141,6 +141,14 @@ async def resume_job(job_id: JobIdParam, auth: RequireEmployerOrManager, db: DbS
 async def close_job(job_id: JobIdParam, body: ReasonRequest, auth: RequireEmployerOrManager, db: DbSession, settings: SettingsDep) -> EmployerJobResponse:
     service = JobService(db, settings)
     return await _present(service, db, await service.close(await service.get_for_employer(auth, job_id), body.reason), message="Closed.")
+
+
+@router.delete("/{job_id}", summary="Delete a job", responses=errors(*AUTHENTICATED, 404, 409), dependencies=[WriteRateLimit])
+async def delete_job(job_id: JobIdParam, auth: RequireEmployerOrManager, db: DbSession, settings: SettingsDep) -> dict[str, Any]:
+    service = JobService(db, settings)
+    job = await service.get_for_employer(auth, job_id)
+    await service.delete(job)
+    return {"message": "Job deleted successfully."}
 
 
 # ---------------------------------------------------------------- the platform's approval queue

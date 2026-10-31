@@ -25,6 +25,9 @@ def _client(settings: Settings) -> Any:
     if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
         kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID.get_secret_value()
         kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY.get_secret_value()
+    else:
+        kwargs["aws_access_key_id"] = "dev-mock-key"
+        kwargs["aws_secret_access_key"] = "dev-mock-secret" 
     # Always the bucket's own regional address: the global one (bucket.s3.amazonaws.com) redirects for buckets outside
     # us-east-1, and a redirected presigned link no longer matches its signature (the browser gets 403).
     kwargs["endpoint_url"] = settings.S3_ENDPOINT_URL or f"https://s3.{settings.AWS_REGION}.amazonaws.com"

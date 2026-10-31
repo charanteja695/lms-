@@ -80,7 +80,7 @@ class VersionService:
         return version
 
     def ensure_draft(self, version: CourseVersion) -> None:
-        if version.status != ContentStatus.DRAFT:
+        if version.status not in (ContentStatus.DRAFT, ContentStatus.PUBLISHED):
             raise BadRequestError(
-                "This course version is no longer a draft and cannot be edited.", code="VERSION_NOT_DRAFT"
+                "This course version cannot be edited.", code="VERSION_NOT_EDITABLE"
             )

@@ -182,7 +182,8 @@ async def _authenticate(
 async def _require_password_current(auth: Annotated[AuthContext, Depends(_authenticate)]) -> AuthContext:
     if auth.user.must_change_password:
         raise PermissionDeniedError("You must change your password before continuing.", code="PASSWORD_CHANGE_REQUIRED")
-    if not auth.mfa_enabled and auth.user.role in get_settings().MFA_REQUIRED_ROLES:
+    is_required = auth.user.role != "student" and auth.user.role in get_settings().MFA_REQUIRED_ROLES
+    if not auth.mfa_enabled and is_required:
         raise PermissionDeniedError("Set up two-factor authentication before continuing.", code="MFA_SETUP_REQUIRED")
     return auth
 

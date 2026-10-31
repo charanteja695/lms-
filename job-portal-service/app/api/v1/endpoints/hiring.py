@@ -17,13 +17,13 @@ from app.api.deps import (
     SettingsDep,
     WriteRateLimit,
 )
-from app.api.presenters import recruiter_application_detail, recruiter_application_out
+from app.api.presenters import company_names, recruiter_application_detail, recruiter_application_out
 from app.api.responses import AUTHENTICATED, errors
 from app.core.exceptions import ValidationFailedError
 from app.domain.enums import ApplicationStatus
 from app.models.application import Application
 from app.models.job import Job
-from app.models.refs import UserRef
+from app.models.refs import CandidateProfile, UserRef
 from app.pipeline import progress as pipeline_progress
 from app.schemas.application import (
     BatchOut,
@@ -57,8 +57,17 @@ router = APIRouter(prefix="/employer", tags=["Hiring pipeline (recruiter)"])
 
 async def _detail(service: ApplicationService, db: DbSession, application: Application, job: Job) -> RecruiterApplicationDetail:
     user = await db.get(UserRef, application.user_id)
+    profile = await db.get(CandidateProfile, application.user_id)
+    c_names = await company_names(db, {job.employer_org_id})
+    inst_name = None
+    if application.organization_id:
+        inst_name = (await company_names(db, {application.organization_id})).get(application.organization_id)
     return recruiter_application_detail(
-        application, user, job, history=await service.history(application), notes=await service.notes(application), offer=await OfferService(db, service.settings).for_application(application)
+        application, user, job, history=await service.history(application), notes=await service.notes(application),
+        offer=await OfferService(db, service.settings).for_application(application),
+        company_name=c_names.get(job.employer_org_id),
+        institution_name=inst_name,
+        profile_facts=profile.facts if profile else None,
     )
 
 
@@ -69,19 +78,35 @@ async def _job(db: DbSession, settings: SettingsDep, auth: RequireEmployerOrMana
 # ---------------------------------------------------------------- a job's applicants
 @router.get(
     "/jobs/{job_id}/applications", response_model=RecruiterApplicationPage, summary="Applicants of a job",
-    description="Filter by `status` (repeat it for several), `min_score` (screening score) and `q` (candidate name); `sort` is `screen` (best first), `match` or `recent`.", responses=errors(*AUTHENTICATED, 404),
+    description="Filter by `status` (repeat it for several), `min_score` (screening score) and `q` (candidate name); `sort` is `screen` (best first), `match`, `recent` or `date`.", responses=errors(*AUTHENTICATED, 404),
 )
 async def applicants(
     job_id: JobIdParam, auth: RequireEmployerOrManager, db: DbSession, settings: SettingsDep, status: Annotated[list[ApplicationStatus] | None, Query()] = None,
-    min_score: Annotated[int | None, Query(ge=0, le=100)] = None, q: Annotated[str | None, Query(max_length=100)] = None, sort: Annotated[str, Query(pattern="^(screen|match|recent)$")] = "screen",
+    min_score: Annotated[int | None, Query(ge=0, le=100)] = None, q: Annotated[str | None, Query(max_length=100)] = None, sort: Annotated[str, Query(pattern="^(screen|match|recent|date)$")] = "recent",
     page: Annotated[int, Query(ge=1, le=10_000)] = 1, per_page: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> RecruiterApplicationPage:
     job = await _job(db, settings, auth, job_id)
+    c_names = await company_names(db, {job.employer_org_id})
+    company_name = c_names.get(job.employer_org_id)
     rows, total = await ApplicationService(db, settings).list_for_job(
         job, statuses=[s.value for s in status] if status else None, min_score=min_score, sort=sort, q=q, page=page, per_page=per_page
     )
+    user_ids = [a.user_id for a, _ in rows]
+    profiles = {p.user_id: p for p in (await db.execute(select(CandidateProfile).where(CandidateProfile.user_id.in_(user_ids)))).scalars()} if user_ids else {}
     context = PageContext.build(page=page, per_page=per_page, total=total, is_exact=True, sort_column=sort, sort_order=SortOrder.DESC)
-    return RecruiterApplicationPage(message="", applications=[recruiter_application_out(a, u, job.public_id) for a, u in rows], page_context=context)
+    return RecruiterApplicationPage(
+        message="",
+        applications=[
+            recruiter_application_out(
+                a, u, job.public_id,
+                job_title=job.title,
+                company_name=company_name,
+                profile_facts=profiles.get(a.user_id).facts if profiles.get(a.user_id) else None,
+            )
+            for a, u in rows
+        ],
+        page_context=context,
+    )
 
 
 @router.get("/jobs/{job_id}/funnel", response_model=FunnelResponse, summary="Applicants by stage", responses=errors(*AUTHENTICATED, 404))
@@ -108,8 +133,18 @@ async def ranking(
     data = await ScreeningService(db, settings, gateway).ranking(job, shortlist_at=high, reject_below=low)
     users = {u.user_id: u for u in (await db.execute(select(UserRef).where(UserRef.user_id.in_([a.user_id for group in data["buckets"].values() for a in group])))).scalars()} if data["buckets"] else {}
 
+    c_names = await company_names(db, {job.employer_org_id})
+    company_name = c_names.get(job.employer_org_id)
+
     def out(group: list[Application]) -> list[RecruiterApplicationOut]:
-        return [recruiter_application_out(a, users.get(a.user_id), job.public_id) for a in group]
+        return [
+            recruiter_application_out(
+                a, users.get(a.user_id), job.public_id,
+                job_title=job.title,
+                company_name=company_name,
+            )
+            for a in group
+        ]
 
     b = data["buckets"]
     return RankingResponse(message="", ranking=RankingOut(shortlist_at=high, reject_below=low, shortlist=out(b["shortlist"]), review=out(b["review"]), reject=out(b["reject"]), unscreened=out(b["unscreened"])))

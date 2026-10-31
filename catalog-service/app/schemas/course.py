@@ -48,6 +48,7 @@ class CourseResponse(SuccessResponse):
 
 class CourseListQuery(ListQuery):
     include_archived: bool = False
+    published_only: bool = False
 
 
 class CourseListResponse(SuccessResponse):

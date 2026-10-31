@@ -28,3 +28,11 @@ Thumbs.db
 
 # Runtime files (export jobs)
 var/
+
+# Local databases & storage
+*.db
+*.sqlite
+*.sqlite3
+media_storage/
+create_dbs.py
+seed_mock_plans.py

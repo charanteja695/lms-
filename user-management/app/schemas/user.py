@@ -84,6 +84,10 @@ class AccountInput(RequestSchema):
         "When omitted, an account set-up link is emailed instead (recommended), or a temporary password is "
         "generated for students without email.",
     )
+    generate_password: bool = Field(
+        default=False,
+        description="When true, generates a secure temporary password and returns it in credentials.",
+    )
 
 
 class AccountUpdate(RequestSchema):
@@ -464,6 +468,7 @@ class UserListItem(ResponseSchema):
     year_of_study: int | None = Field(description="Students only")
     section: str | None = Field(description="Students only")
     graduation_year: int | None = Field(description="Students only")
+    cgpa: Decimal | None = Field(default=None, description="Students only")
     institution: InstitutionRef | None
     last_login_time: Timestamp | None
     created_time: Timestamp
@@ -489,6 +494,7 @@ class UserListItem(ResponseSchema):
             year_of_study=user.student.year_of_study if user.student else None,
             section=user.student.section if user.student else None,
             graduation_year=user.student.graduation_year if user.student else None,
+            cgpa=user.student.cgpa if user.student else None,
             institution=InstitutionRef.of(user.institution),
             last_login_time=user.last_login_at,
             created_time=user.created_at,
@@ -583,10 +589,19 @@ class UserResponse(SuccessResponse):
 class CredentialsOut(ResponseSchema):
     delivery: Literal["email_link", "initial_password", "temporary_password"] = Field(
         description="email_link: set-up link emailed; initial_password: the password you chose; "
-        "temporary_password: generated because the student has no email (shown once, share it securely)"
+        "temporary_password: generated temporary password (shown once, share it securely)"
     )
     temporary_password: str | None = Field(
         default=None, description="Only for delivery=temporary_password; never shown again"
+    )
+    email_sent: bool | None = Field(
+        default=None, description="Whether the invitation/setup email was actually sent"
+    )
+    setup_link: str | None = Field(
+        default=None, description="Authorised recovery link when email delivery fails or is in console mode"
+    )
+    message: str | None = Field(
+        default=None, description="Detailed instruction or delivery status message"
     )
 
 

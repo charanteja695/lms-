@@ -296,6 +296,10 @@ class QuestionService:
         version = self.working(question)
         if version is None or version.status != VersionStatus.DRAFT:
             raise ConflictError("Only a draft can be submitted for review.", code="VERSION_NOT_DRAFT")
+        if (version.body or {}).get("sync_status") == "not_synced":
+            raise ValidationFailedError(
+                details=[{"field": "body.sync_status", "code": "NOT_SYNCED", "message": "Programming problem is not synced with code-execution-service"}]
+            )
         validate_question_content(QuestionType(question.question_type), version.body, version.answer_key, self.settings)
         version.status = VersionStatus.IN_REVIEW
         version.submitted_at = utcnow()

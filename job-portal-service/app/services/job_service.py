@@ -8,12 +8,13 @@ from datetime import datetime
 from typing import Any
 
 from lms_common.pagination import LIKE_ESCAPE, contains_pattern
-from sqlalchemy import ColumnElement, Select, and_, exists, func, or_, select
+from sqlalchemy import ColumnElement, Select, and_, delete, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.exceptions import ConflictError, NotFoundError, ValidationFailedError
 from app.core.ids import new_public_id
+from app.core.sanitizer import sanitize_bullets, sanitize_html
 from app.core.security import AccessTokenClaims
 from app.core.time import utcnow
 from app.domain.enums import ApplicationStatus, EmployerStatus, JobStatus, Visibility, WorkKind
@@ -21,6 +22,7 @@ from app.matching.model import JobSpec
 from app.models.application import Application
 from app.models.employer import EmployerProfile
 from app.models.job import Job, JobInstitution
+from app.models.match import JobMatch
 from app.models.refs import CourseRef, OrgRef
 from app.permissions.policy import owns_employer
 from app.services import work_service
@@ -46,6 +48,19 @@ def eligibility_json(data: dict[str, Any]) -> dict[str, Any]:
         "graduation_years": {"min": years.get("min"), "max": years.get("max")} if years else None,
         "certificate_course_ids": [str(c) for c in data.get("certificate_course_ids") or []],
         "min_scores": [{"course_id": str(m["course_id"]), "min_percent": float(m["min_percent"])} for m in data.get("min_scores") or []],
+        "min_cgpa": float(data["min_cgpa"]) if data.get("min_cgpa") not in (None, "") else None,
+        "degrees": [str(d).strip() for d in data.get("degrees") or [] if str(d).strip()],
+        "branches": [str(b).strip() for b in data.get("branches") or [] if str(b).strip()],
+        "max_backlogs": int(data["max_backlogs"]) if data.get("max_backlogs") not in (None, "") else None,
+        "min_experience_months": int(data["min_experience_months"]) if data.get("min_experience_months") not in (None, "") else None,
+        "required_skills": [str(s).strip() for s in data.get("required_skills") or [] if str(s).strip()],
+        "required_certifications": [str(c).strip() for c in data.get("required_certifications") or [] if str(c).strip()],
+        "department": str(data["department"]).strip() if data.get("department") else None,
+        "contact_email": str(data["contact_email"]).strip() if data.get("contact_email") else None,
+        "application_url": str(data["application_url"]).strip() if data.get("application_url") else None,
+        "salary_period": str(data.get("salary_period", "annual")).strip() if data.get("salary_period") else "annual",
+        "is_negotiable": bool(data.get("is_negotiable", False)),
+        "salary_disclosed": bool(data.get("salary_disclosed", True)),
     }
 
 
@@ -104,13 +119,31 @@ class JobService:
         job.visibility = Visibility.RESTRICTED if wanted else Visibility.PUBLIC
 
     async def create(self, auth: AccessTokenClaims, employer_org_id: int, fields: dict[str, Any]) -> Job:
+        pub_id = new_public_id()
+        job_code = fields.get("job_code") or f"JOB-{str(pub_id)[-6:]}"
+        about_job = sanitize_html(fields.get("about_job") or fields.get("description") or "")
+        description = fields.get("description") or about_job
         job = Job(
-            public_id=new_public_id(), employer_org_id=employer_org_id, created_by=auth.user_id, status=JobStatus.DRAFT, revision=0, visibility=Visibility.PUBLIC,
-            title=fields["title"], description=fields["description"], employment_type=fields["employment_type"], location_type=fields["location_type"], locations=fields["locations"],
+            public_id=pub_id, employer_org_id=employer_org_id, created_by=auth.user_id, status=JobStatus.DRAFT, revision=0, visibility=Visibility.PUBLIC,
+            title=fields["title"], description=description, employment_type=fields["employment_type"], location_type=fields["location_type"], locations=fields["locations"],
             experience_min_months=fields["experience_min_months"], experience_max_months=fields["experience_max_months"], ctc_min=fields["ctc_min"], ctc_max=fields["ctc_max"],
             stipend_per_month=fields.get("stipend_per_month"), duration_months=fields.get("duration_months"),
             currency=fields["currency"], required_skills=fields["required_skills"], preferred_skills=fields["preferred_skills"], openings=fields["openings"], deadline_at=fields["deadline_at"],
             eligibility=eligibility_json(fields["eligibility"]), pipeline=pipeline_json(fields["pipeline"]),
+            job_code=job_code,
+            job_details=fields.get("job_details") or {},
+            hiring_process=fields.get("hiring_process") or [],
+            application_config=fields.get("application_config") or {},
+            banner_text=(fields.get("banner_text") or "").strip() or None,
+            banner_type=fields.get("banner_type") or "info",
+            experience_level=fields.get("experience_level"),
+            experience_level_description=(fields.get("experience_level_description") or "").strip() or None,
+            remote_eligible=bool(fields.get("remote_eligible", False)),
+            about_job=about_job,
+            responsibilities=sanitize_bullets(fields.get("responsibilities")),
+            minimum_qualifications=sanitize_bullets(fields.get("minimum_qualifications")),
+            preferred_qualifications=sanitize_bullets(fields.get("preferred_qualifications")),
+            perks=sanitize_bullets(fields.get("perks")),
         )
         self.db.add(job)
         await self.db.flush()
@@ -125,9 +158,37 @@ class JobService:
         if job.status not in _EDITABLE:
             raise ConflictError("A closed job cannot be edited.", code="JOB_CLOSED")
         before = {name: getattr(job, name) for name in _MATCH_FIELDS}
-        for name in ("title", "description", "employment_type", "location_type", "locations", "experience_min_months", "experience_max_months", "ctc_min", "ctc_max", "stipend_per_month", "duration_months", "currency", "required_skills", "preferred_skills", "openings", "deadline_at"):
-            if name in fields:
+        for name in ("title", "description", "employment_type", "location_type", "locations", "experience_min_months", "experience_max_months", "ctc_min", "ctc_max", "stipend_per_month", "duration_months", "currency", "required_skills", "preferred_skills", "openings", "deadline_at", "job_code"):
+            if name in fields and fields[name] is not None:
                 setattr(job, name, fields[name])
+        if "job_details" in fields and fields["job_details"] is not None:
+            job.job_details = fields["job_details"]
+        if "hiring_process" in fields and fields["hiring_process"] is not None:
+            job.hiring_process = fields["hiring_process"]
+        if "application_config" in fields and fields["application_config"] is not None:
+            job.application_config = fields["application_config"]
+        if "banner_text" in fields:
+            job.banner_text = (fields["banner_text"] or "").strip() or None
+        if "banner_type" in fields and fields["banner_type"] is not None:
+            job.banner_type = fields["banner_type"]
+        if "experience_level" in fields:
+            job.experience_level = fields["experience_level"]
+        if "experience_level_description" in fields:
+            job.experience_level_description = (fields["experience_level_description"] or "").strip() or None
+        if "remote_eligible" in fields and fields["remote_eligible"] is not None:
+            job.remote_eligible = bool(fields["remote_eligible"])
+        if "about_job" in fields and fields["about_job"] is not None:
+            job.about_job = sanitize_html(fields["about_job"])
+            if not job.description:
+                job.description = job.about_job
+        if "responsibilities" in fields and fields["responsibilities"] is not None:
+            job.responsibilities = sanitize_bullets(fields["responsibilities"])
+        if "minimum_qualifications" in fields and fields["minimum_qualifications"] is not None:
+            job.minimum_qualifications = sanitize_bullets(fields["minimum_qualifications"])
+        if "preferred_qualifications" in fields and fields["preferred_qualifications"] is not None:
+            job.preferred_qualifications = sanitize_bullets(fields["preferred_qualifications"])
+        if "perks" in fields and fields["perks"] is not None:
+            job.perks = sanitize_bullets(fields["perks"])
         if "eligibility" in fields and fields["eligibility"] is not None:
             job.eligibility = eligibility_json(fields["eligibility"])
             await self._set_institutions(job, [int(i) for i in fields["eligibility"].get("institution_ids") or []])
@@ -151,6 +212,16 @@ class JobService:
         await self.db.commit()
         return job
 
+    async def delete(self, job: Job) -> None:
+        job = await self._locked(job)
+        app_count = await self._application_count(job)
+        if app_count > 0:
+            raise ConflictError("Cannot delete a job that has active applications. You can close it instead.", code="JOB_HAS_APPLICATIONS")
+        await self.db.execute(delete(JobInstitution).where(JobInstitution.job_id == job.id))
+        await self.db.execute(delete(JobMatch).where(JobMatch.job_id == job.id))
+        await self.db.delete(job)
+        await self.db.commit()
+
     async def _application_count(self, job: Job) -> int:
         return int((await self.db.execute(select(func.count()).select_from(Application).where(Application.job_id == job.id))).scalar_one())
 
@@ -166,6 +237,12 @@ class JobService:
             problems.append({"field": "required_skills", "code": "REQUIRED", "message": "List at least one required skill: matching needs it"})
         if len((job.description or "").strip()) < _MIN_DESCRIPTION:
             problems.append({"field": "description", "code": "TOO_SHORT", "message": f"Describe the job in at least {_MIN_DESCRIPTION} characters"})
+        if not (job.about_job or "").strip():
+            problems.append({"field": "about_job", "code": "REQUIRED", "message": "About the job is required to publish"})
+        if not job.minimum_qualifications or len(job.minimum_qualifications) < 2:
+            problems.append({"field": "minimum_qualifications", "code": "TOO_FEW_ITEMS", "message": "At least 2 minimum qualifications are required to publish"})
+        if not job.responsibilities or len(job.responsibilities) < 3:
+            problems.append({"field": "responsibilities", "code": "TOO_FEW_ITEMS", "message": "At least 3 responsibilities are required to publish"})
         if job.deadline_at is not None and job.deadline_at <= utcnow():
             problems.append({"field": "deadline_at", "code": "IN_THE_PAST", "message": "The deadline has passed"})
         if len(job.required_skills or []) + len(job.preferred_skills or []) > self.settings.MAX_SKILLS_PER_JOB:

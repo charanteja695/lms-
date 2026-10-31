@@ -9,8 +9,8 @@ DecisionReason = text(500, min_length=3, examples=["We only license this course 
 
 class CourseRequestCreate(RequestSchema):
     course_id: RequestCourseId  # type: ignore[valid-type]
-    requested_seats: int = Field(gt=0, le=100_000)
-    requested_term_days: int = Field(gt=0, le=3_650)
+    requested_seats: int = Field(default=100, gt=0, le=100_000)
+    requested_term_days: int = Field(default=365, gt=0, le=3_650)
 
 
 class ApproveRequest(RequestSchema):
@@ -36,6 +36,9 @@ class CourseRequestOut(ResponseSchema):
     decided_at: Timestamp | None = None
     decision_reason: str | None = None
     created_at: Timestamp
+    course_name: str | None = None
+    institution_name: str | None = None
+    requester_name: str | None = None
 
 
 class CourseRequestResponse(SuccessResponse):

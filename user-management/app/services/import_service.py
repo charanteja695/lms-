@@ -104,7 +104,7 @@ TEMPLATE_ROWS = [
         "role": "student", "email": "aarav.reddy@example.com", "first_name": "Aarav", "last_name": "Reddy",
         "gender": "male", "date_of_birth": "2012-04-15", "address_line1": "Plot 42, Road No. 5", "city": "Hyderabad",
         "state": "Telangana", "postal_code": "500033", "country": "IN", "admission_number": "ADM/2024/0457",
-        "admission_date": "2024-06-01", "program": "Class 8", "section": "B", "guardian_name": "Suresh Reddy", "guardian_relationship": "father",
+        "admission_date": "2024-06-01", "program": "Class 8", "section": "B", "cgpa": "8.50", "guardian_name": "Suresh Reddy", "guardian_relationship": "father",
         "guardian_phone": "+919876543210",
     },
 ]  # fmt: skip

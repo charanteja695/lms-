@@ -51,7 +51,7 @@ async def _mine(service: ApplicationService, application: Application, job: Job,
 )
 async def apply(job_id: JobIdParam, body: ApplyRequest, auth: RequireApplicant, db: DbSession, settings: SettingsDep, career: CareerDep) -> MyApplicationResponse:
     service = ApplicationService(db, settings)
-    application = await service.apply(auth, job_id, resume_id=body.resume_id, cover_note=body.cover_note, career=career)
+    application = await service.apply(auth, job_id, resume_id=body.resume_id, cover_note=body.cover_note, answers=body.answers, career=career)
     return await _mine(service, application, await service.job_of(application), db, message="Application sent.")
 
 

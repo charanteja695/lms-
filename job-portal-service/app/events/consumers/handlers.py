@@ -49,9 +49,31 @@ async def handle_user_upserted(db: AsyncSession, settings: Settings, payload: di
     ref.organization_id = _int(payload.get("organization_id"))
     ref.active = payload.get("status", "active") == "active"
     profile = await db.get(CandidateProfile, user_id)
-    if profile is not None and ref.organization_id is not None and profile.organization_id != ref.organization_id:
-        profile.organization_id = ref.organization_id  # a student moved institution: drives and restricted jobs follow
-        await work_service.enqueue(db, WorkKind.MATCH_CANDIDATE, user_id)
+    if profile is None and (payload.get("role") == "student" or ref.role == "student"):
+        profile = CandidateProfile(user_id=user_id, organization_id=ref.organization_id, revision=0, facts={})
+        db.add(profile)
+    if profile is not None:
+        facts = dict(profile.facts or {})
+        changed = False
+        if "cgpa" in payload:
+            facts["cgpa"] = float(payload["cgpa"]) if payload["cgpa"] is not None else None
+            changed = True
+        if "branch" in payload:
+            facts["branch"] = payload["branch"]
+            changed = True
+        if "graduation_year" in payload and payload["graduation_year"] is not None:
+            try:
+                facts["graduation_year"] = int(payload["graduation_year"])
+                changed = True
+            except (ValueError, TypeError):
+                pass
+        if ref.organization_id is not None and profile.organization_id != ref.organization_id:
+            profile.organization_id = ref.organization_id
+            changed = True
+        if changed:
+            profile.facts = facts
+            profile.revision = (profile.revision or 0) + 1
+            await work_service.enqueue(db, WorkKind.MATCH_CANDIDATE, user_id)
 
 
 async def handle_user_deleted(db: AsyncSession, settings: Settings, payload: dict[str, Any]) -> None:
@@ -120,7 +142,15 @@ async def handle_skill_profile_updated(db: AsyncSession, settings: Settings, pay
     if profile is None:
         profile = CandidateProfile(user_id=user_id, revision=0, facts={})
         db.add(profile)
-    profile.facts, profile.revision = payload["facts"], revision
+    merged_facts = dict(profile.facts or {})
+    merged_facts.update(payload["facts"])
+    # Preserve student academic fields from user-management if career-service did not supply them
+    for key in ("cgpa", "branch", "graduation_year"):
+        if key in (profile.facts or {}) and (profile.facts or {})[key] is not None:
+            if key not in payload["facts"] or payload["facts"].get(key) is None:
+                merged_facts[key] = (profile.facts or {})[key]
+    profile.facts = merged_facts
+    profile.revision = revision
     profile.organization_id = _int(payload.get("organization_id")) or profile.organization_id
     profile.updated_by_event_at = utcnow()
     profile.embedding, profile.embedding_revision = None, None

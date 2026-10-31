@@ -76,6 +76,8 @@ async def update_rules(
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(version.rule, field, value)
     await db.commit()
+    if version.status == ContentStatus.PUBLISHED:
+        await ReviewService(db).sync_published_curriculum(version)
     return CourseRuleOut.model_validate(version.rule)
 
 

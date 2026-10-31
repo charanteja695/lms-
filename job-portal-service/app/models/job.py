@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -52,6 +52,20 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     closed_reason: Mapped[str | None] = mapped_column(String(200))
     embedding: Mapped[list[float] | None] = mapped_column(NullableJSONType)
     embedding_revision: Mapped[int | None] = mapped_column(Integer)
+    job_code: Mapped[str | None] = mapped_column(String(32))
+    job_details: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    hiring_process: Mapped[list[dict[str, Any]]] = mapped_column(JSONType, default=list)
+    application_config: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    banner_text: Mapped[str | None] = mapped_column(Text)
+    banner_type: Mapped[str | None] = mapped_column(String(20), default="info")
+    experience_level: Mapped[str | None] = mapped_column(String(20))
+    experience_level_description: Mapped[str | None] = mapped_column(Text)
+    remote_eligible: Mapped[bool] = mapped_column(Boolean, default=False)
+    about_job: Mapped[str | None] = mapped_column(Text)
+    responsibilities: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    minimum_qualifications: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    preferred_qualifications: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    perks: Mapped[list[str]] = mapped_column(JSONType, default=list)
 
     __table_args__ = (
         Index("ix_jobs_employer_status", "employer_org_id", "status"),

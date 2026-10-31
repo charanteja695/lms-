@@ -37,6 +37,19 @@ def can_manage_careers(auth: AccessTokenClaims) -> bool:
 
 
 def can_view_student_profile(auth: AccessTokenClaims, *, student_user_id: int, student_organization_id: int | None) -> bool:
-    if auth.user_id == student_user_id or can_manage_careers(auth):
+    if is_super_admin(auth):
         return True
-    return is_institution_staff(auth) and student_organization_id is not None and auth.organization_id == student_organization_id
+    if auth.user_id == student_user_id:
+        return True
+    if auth.role == Role.STUDENT:
+        return False
+    if can_manage_careers(auth):
+        return True
+    if auth.role == Role.ADMIN and student_organization_id is not None:
+        if auth.admin_organization_ids and student_organization_id in auth.admin_organization_ids:
+            return True
+    if student_organization_id is not None and auth.organization_id is not None:
+        if auth.organization_id == student_organization_id:
+            if is_institution_staff(auth) or auth.role in (Role.INSTITUTION_HEAD, Role.STAFF):
+                return True
+    return False

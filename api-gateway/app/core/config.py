@@ -15,11 +15,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Where each service listens on a developer's machine (see lms-backend/README.md). Docker overrides them all (UPSTREAM_URLS).
 LOCAL_UPSTREAMS: dict[str, str] = {
-    "user-management": "http://localhost:8001", "catalog-service": "http://localhost:8002", "media-service": "http://localhost:8003", "subscription-service": "http://localhost:8004",
-    "learning-service": "http://localhost:8005", "code-execution-service": "http://localhost:8006", "assessment-service": "http://localhost:8007", "proctoring-service": "http://localhost:8008",
-    "certificate-service": "http://localhost:8009", "ai-gateway": "http://localhost:8010", "ai-tutor-service": "http://localhost:8011", "support-service": "http://localhost:8012",
-    "career-service": "http://localhost:8013", "job-portal-service": "http://localhost:8014", "ai-interview-service": "http://localhost:8015", "notification-service": "http://localhost:8016",
-    "analytics-service": "http://localhost:8017", "billing-service": "http://localhost:8018",
+    "user-management": "http://127.0.0.1:8001", "catalog-service": "http://127.0.0.1:8002", "media-service": "http://127.0.0.1:8003", "subscription-service": "http://127.0.0.1:8004",
+    "learning-service": "http://127.0.0.1:8005", "code-execution-service": "http://127.0.0.1:8006", "assessment-service": "http://127.0.0.1:8007", "proctoring-service": "http://127.0.0.1:8008",
+    "certificate-service": "http://127.0.0.1:8009", "ai-gateway": "http://127.0.0.1:8010", "ai-tutor-service": "http://127.0.0.1:8011", "support-service": "http://127.0.0.1:8012",
+    "career-service": "http://127.0.0.1:8013", "job-portal-service": "http://127.0.0.1:8014", "ai-interview-service": "http://127.0.0.1:8015", "notification-service": "http://127.0.0.1:8016",
+    "analytics-service": "http://127.0.0.1:8017", "billing-service": "http://127.0.0.1:8018",
 }
 ROUTES_FILE = Path(__file__).resolve().parents[2] / "config" / "routes.json"
 
@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # --- Authentication: an Authorization header, if sent, must be valid; the services still verify it themselves ---
-    USER_MANAGEMENT_JWKS_URL: str = "http://localhost:8001/.well-known/jwks.json"
+    USER_MANAGEMENT_JWKS_URL: str = "http://127.0.0.1:8001/.well-known/jwks.json"
     JWT_ISSUER: str = "lms-user-management"
     JWT_AUDIENCE: str = "lms"
     JWT_LEEWAY_SECONDS: int = Field(default=10, ge=0, le=60)
@@ -60,9 +60,9 @@ class Settings(BaseSettings):
 
     # --- Routing ---
     UPSTREAM_URLS: str = Field(default="", description="JSON object of service name -> base URL, overriding the local defaults for the services it names")
-    MAX_BODY_BYTES: int = Field(default=32 * 1024 * 1024, ge=1024, description="Larger request bodies are refused (spoken interview answers are the biggest legitimate ones)")
+    MAX_BODY_BYTES: int = Field(default=5 * 1024 * 1024 * 1024, ge=1024, description="Larger request bodies are refused (spoken interview answers are the biggest legitimate ones)")
     UPSTREAM_CONNECT_TIMEOUT_SECONDS: float = Field(default=5.0, gt=0)
-    UPSTREAM_READ_TIMEOUT_SECONDS: float = Field(default=120.0, gt=0)
+    UPSTREAM_READ_TIMEOUT_SECONDS: float = Field(default=600.0, gt=0)
     STREAM_READ_TIMEOUT_SECONDS: float = Field(default=3600.0, gt=0, description="For server-sent-event streams (a path ending /stream)")
     HEALTH_CHECK_TIMEOUT_SECONDS: float = Field(default=2.0, gt=0)
 

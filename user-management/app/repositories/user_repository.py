@@ -152,4 +152,7 @@ class UserRepository:
             "role": user.role,
             "status": user.status,
             "organization_id": str(institution_public_id) if institution_public_id else None,
+            "branch": user.student.branch if user.student else None,
+            "graduation_year": user.student.graduation_year if user.student else None,
+            "cgpa": float(user.student.cgpa) if (user.student and user.student.cgpa is not None) else None,
         }

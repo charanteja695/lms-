@@ -248,6 +248,12 @@ async def finish_section(attempt_id: AttemptIdParam, auth: RequireStudent, db: D
 async def submit_attempt(attempt_id: AttemptIdParam, auth: RequireStudent, db: DbSession, settings: SettingsDep, redis: RedisDep, ctx: RequestCtx) -> AttemptResponse:
     service = AttemptService(db, settings, redis)
     attempt = await service.submit(await service.get_owned(attempt_id, auth.user_id), reason=SubmitReason.MANUAL, ip_address=ctx.ip_address)
+    try:
+        from app.services.grading_service import GradingService
+        await GradingService(db, settings, redis).grade_attempt(attempt.public_id)
+        attempt = await service.get(attempt.public_id)
+    except Exception as exc:
+        logger.warning(f"Immediate grading failed for attempt {attempt.public_id}: {exc}")
     return AttemptResponse(message="Attempt submitted; it is being graded.", attempt=await state_of(service, attempt))
 
 

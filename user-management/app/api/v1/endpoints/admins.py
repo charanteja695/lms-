@@ -74,7 +74,7 @@ async def create_admin(
     return AdminCreatedResponse(
         message="Admin created successfully.",
         admin=await _admin_out(user, auth.user, institutions),
-        credentials=credentials_out(prepared),
+        credentials=credentials_out(prepared, service.settings),
     )
 
 

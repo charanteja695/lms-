@@ -85,8 +85,33 @@ def test_ordering_key_must_be_a_permutation_of_the_items():
 def test_coding_needs_a_code_execution_problem_id():
     body, key = validate(T.CODING, {"problem_id": "1755000000006555", "languages": ["python", "java"]}, {})
     assert body["languages"] == ["java", "python"] and key == {"scoring": "partial"}
+    # Confirm invalid ID format is rejected
     with pytest.raises(ValidationFailedError):
         validate(T.CODING, {"problem_id": "12"}, {})
+    with pytest.raises(ValidationFailedError):
+        validate(T.CODING, {"problem_id": "abc_not_numeric"}, {})
+    # Without problem_id and without not_synced status, validation fails
+    with pytest.raises(ValidationFailedError):
+        validate(T.CODING, {"languages": ["python"]}, {})
+
+
+def test_coding_allows_draft_not_synced_without_problem_id():
+    # Allow draft questions without problem_id when sync_status / status is not_synced
+    body1, key1 = validate(T.CODING, {"sync_status": "not_synced", "languages": ["python"]}, {})
+    assert body1["sync_status"] == "not_synced"
+    assert body1.get("problem_id") is None
+    assert body1["languages"] == ["python"]
+
+    body2, key2 = validate(T.CODING, {"status": "not_synced", "sync_error": "CES down"}, {})
+    assert body2["sync_status"] == "not_synced"
+    assert body2["sync_error"] == "CES down"
+    assert body2.get("problem_id") is None
+
+    # Invalid problem_id format is still rejected even if status is not_synced
+    with pytest.raises(ValidationFailedError):
+        validate(T.CODING, {"sync_status": "not_synced", "problem_id": "12"}, {})
+    with pytest.raises(ValidationFailedError):
+        validate(T.CODING, {"sync_status": "not_synced", "problem_id": "invalid_format"}, {})
 
 
 def test_subjective_and_file_rubrics_are_checked():

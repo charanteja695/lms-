@@ -211,6 +211,10 @@ class TestService:
         await self.db.flush()
         await self._write_sections(test, sections)
         await flush_or_conflict(self.db)
+        if test.status == TestStatus.PUBLISHED:
+            issues, total, count, _ = await self.validate(test)
+            if not issues and total is not None and count is not None:
+                test.total_marks, test.question_count = total, count
         await self.db.commit()
         return await self.load(test.public_id)
 
@@ -383,7 +387,7 @@ class TestService:
         fixed_questions: dict[uuid.UUID, Question] = {}
         if fixed_ids:
             fixed_questions = {
-                q.id: q for q in (await self.db.execute(select(Question).where(Question.id.in_(fixed_ids)))).scalars()
+                q.id: q for q in (await self.db.execute(select(Question).options(selectinload(Question.versions)).where(Question.id.in_(fixed_ids)))).scalars()
             }
         pools = PoolIndex(self.db, None, self.settings)
         seen_fixed: set[uuid.UUID] = set()
@@ -405,6 +409,10 @@ class TestService:
                     if slot.question_id is not None:
                         seen_fixed.add(slot.question_id)
                     if question is not None:
+                        curr_v = next((v for v in question.versions if v.version_no == question.current_version_no), None) or (question.versions[-1] if question.versions else None)
+                        v_body = curr_v.body if curr_v and curr_v.body else {}
+                        if v_body.get("sync_status") == "not_synced" or (question.question_type in _PROGRAM_TYPES and not v_body.get("problem_id")):
+                            issue(where, "PROBLEM_NOT_SYNCED", f"Programming problem for question {question.public_id} is not synced")
                         mcq_count += question.question_type in _MCQ_TYPES
                         program_count += question.question_type in _PROGRAM_TYPES
                     question_count += 1
@@ -441,9 +449,13 @@ class TestService:
 
     async def submit(self, test: Test, auth: AccessTokenClaims) -> Test:
         self._require_editable(test, auth)
-        issues, total, count = await self.validate(test)
+        issues, total, count, _ = await self.validate(test)
         if issues:
             raise ValidationFailedError("The test is not ready to be reviewed.", details=issues)
+        if test.status == TestStatus.PUBLISHED:
+            test.total_marks, test.question_count = total, count
+            await self.db.commit()
+            return await self.load(test.public_id)
         test.status = TestStatus.IN_REVIEW
         test.submitted_at = utcnow()
         test.total_marks, test.question_count = total, count
@@ -453,14 +465,14 @@ class TestService:
 
     async def approve(self, test: Test, auth: AccessTokenClaims, note: str | None) -> Test:
         self._require_reviewer(test, auth)
-        if test.status != TestStatus.IN_REVIEW:
-            raise ConflictError("Only a test in review can be approved.", code="TEST_NOT_IN_REVIEW")
+        if test.status not in (TestStatus.IN_REVIEW, TestStatus.PUBLISHED):
+            raise ConflictError("Only a test in review or published can be approved.", code="TEST_NOT_IN_REVIEW")
         if test.created_by == auth.user_id and not is_super_admin(auth):
             raise PermissionDeniedError("Someone other than the author must approve this.", code="SELF_REVIEW_NOT_ALLOWED")
-        issues, total, count = await self.validate(test)  # the bank may have changed since it was submitted
+        issues, total, count, _ = await self.validate(test)  # the bank may have changed since it was submitted
         if issues:
             raise ValidationFailedError("The test is no longer valid.", details=issues)
-        if test.target_id is not None:
+        if test.status != TestStatus.PUBLISHED and test.target_id is not None:
             clash = (
                 await self.db.execute(
                     select(Test.public_id).where(
@@ -513,9 +525,9 @@ class TestService:
     def _require_editable(test: Test, auth: AccessTokenClaims) -> None:
         if not can_author_owned_by(auth, test.organization_id):
             raise PermissionDeniedError()
-        if test.status != TestStatus.DRAFT:
+        if test.status not in (TestStatus.DRAFT, TestStatus.PUBLISHED):
             raise ConflictError(
-                "Only a draft test can be edited; clone it to change a published one.", code="TEST_NOT_DRAFT"
+                "This test cannot be edited.", code="TEST_NOT_EDITABLE"
             )
 
     @staticmethod

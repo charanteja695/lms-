@@ -64,6 +64,52 @@ def test_certificate_and_score_rules_say_what_is_missing():
     assert eligibility.check(spec(certificate_course_ids=["1"], min_scores=[{"course_id": "1", "min_percent": 90}]), ASHA, course_titles=COURSES).eligible
 
 
+
+def test_cgpa_eligibility_rule():
+    # Inclusive check: CGPA >= min_cgpa
+    cand_high = replace(ASHA, cgpa=8.50)
+    cand_exact = replace(ASHA, cgpa=7.50)
+    cand_low = replace(ASHA, cgpa=7.49)
+    cand_none = replace(ASHA, cgpa=None)
+
+    assert eligibility.check(spec(min_cgpa=7.50), cand_high, course_titles=COURSES).eligible
+    assert eligibility.check(spec(min_cgpa=7.50), cand_exact, course_titles=COURSES).eligible
+
+    low_result = eligibility.check(spec(min_cgpa=7.50), cand_low, course_titles=COURSES)
+    assert not low_result.eligible
+    assert low_result.reasons == ["Requires minimum CGPA of 7.50 (yours: 7.49)."]
+
+    # Candidate with missing CGPA is not marked ineligible solely because CGPA is unavailable
+    none_result = eligibility.check(spec(min_cgpa=7.50), cand_none, course_titles=COURSES)
+    assert none_result.eligible
+    assert none_result.reasons == []
+
+    # min_cgpa not set or 0 -> everyone eligible
+    assert eligibility.check(spec(min_cgpa=None), cand_none, course_titles=COURSES).eligible
+    assert eligibility.check(spec(min_cgpa=0), cand_none, course_titles=COURSES).eligible
+
+
+def test_branch_eligibility_rule():
+    cand_cs = replace(ASHA, branch="Computer Science")
+    cand_mech = replace(ASHA, branch="Mechanical Engineering")
+    cand_none = replace(ASHA, branch=None)
+
+    allowed = ["Computer Science", "Information Technology"]
+    assert eligibility.check(spec(branches=allowed), cand_cs, course_titles=COURSES).eligible
+
+    mech_res = eligibility.check(spec(branches=allowed), cand_mech, course_titles=COURSES)
+    assert not mech_res.eligible
+    assert "Open to branches: Computer Science, Information Technology (yours: Mechanical Engineering)." in mech_res.reasons
+
+    none_res = eligibility.check(spec(branches=allowed), cand_none, course_titles=COURSES)
+    assert not none_res.eligible
+    assert "Open to branches: Computer Science, Information Technology (yours: None)." in none_res.reasons
+
+    # Empty or "all" -> everyone eligible
+    assert eligibility.check(spec(branches=[]), cand_mech, course_titles=COURSES).eligible
+    assert eligibility.check(spec(branches=["All"]), cand_mech, course_titles=COURSES).eligible
+
+
 def test_restricted_jobs_need_the_right_institution():
     assert eligibility.check(spec(restricted=True, institutions=[10, 11]), ASHA, course_titles=COURSES).eligible
     other = eligibility.check(spec(restricted=True, institutions=[11]), ASHA, course_titles=COURSES)
@@ -133,4 +179,4 @@ def test_no_personal_attribute_can_change_a_score():
         certificate_course_ids=ASHA.certificate_course_ids, scores=ASHA.scores, education=ASHA.education, location=ASHA.location, target_roles=ASHA.target_roles,
     )
     assert rate(ASHA).score == rate(twin).score
-    assert {f for f in Candidate.__slots__} == {"user_id", "organization_id", "skills", "technologies", "job_titles", "experience_months", "graduation_year", "certificate_course_ids", "scores", "education", "location", "target_roles", "headline"}
+    assert {f for f in Candidate.__slots__} == {"user_id", "organization_id", "skills", "technologies", "job_titles", "experience_months", "graduation_year", "certificate_course_ids", "scores", "education", "location", "target_roles", "headline", "cgpa", "branch"}

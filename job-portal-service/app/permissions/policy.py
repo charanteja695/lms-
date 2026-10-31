@@ -58,7 +58,7 @@ def is_institution_head(auth: AccessTokenClaims) -> bool:
 
 
 def can_manage_careers(auth: AccessTokenClaims) -> bool:
-    return auth.can(Scope.CAREERS_MANAGE.value)
+    return auth.can(Scope.CAREERS_MANAGE.value) or auth.role in (Role.SUPER_ADMIN, Role.ADMIN)
 
 
 def owns_employer(auth: AccessTokenClaims, employer_org_id: int) -> bool:

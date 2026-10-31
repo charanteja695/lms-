@@ -56,17 +56,65 @@ class DriveService:
             },
         )
 
-    async def propose(self, auth: AccessTokenClaims, employer_org_id: int, *, title: str, description: str | None, drive_date: date | None) -> PlacementDrive:
+    async def propose(
+        self,
+        auth: AccessTokenClaims,
+        employer_org_id: int,
+        *,
+        title: str,
+        description: str | None,
+        drive_date: date | None,
+        institution_org_id: int | None = None,
+        status: str | None = None,
+        job_ids: list[str] | None = None,
+        deadline_date: date | None = None,
+    ) -> PlacementDrive:
         employer = (await self.db.execute(select(EmployerProfile).where(EmployerProfile.organization_id == employer_org_id))).scalar_one_or_none()
         org = await self.db.get(OrgRef, employer_org_id)
         if employer is None or employer.status != EmployerStatus.VERIFIED or org is None or org.org_type != "employer":
             raise ValidationFailedError(details=[{"field": "employer_id", "code": "UNKNOWN_EMPLOYER", "message": "Invite a verified company"}])
+
+        inst_id = institution_org_id or auth.organization_id or 0
+        if not inst_id:
+            first_inst = (await self.db.execute(select(OrgRef).where(OrgRef.org_type == "institution"))).scalars().first()
+            if first_inst:
+                inst_id = first_inst.id
+
+        drive_status = DriveStatus.PROPOSED
+        if status:
+            val = status.lower().strip()
+            if val in [s.value for s in DriveStatus]:
+                drive_status = DriveStatus(val)
+
+        full_desc = description or ""
+        if deadline_date:
+            prefix = f"Registration Deadline: {deadline_date}"
+            full_desc = f"{prefix}\n\n{full_desc}" if full_desc else prefix
+
         drive = PlacementDrive(
-            public_id=new_public_id(), organization_id=auth.organization_id or 0, employer_org_id=employer_org_id, title=title, description=description, drive_date=drive_date,
-            status=DriveStatus.PROPOSED, created_by=auth.user_id,
+            public_id=new_public_id(),
+            organization_id=inst_id,
+            employer_org_id=employer_org_id,
+            title=title,
+            description=full_desc or None,
+            drive_date=drive_date,
+            status=drive_status,
+            created_by=auth.user_id,
         )
         self.db.add(drive)
         await self.db.flush()
+
+        if job_ids:
+            for j_val in job_ids:
+                try:
+                    job = (await self.db.execute(select(Job).where(Job.public_id == int(j_val), Job.employer_org_id == employer_org_id))).scalar_one_or_none()
+                    if job:
+                        job.drive_id = drive.public_id
+                        await self.jobs._set_institutions(job, [drive.organization_id])
+                        job.revision += 1
+                except (ValueError, TypeError):
+                    pass
+
         self._event("placement_drive.proposed", drive)
         await self.db.commit()
         return drive

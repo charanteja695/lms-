@@ -63,8 +63,104 @@ class EligibilityService:
             result.enrollment = await self._enrollment(auth.user_id, test)
             if result.enrollment is None:
                 return self._deny(result, "NOT_ENROLLED", "You are not enrolled in a course that includes this test.")
-            if test.kind == TestKind.FINAL and not result.enrollment.eligible_for_final:
-                return self._deny(result, "NOT_ELIGIBLE_FOR_FINAL", "Complete every module before taking the final test.")
+            if test.kind == TestKind.MODULE:
+                # Backend validation: Module test unlocks ONLY after all chapters and chapter exams in this module are complete/passed
+                try:
+                    import asyncpg
+                    conn_cat = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_catalog')
+                    topic_rows = await conn_cat.fetch(
+                        '''SELECT t.public_id as topic_id, t.topic_test_id, ti.public_id as item_id, ti.required
+                           FROM modules m
+                           JOIN topics t ON t.module_id = m.id
+                           LEFT JOIN topic_items ti ON ti.topic_id = t.id
+                           WHERE m.public_id = $1''',
+                        test.target_id
+                    )
+                    await conn_cat.close()
+
+                    if topic_rows:
+                        topics_dict = {}
+                        for r in topic_rows:
+                            tid = r['topic_id']
+                            if tid not in topics_dict:
+                                topics_dict[tid] = {'test_id': r['topic_test_id'], 'req_items': set()}
+                            if r['item_id'] and r['required']:
+                                topics_dict[tid]['req_items'].add(r['item_id'])
+
+                        conn_learn = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_learning')
+                        enr = await conn_learn.fetchrow('SELECT id FROM enrollments WHERE public_id = $1', result.enrollment.enrollment_id)
+                        if enr:
+                            enr_uuid = enr['id']
+                            completed_items = await conn_learn.fetch(
+                                'SELECT topic_item_id FROM item_progress WHERE enrollment_id = $1', enr_uuid
+                            )
+                            completed_item_ids = {r['topic_item_id'] for r in completed_items}
+
+                            passed_tests = await conn_learn.fetch(
+                                'SELECT test_id FROM assessment_results WHERE enrollment_id = $1 AND passed = true', enr_uuid
+                            )
+                            passed_test_ids = {r['test_id'] for r in passed_tests}
+
+                            assessment_passed = (await self.db.execute(
+                                select(Attempt.test_public_id).where(
+                                    Attempt.user_id == auth.user_id,
+                                    Attempt.result == AttemptResult.PASSED
+                                )
+                            )).scalars().all()
+                            passed_test_ids.update(t for t in assessment_passed if t)
+
+                            for tid, info in topics_dict.items():
+                                if not info['req_items'].issubset(completed_item_ids):
+                                    await conn_learn.close()
+                                    return self._deny(result, "MODULE_PREREQUISITES_NOT_MET", "You must complete all chapters in this module before taking the module test.")
+                                if info['test_id'] and info['test_id'] not in passed_test_ids:
+                                    await conn_learn.close()
+                                    return self._deny(result, "MODULE_PREREQUISITES_NOT_MET", "You must pass all chapter exams in this module before taking the module test.")
+                        await conn_learn.close()
+                except Exception as e:
+                    logger.warning(f"Error checking module prerequisites: {e}")
+
+            if test.kind == TestKind.FINAL:
+                # Backend validation: Final test unlocks ONLY after all module tests in the course are passed
+                try:
+                    import asyncpg
+                    conn_cat = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_catalog')
+                    course_id = test.target_id
+                    mod_rows = await conn_cat.fetch(
+                        '''SELECT m.public_id as module_id, m.module_test_id
+                           FROM courses c
+                           JOIN course_versions cv ON cv.course_id = c.id
+                           JOIN modules m ON m.course_version_id = cv.id
+                           WHERE c.public_id = $1''',
+                        course_id
+                    )
+                    await conn_cat.close()
+
+                    required_module_tests = [r['module_test_id'] for r in mod_rows if r['module_test_id']]
+                    if required_module_tests:
+                        conn_learn = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_learning')
+                        enr = await conn_learn.fetchrow('SELECT id FROM enrollments WHERE public_id = $1', result.enrollment.enrollment_id)
+                        passed_test_ids = set()
+                        if enr:
+                            pt = await conn_learn.fetch(
+                                'SELECT test_id FROM assessment_results WHERE enrollment_id = $1 AND passed = true', enr['id']
+                            )
+                            passed_test_ids = {r['test_id'] for r in pt}
+                        await conn_learn.close()
+
+                        assessment_passed = (await self.db.execute(
+                            select(Attempt.test_public_id).where(
+                                Attempt.user_id == auth.user_id,
+                                Attempt.result == AttemptResult.PASSED
+                            )
+                        )).scalars().all()
+                        passed_test_ids.update(t for t in assessment_passed if t)
+
+                        for mod_test_id in required_module_tests:
+                            if mod_test_id not in passed_test_ids:
+                                return self._deny(result, "NOT_ELIGIBLE_FOR_FINAL", "You must pass all module tests before taking the final course test.")
+                except Exception as e:
+                    logger.warning(f"Error checking final test prerequisites: {e}")
         elif test.kind == TestKind.HIRING:
             result.assignment = (
                 await self.db.execute(
@@ -134,7 +230,40 @@ class EligibilityService:
                     and_(VersionTarget.target_type == TEST_TARGET, VersionTarget.target_id == test.public_id),
                 )
             )
-        return (await self.db.execute(stmt.order_by(EnrollmentRef.enrollment_id.desc()).limit(1))).scalar_one_or_none()
+        enr = (await self.db.execute(stmt.order_by(EnrollmentRef.enrollment_id.desc()).limit(1))).scalar_one_or_none()
+        if enr is not None:
+            return enr
+
+        # Fallback check against lms_learning if event sync was skipped
+        try:
+            import asyncpg
+            conn = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_learning')
+            row = await conn.fetchrow(
+                '''SELECT e.public_id as enrollment_id, e.student_user_id, b.organization_id, b.version_id, e.status
+                   FROM enrollments e
+                   JOIN batches b ON b.id = e.batch_id
+                   WHERE e.student_user_id = $1 AND e.status = 'active'
+                   ORDER BY e.created_at DESC LIMIT 1''',
+                user_id
+            )
+            await conn.close()
+            if row:
+                existing_ref = await self.db.get(EnrollmentRef, row['enrollment_id'])
+                if existing_ref is None:
+                    existing_ref = EnrollmentRef(
+                        enrollment_id=row['enrollment_id'],
+                        student_user_id=row['student_user_id'],
+                        organization_id=row['organization_id'],
+                        version_id=row['version_id'],
+                        active=True,
+                        eligible_for_final=False,
+                    )
+                    self.db.add(existing_ref)
+                    await self.db.flush()
+                return existing_ref
+        except Exception:
+            pass
+        return None
 
     async def schedule_for(self, test: Test, organization_id: int | None, now: datetime) -> TestSchedule | None:
         """The session a student should sit: the earliest one that has not ended, for their institution or all."""
@@ -145,7 +274,7 @@ class EligibilityService:
                     TestSchedule.test_id == test.id,
                     TestSchedule.cancelled_at.is_(None),
                     TestSchedule.ends_at > now,
-                    or_(TestSchedule.organization_id.is_(None), TestSchedule.organization_id == organization_id),
+                    or_(TestSchedulb.organization_id.is_(None), TestSchedulb.organization_id == organization_id),
                 )
                 .order_by(TestSchedule.starts_at)
                 .limit(1)

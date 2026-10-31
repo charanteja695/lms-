@@ -194,9 +194,17 @@ def _ordering(body: dict[str, Any], key: dict[str, Any], problems: _Problems) ->
 
 
 def _judged(body: dict[str, Any], key: dict[str, Any], problems: _Problems) -> tuple[dict[str, Any], dict[str, Any]]:
+    sync_status = body.get("sync_status") or body.get("status")
     problem_id = body.get("problem_id")
-    if not isinstance(problem_id, str) or parse_public_id(problem_id) is None:
-        problems.add("body.problem_id", "INVALID_ID", "Must be the code-execution-service problem id (a numeric string)")
+    if problem_id is not None and isinstance(problem_id, str) and not problem_id.strip():
+        problem_id = None
+    if sync_status == "not_synced":
+        if problem_id is not None:
+            if not isinstance(problem_id, str) or parse_public_id(problem_id) is None:
+                problems.add("body.problem_id", "INVALID_ID", "Must be the code-execution-service problem id (a numeric string)")
+    else:
+        if not isinstance(problem_id, str) or parse_public_id(problem_id) is None:
+            problems.add("body.problem_id", "INVALID_ID", "Must be the code-execution-service problem id (a numeric string)")
     languages = body.get("languages")
     normalised: list[str] | None = None
     if languages is not None:
@@ -205,7 +213,12 @@ def _judged(body: dict[str, Any], key: dict[str, Any], problems: _Problems) -> t
         else:
             normalised = sorted(set(languages))
     scoring = _scoring(key, problems, allowed=("all_or_nothing", "partial"), default="partial")
-    return {"problem_id": problem_id, "languages": normalised}, {"scoring": scoring}
+    out_body: dict[str, Any] = {"problem_id": problem_id, "languages": normalised}
+    if sync_status == "not_synced":
+        out_body["sync_status"] = "not_synced"
+        if "sync_error" in body and body["sync_error"] is not None:
+            out_body["sync_error"] = str(body["sync_error"])
+    return out_body, {"scoring": scoring}
 
 
 def _subjective(body: dict[str, Any], key: dict[str, Any], problems: _Problems) -> tuple[dict[str, Any], dict[str, Any]]:

@@ -118,6 +118,7 @@ class PreparedUser:
     institution: Institution | None
     password: str | None
     password_generated: bool = False
+    setup_token: str | None = None
 
 
 @dataclass
@@ -335,6 +336,7 @@ class UserService:
             await self.db.rollback()
             raise ConflictError("Some details are already used by another record.") from exc
         await commit_or_conflict(self.db, "Some details are already used by another record.")
+        prepared.setup_token = setup_token
         self.notify_created(prepared.user, setup_token)
         return await self.users.get_detailed(prepared.user.id), prepared
 
@@ -431,8 +433,8 @@ class UserService:
                 username=user.username,
                 field="account.password",
             )
-        elif user.email is None:
-            # No email to send a set-up link to: generate a temporary password, shown once to the creator.
+        elif user.email is None or getattr(data.account, "generate_password", False):
+            # No email to send a set-up link to or auto-generation requested: generate a temporary password.
             password, generated = generate_temporary_password(self.settings.PASSWORD_MIN_LENGTH), True
         if reserved is not None:
             reserved.claim(user)

@@ -44,6 +44,10 @@ class Candidate:
     location: str | None = None
     target_roles: tuple[str, ...] = ()
     headline: str | None = None
+    cgpa: float | None = None
+    branch: str | None = None
+    degrees: tuple[str, ...] = ()
+    backlogs: int | None = None
 
     @property
     def text(self) -> str:

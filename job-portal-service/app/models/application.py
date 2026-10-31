@@ -51,6 +51,7 @@ class Application(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     hr_interview_at: Mapped[datetime | None]
     hr_interview_note: Mapped[str | None] = mapped_column(String(500))
     decision_reason: Mapped[str | None] = mapped_column(String(500))  # why it was rejected / withdrawn
+    answers: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
 
     __table_args__ = (
         UniqueConstraint("job_id", "user_id", name="uq_applications_job_user"),

@@ -2,6 +2,7 @@
 
     python -m app.cli create-super-admin --email ... --username ... --first-name ... --last-name ...
     python -m app.cli purge-expired
+    python -m app.cli seed-demo-accounts
 
 The password is read from the SUPER_ADMIN_PASSWORD environment variable or prompted for.
 Super admins can only be created here, never through the HTTP API.
@@ -104,6 +105,10 @@ def main() -> int:
     purge = commands.add_parser("purge-expired", help="Delete expired sessions, tokens and old outbox events")
     purge.add_argument("--batch-size", type=int, default=5_000)
 
+    seed_demo = commands.add_parser("seed-demo-accounts", help="Seed 15 demo accounts across all 5 roles")
+    seed_demo.add_argument("--force", action="store_true", help="Force execution even in production-like environments")
+    seed_demo.add_argument("--output", type=str, default=None, help="Path to save credentials json")
+
     args = parser.parse_args()
     if args.command == "create-super-admin":
         return asyncio.run(create_super_admin(args))
@@ -111,6 +116,12 @@ def main() -> int:
         totals = asyncio.run(purge_expired(get_settings(), batch_size=args.batch_size))
         for table, count in totals.items():
             print(f"{table}: {count} deleted")
+        return 0
+    if args.command == "seed-demo-accounts":
+        from scripts.seed_demo_accounts import print_summary, seed_demo_accounts
+
+        report = asyncio.run(seed_demo_accounts(force=args.force, output_file=args.output))
+        print_summary(report)
         return 0
     return 1
 
