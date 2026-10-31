@@ -185,7 +185,7 @@ class EligibilityOut(ResponseSchema):
     reasons: list[str]
 
 
-class JobOut(ResponseSchema):
+class StudentJobOut(ResponseSchema):
     job_id: PublicIdOut
     employer_id: PublicIdOut
     company_name: str | None = None
@@ -213,9 +213,6 @@ class JobOut(ResponseSchema):
     status: str
     published_at: Timestamp | None
     created_at: Timestamp
-    job_details: dict[str, Any] = Field(default_factory=dict)
-    hiring_process: list[dict[str, Any]] = Field(default_factory=list)
-    application_config: dict[str, Any] = Field(default_factory=dict)
     banner_text: str | None = None
     banner_type: str | None = Field(default="info", description="info or warning")
     experience_level: str | None = Field(default=None, description="fresher, junior, mid, senior, lead")
@@ -228,10 +225,25 @@ class JobOut(ResponseSchema):
     perks: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def _fallback_about_job(self) -> "JobOut":
+    def _fallback_about_job(self) -> "StudentJobOut":
         if not self.about_job and self.description:
             self.about_job = self.description
         return self
+
+
+class CandidateJobOut(StudentJobOut):
+    """A job as a student sees it: with whether they may apply and why not, and their match. Excludes hiring process roadmap and pipeline stages."""
+
+    eligibility_result: EligibilityOut | None = None
+    match: MatchOut | None = None
+    applied: bool = False
+    application_id: PublicIdOut | None = None
+
+
+class JobOut(StudentJobOut):
+    job_details: dict[str, Any] = Field(default_factory=dict)
+    hiring_process: list[dict[str, Any]] = Field(default_factory=list)
+    application_config: dict[str, Any] = Field(default_factory=dict)
 
 
 class EmployerJobOut(JobOut):
@@ -246,16 +258,6 @@ class EmployerJobOut(JobOut):
     applications: int = 0
     placed: int = 0
     created_by: PublicIdOut | None = None
-
-
-class CandidateJobOut(JobOut):
-    """A job as a student sees it: with whether they may apply and why not, and their match."""
-
-    eligibility_result: EligibilityOut | None = None
-    match: MatchOut | None = None
-    applied: bool = False
-    application_id: PublicIdOut | None = None
-    steps: list[dict[str, str]] = Field(default_factory=list, description="The hiring steps this job uses, in order ({key, label})")
 
 
 class EmployerJobResponse(SuccessResponse):

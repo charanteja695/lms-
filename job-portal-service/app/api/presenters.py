@@ -55,9 +55,6 @@ def _base(job: Job, company_name: str | None, company_website: str | None = None
         "stipend_per_month": job.stipend_per_month, "duration_months": job.duration_months,
         "currency": job.currency, "required_skills": list(job.required_skills or []), "preferred_skills": list(job.preferred_skills or []), "openings": job.openings,
         "deadline_at": job.deadline_at, "visibility": job.visibility, "drive_id": job.drive_id, "status": job.status, "published_at": job.published_at, "created_at": job.created_at,
-        "job_details": dict(job.job_details or {}),
-        "hiring_process": list(job.hiring_process or []),
-        "application_config": dict(job.application_config or {}),
         "banner_text": job.banner_text,
         "banner_type": job.banner_type or "info",
         "experience_level": job.experience_level,
@@ -79,8 +76,19 @@ def _job_steps(job: Job) -> list[dict[str, str]]:
 
 def employer_job_out(job: Job, company_name: str | None, *, institution_ids: list[int], applications: int = 0, placed: int = 0, company_website: str | None = None, company_about: str | None = None) -> EmployerJobOut:
     return EmployerJobOut(
-        **_base(job, company_name, company_website, company_about), eligibility={**(job.eligibility or {}), "institution_ids": [str(i) for i in institution_ids]}, institution_ids=[str(i) for i in institution_ids],
-        pipeline=dict(job.pipeline or {}), steps=_job_steps(job), review_note=job.review_note, closed_reason=job.closed_reason, applications=applications, placed=placed, created_by=job.created_by,
+        **_base(job, company_name, company_website, company_about),
+        job_details=dict(job.job_details or {}),
+        hiring_process=list(job.hiring_process or []),
+        application_config=dict(job.application_config or {}),
+        eligibility={**(job.eligibility or {}), "institution_ids": [str(i) for i in institution_ids]},
+        institution_ids=[str(i) for i in institution_ids],
+        pipeline=dict(job.pipeline or {}),
+        steps=_job_steps(job),
+        review_note=job.review_note,
+        closed_reason=job.closed_reason,
+        applications=applications,
+        placed=placed,
+        created_by=job.created_by,
     )
 
 
@@ -92,7 +100,8 @@ def candidate_job_out(
         **_base(job, company_name, company_website, company_about),
         eligibility_result=EligibilityOut(eligible=eligible, reasons=reasons or []) if eligible is not None else None,
         match=MatchOut(score=match[0], explanation=match[1], breakdown=match[2], method=match[3]) if match else None,
-        applied=application_id is not None, application_id=application_id, steps=_job_steps(job),
+        applied=application_id is not None,
+        application_id=application_id,
     )
 
 
@@ -124,13 +133,15 @@ def my_application_out(
     if stopped_from is None and history:
         stopped_from = history[-1].from_status
     steps = pipeline_progress.progress(status, template_of(job), stopped_from=ApplicationStatus(stopped_from) if stopped_from else None)
+    # Hide future roadmap stages from the student's progress view
+    visible_steps = [s for s in steps if s.get("state") != "upcoming"]
     action = pipeline_progress.next_action(
         status, assessment_invite_state=application.assessment_invite_state, offer_status=offer.status if offer else None, offer_expires_at=offer.expires_at if offer else None
     )
     return MyApplicationOut(
         application_id=application.public_id, job_id=job.public_id, job_title=job.title, company_name=company_name, status=application.status,
         match_score=application.match_score, match_explanation=application.match_explanation, resume_version_no=application.resume_version_no, assessment=_assessment(application),
-        offer=offer_out(offer), history=[stage_out(s) for s in history or []], progress=steps, next_action=action.as_dict() if action else None,
+        offer=offer_out(offer), history=[stage_out(s) for s in history or []], progress=visible_steps, next_action=action.as_dict() if action else None,
         applied_at=application.created_at, status_changed_at=application.status_changed_at,
     )
 
