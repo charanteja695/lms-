@@ -264,6 +264,92 @@ async def upload_document(
     }
 
 
+@router.post(
+    "/images",
+    response_model=dict[str, Any],
+    status_code=201,
+    summary="Direct upload for course thumbnails and images",
+    description="Uploads thumbnail image via multipart/form-data (PNG, JPG, WebP, max 5 MB).",
+    responses=errors(400, 401, 403, 422),
+)
+async def upload_image(
+    auth: RequireAuthor,
+    db: DbSession,
+    settings: SettingsDep,
+    file: UploadFile = File(...),
+    course_id: Annotated[str | None, Form()] = None,
+) -> dict[str, Any]:
+    filename = file.filename or "thumbnail.jpg"
+    lower_name = filename.lower()
+    valid_exts = (".png", ".jpg", ".jpeg", ".webp")
+    if not (any(lower_name.endswith(ext) for ext in valid_exts) or (file.content_type and file.content_type.startswith("image/"))):
+        raise BadRequestError("Only image files (.png, .jpg, .jpeg, .webp) up to 5 MB are allowed.", code="INVALID_IMAGE_FORMAT")
+
+    storage_dir = Path(settings.STORAGE_LOCAL_DIR) / "images"
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    asset_public_id = new_public_id()
+    safe_name = "".join(c for c in filename if c.isalnum() or c in " ._-")[:100] or "thumbnail.jpg"
+    temp_target = storage_dir / f"{asset_public_id}_{safe_name}"
+
+    total_bytes = 0
+    chunk_size = 512 * 1024
+    with open(temp_target, "wb") as out_f:
+        while True:
+            chunk = await file.read(chunk_size)
+            if not chunk:
+                break
+            total_bytes += len(chunk)
+            if total_bytes > 5 * 1024 * 1024:
+                out_f.close()
+                temp_target.unlink(missing_ok=True)
+                raise BadRequestError("Image exceeds 5 MB limit.", code="FILE_TOO_LARGE")
+            out_f.write(chunk)
+
+    playback_url = f"/api/v1/media/stream/{asset_public_id}"
+    resolved_context_id = int(course_id) if course_id and course_id.isdigit() else None
+
+    asset = MediaAsset(
+        public_id=asset_public_id,
+        kind=AssetKind.IMAGE,
+        original_filename=filename,
+        content_type=file.content_type or "image/jpeg",
+        byte_size=total_bytes,
+        storage_key=playback_url,
+        status=AssetStatus.READY,
+        duration_seconds=0,
+        context_type="course_thumbnail",
+        context_id=resolved_context_id,
+        created_by=auth.user_id,
+    )
+    db.add(asset)
+    await db.flush()
+
+    rendition = Rendition(
+        media_asset_id=asset.id,
+        label="source",
+        storage_key=playback_url,
+        byte_size=total_bytes,
+    )
+    db.add(rendition)
+    await commit_or_conflict(db)
+
+    return {
+        "message": "Thumbnail uploaded successfully.",
+        "asset": {
+            "asset_id": str(asset.public_id),
+            "kind": "image",
+            "status": "ready",
+            "original_filename": asset.original_filename,
+            "byte_size": asset.byte_size,
+            "playback_url": asset.storage_key,
+            "public_id": str(asset.public_id),
+            "duration_seconds": 0,
+        },
+        "url": asset.storage_key,
+        "public_id": str(asset.public_id),
+    }
+
+
 @router.get(
     "/stream/{asset_id}",
     summary="Stream video with HTTP Range support",
@@ -278,10 +364,17 @@ async def stream_media(asset_id: AssetIdParam, db: DbSession, settings: Settings
     if asset.storage_key.startswith("http://") or asset.storage_key.startswith("https://"):
         return RedirectResponse(asset.storage_key, status_code=307)
 
-    storage_dir = Path(settings.STORAGE_LOCAL_DIR) / "videos"
+    subfolder = "images" if asset.kind == AssetKind.IMAGE else ("documents" if asset.kind == AssetKind.DOCUMENT else "videos")
+    storage_dir = Path(settings.STORAGE_LOCAL_DIR) / subfolder
     matching = list(storage_dir.glob(f"{asset.public_id}_*"))
     if not matching or not matching[0].exists():
-        raise NotFoundError("Video file not found on disk.", code="FILE_NOT_FOUND")
+        for alt in ("images", "documents", "videos"):
+            alt_m = list((Path(settings.STORAGE_LOCAL_DIR) / alt).glob(f"{asset.public_id}_*"))
+            if alt_m and alt_m[0].exists():
+                matching = alt_m
+                break
+    if not matching or not matching[0].exists():
+        raise NotFoundError("Media file not found on disk.", code="FILE_NOT_FOUND")
 
     file_path = matching[0]
     file_size = file_path.stat().st_size
