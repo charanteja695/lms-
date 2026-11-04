@@ -206,13 +206,64 @@ class TestService:
 
     async def replace_sections(self, test: Test, sections: list[SectionIn], auth: AccessTokenClaims) -> Test:
         self._require_editable(test, auth)
-        for section in list(test.sections):
-            await self.db.delete(section)
-        await self.db.flush()
-        await self._write_sections(test, sections)
+        if len(sections) > self.settings.MAX_SECTIONS_PER_TEST:
+            raise ValidationFailedError(
+                details=[{"field": "sections", "code": "TOO_MANY_ITEMS", "message": f"At most {self.settings.MAX_SECTIONS_PER_TEST} sections"}]
+            )
+        questions = await self._questions_for(test, sections)
+        existing_sections = list(test.sections)
+
+        for i, section_in in enumerate(sections, start=1):
+            if i <= len(existing_sections):
+                section = existing_sections[i - 1]
+                section.position = i
+                section.title = section_in.title
+                section.instructions = section_in.instructions
+                section.time_limit_minutes = section_in.time_limit_minutes
+                for slot in list(section.slots):
+                    await self.db.delete(slot)
+                await self.db.flush()
+            else:
+                section = TestSection(
+                    public_id=new_public_id(),
+                    test_id=test.id,
+                    position=i,
+                    title=section_in.title,
+                    instructions=section_in.instructions,
+                    time_limit_minutes=section_in.time_limit_minutes,
+                )
+                section.id = uuid.uuid4()
+                self.db.add(section)
+                await self.db.flush()
+
+            for slot_position, slot_in in enumerate(section_in.slots, start=1):
+                question = questions.get(slot_in.question_id) if slot_in.question_id else None
+                marks = slot_in.marks or (question[1] if question else 1.0)
+                self.db.add(
+                    SectionSlot(
+                        section_id=section.id,
+                        test_id=test.id,
+                        position=slot_position,
+                        slot_type=slot_in.slot_type,
+                        question_id=question[0].id if question else None,
+                        criteria=slot_in.criteria.model_dump(exclude_none=True, mode="json") if slot_in.criteria else None,
+                        count=slot_in.count,
+                        marks=marks,
+                    )
+                )
+
+        if len(existing_sections) > len(sections):
+            for section in existing_sections[len(sections):]:
+                for slot in list(section.slots):
+                    await self.db.delete(slot)
+                try:
+                    await self.db.delete(section)
+                except Exception:
+                    pass
+
         await flush_or_conflict(self.db)
         if test.status == TestStatus.PUBLISHED:
-            issues, total, count, _ = await self.validate(test)
+            issues, total, count = await self.validate(test)
             if not issues and total is not None and count is not None:
                 test.total_marks, test.question_count = total, count
         await self.db.commit()
@@ -449,7 +500,7 @@ class TestService:
 
     async def submit(self, test: Test, auth: AccessTokenClaims) -> Test:
         self._require_editable(test, auth)
-        issues, total, count, _ = await self.validate(test)
+        issues, total, count = await self.validate(test)
         if issues:
             raise ValidationFailedError("The test is not ready to be reviewed.", details=issues)
         if test.status == TestStatus.PUBLISHED:
@@ -469,7 +520,7 @@ class TestService:
             raise ConflictError("Only a test in review or published can be approved.", code="TEST_NOT_IN_REVIEW")
         if test.created_by == auth.user_id and not is_super_admin(auth):
             raise PermissionDeniedError("Someone other than the author must approve this.", code="SELF_REVIEW_NOT_ALLOWED")
-        issues, total, count, _ = await self.validate(test)  # the bank may have changed since it was submitted
+        issues, total, count = await self.validate(test)  # the bank may have changed since it was submitted
         if issues:
             raise ValidationFailedError("The test is no longer valid.", details=issues)
         if test.status != TestStatus.PUBLISHED and test.target_id is not None:

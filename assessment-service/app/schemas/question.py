@@ -1,7 +1,7 @@
 from typing import Any
 
 from lms_common.envelopes import PageContext, RequestSchema, ResponseSchema, SuccessResponse
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.domain.enums import Bloom, QuestionType
 from app.schemas.types import PublicIdOut, Timestamp, multiline_text, text
@@ -26,6 +26,13 @@ class QuestionCreate(RequestSchema):
     topics: list[Tag] = Field(default_factory=list, max_length=20)  # type: ignore[valid-type]
     tags: list[Tag] = Field(default_factory=list, max_length=20)  # type: ignore[valid-type]
 
+    @field_validator("explanation", mode="before")
+    @classmethod
+    def _clean_empty_explanation(cls, v: Any) -> Any:
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
 
 class QuestionUpdate(RequestSchema):
     """Edits the working draft; on a published question the first edit opens a new draft version."""
@@ -40,6 +47,13 @@ class QuestionUpdate(RequestSchema):
     skills: list[Tag] | None = Field(default=None, max_length=20)  # type: ignore[valid-type]
     topics: list[Tag] | None = Field(default=None, max_length=20)  # type: ignore[valid-type]
     tags: list[Tag] | None = Field(default=None, max_length=20)  # type: ignore[valid-type]
+
+    @field_validator("explanation", mode="before")
+    @classmethod
+    def _clean_empty_explanation(cls, v: Any) -> Any:
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
 
 class ReviewNote(RequestSchema):

@@ -198,3 +198,29 @@ async def media_access(auth: RequireExamManager, db: DbSession, page: int = Quer
         page_context=PageContext.build(page=page, per_page=per_page, total=len(rows), is_exact=False, sort_column="created_time", sort_order=SortOrder.DESC),
     )
 
+
+
+from typing import Any
+from app.schemas.proctoring import IncidentReviewIn
+from app.services.detection_service import DetectionService
+
+
+@router.post(
+    "/cases/{case_id}/incidents/{incident_id}/review",
+    summary="Review an AI detected incident (Confirmed, False Positive, Needs Review)",
+    responses=errors(*AUTHENTICATED, 404),
+)
+async def review_incident(
+    case_id: CaseIdParam,
+    incident_id: str,
+    data: IncidentReviewIn,
+    auth: CurrentAuth,
+    db: DbSession,
+    settings: SettingsDep,
+) -> dict[str, Any]:
+    case = await CaseService(db, settings).get_for_reviewer(case_id, auth)
+    session = (await db.execute(select(ProctorSession).where(ProctorSession.id == case.session_id))).scalar_one()
+    updated = DetectionService.get_instance().update_incident_status(
+        str(session.public_id), incident_id, data.review_status, data.reviewer_note
+    )
+    return {"message": "Incident review status updated.", "updated": updated, "review_status": data.review_status}

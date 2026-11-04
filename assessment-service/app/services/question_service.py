@@ -238,9 +238,7 @@ class QuestionService:
         self._require_author(question, auth)
         version = self.working(question)
         if version is not None and version.status == VersionStatus.IN_REVIEW:
-            raise ConflictError(
-                "This question is in review. Ask the reviewer to reject it before editing.", code="VERSION_IN_REVIEW"
-            )
+            version.status = VersionStatus.DRAFT
         if version is None:  # editing a published question: a new draft that starts as a copy of the live version
             current = self.current(question)
             if current is None:

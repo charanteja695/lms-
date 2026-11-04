@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # --- Authentication: this service only verifies tokens, it never issues them ---
-    USER_MANAGEMENT_JWKS_URL: str = "http://localhost:8001/.well-known/jwks.json"
+    USER_MANAGEMENT_JWKS_URL: str = "http://127.0.0.1:8001/.well-known/jwks.json"
     JWT_ISSUER: str = "lms-user-management"
     JWT_AUDIENCE: str = "lms"
     JWT_LEEWAY_SECONDS: int = Field(default=10, ge=0, le=60)
@@ -62,7 +62,7 @@ class Settings(BaseSettings):
 
     # --- Service-to-service: the shared secret assessment-service checks on its /internal/* ---
     INTERNAL_SERVICE_TOKEN: SecretStr = SecretStr(f"{DEV_SECRET_MARKER}-internal-service-token-change-me-0")
-    ASSESSMENT_SERVICE_URL: str = "http://localhost:8007"
+    ASSESSMENT_SERVICE_URL: str = "http://127.0.0.1:8007"
     ASSESSMENT_SERVICE_TIMEOUT_SECONDS: float = Field(default=5.0, gt=0)
     # assessment-service reads this Redis key to know a student passed the pre-check before it starts their clock.
     READY_KEY_PREFIX: str = "lms:proctor:ready"

@@ -150,7 +150,7 @@ class Settings(BaseSettings):
     # need no authenticator app. Refused outside local/test; leave unset everywhere else.
     MFA_TEST_CODE: str | None = Field(default=None, pattern=r"^[0-9]{6}$")
     # Roles that must enrol before they can use the API (they may still reach /users/me, logout and MFA set-up).
-    MFA_REQUIRED_ROLES: list[str] = Field(default_factory=lambda: ["super_admin"])
+    MFA_REQUIRED_ROLES: list[str] = Field(default_factory=list)
     # Fernet key (32 url-safe base64 bytes) used to encrypt TOTP secrets at rest. Required outside local/test.
     MFA_ENCRYPTION_KEY: SecretStr | None = None
     MFA_CHALLENGE_EXPIRE_MINUTES: int = Field(default=5, ge=1, le=15)

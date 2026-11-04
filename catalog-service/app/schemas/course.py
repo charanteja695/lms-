@@ -54,3 +54,21 @@ class CourseListQuery(ListQuery):
 class CourseListResponse(SuccessResponse):
     courses: list[CourseOut]
     page_context: PageContext
+
+
+class BulkDeleteRequest(RequestSchema):
+    course_ids: list[str] = Field(default_factory=list)
+    clear_all_active: bool = False
+
+
+class BulkDeleteResponse(SuccessResponse):
+    deleted_count: int
+    affected_courses: list[str] = Field(default_factory=list)
+
+
+class CatalogCleanupSummaryResponse(SuccessResponse):
+    active_courses_count: int
+    published_courses_count: int
+    draft_courses_count: int
+    total_modules_count: int
+    total_chapters_count: int

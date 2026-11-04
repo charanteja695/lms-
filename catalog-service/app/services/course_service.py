@@ -94,3 +94,94 @@ class CourseService:
         from app.core.time import utcnow
         course.archived_at = utcnow()
         await self.db.commit()
+        try:
+            import asyncpg
+            conn = await asyncpg.connect("postgresql://lms:lms@127.0.0.1:5432/lms_subscription")
+            try:
+                await conn.execute(
+                    "UPDATE course_refs SET status = 'retired', updated_at = NOW() WHERE course_id = $1",
+                    course.public_id
+                )
+            finally:
+                await conn.close()
+        except Exception:
+            pass
+
+    async def bulk_delete(self, course_ids: list[int] | None = None, clear_all_active: bool = False) -> tuple[int, list[str]]:
+        from app.core.time import utcnow
+        from sqlalchemy import select
+        stmt = select(Course).where(Course.archived_at.is_(None))
+        if not clear_all_active:
+            if not course_ids:
+                return 0, []
+            stmt = stmt.where(Course.public_id.in_(course_ids))
+
+        result = await self.db.execute(stmt)
+        courses = list(result.scalars().all())
+        if not courses:
+            return 0, []
+
+        now = utcnow()
+        deleted_titles = []
+        public_ids = []
+        for c in courses:
+            c.archived_at = now
+            deleted_titles.append(f"{c.title} ({c.public_id})")
+            public_ids.append(c.public_id)
+
+        await self.db.commit()
+
+        try:
+            import asyncpg
+            conn = await asyncpg.connect("postgresql://lms:lms@127.0.0.1:5432/lms_subscription")
+            try:
+                await conn.execute(
+                    "UPDATE course_refs SET status = 'retired', updated_at = NOW() WHERE course_id = ANY($1::bigint[])",
+                    public_ids
+                )
+            finally:
+                await conn.close()
+        except Exception:
+            pass
+
+        return len(courses), deleted_titles
+
+    async def get_cleanup_summary(self) -> dict[str, int]:
+        from app.models.module import Module
+        from app.models.topic import Topic
+        from sqlalchemy import func, distinct
+
+        active_count = (await self.db.execute(
+            select(func.count(Course.id)).where(Course.archived_at.is_(None))
+        )).scalar() or 0
+
+        published_count = (await self.db.execute(
+            select(func.count(distinct(Course.id)))
+            .join(CourseVersion, CourseVersion.course_id == Course.id)
+            .where(Course.archived_at.is_(None), CourseVersion.status == ContentStatus.PUBLISHED)
+        )).scalar() or 0
+
+        draft_count = active_count - published_count
+
+        modules_count = (await self.db.execute(
+            select(func.count(Module.id))
+            .join(CourseVersion, Module.course_version_id == CourseVersion.id)
+            .join(Course, CourseVersion.course_id == Course.id)
+            .where(Course.archived_at.is_(None))
+        )).scalar() or 0
+
+        chapters_count = (await self.db.execute(
+            select(func.count(Topic.id))
+            .join(Module, Topic.module_id == Module.id)
+            .join(CourseVersion, Module.course_version_id == CourseVersion.id)
+            .join(Course, CourseVersion.course_id == Course.id)
+            .where(Course.archived_at.is_(None))
+        )).scalar() or 0
+
+        return {
+            "active_courses_count": active_count,
+            "published_courses_count": published_count,
+            "draft_courses_count": draft_count,
+            "total_modules_count": modules_count,
+            "total_chapters_count": chapters_count,
+        }

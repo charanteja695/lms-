@@ -300,3 +300,13 @@ class QueueOut(ResponseSchema):
 
 class QueueResponse(SuccessResponse):
     queue: QueueOut
+
+
+class FrameDetectIn(RequestSchema):
+    image_base64: str
+    timestamp: str | None = None
+
+
+class IncidentReviewIn(RequestSchema):
+    review_status: Literal["CONFIRMED", "FALSE_POSITIVE", "NEEDS_REVIEW"]
+    reviewer_note: str | None = None

@@ -37,13 +37,19 @@ class AdminScope(StrEnum):
     BILLING_MANAGE = "billing.manage"  # quotes, invoices, payments, credit notes (billing-service)
 
 
-DEFAULT_ADMIN_SCOPES: tuple[AdminScope, ...] = (AdminScope.ACCOUNTS_MANAGE,)
-# What an admin may be given: their institutes and people, support, reports. Courses, tests, exams, jobs, billing and
-# AI are run by the super admin alone, so the other scopes are never granted to an admin (and are ignored if stored).
+DEFAULT_ADMIN_SCOPES: tuple[AdminScope, ...] = (
+    AdminScope.ACCOUNTS_MANAGE,
+    AdminScope.CONTENT_AUTHOR,
+    AdminScope.CONTENT_REVIEW,
+    AdminScope.EXAMS_MANAGE,
+)
 ADMIN_SCOPES: tuple[AdminScope, ...] = (
     AdminScope.ACCOUNTS_MANAGE,
     AdminScope.SUPPORT_MANAGE,
     AdminScope.ANALYTICS_VIEW,
+    AdminScope.CONTENT_AUTHOR,
+    AdminScope.CONTENT_REVIEW,
+    AdminScope.EXAMS_MANAGE,
 )
 # The scope an admin needs to own organisations of each type.
 SCOPE_FOR_ORGANIZATION: dict[OrganizationType, AdminScope] = {

@@ -121,3 +121,30 @@ async def terminate(session_id: SessionIdParam, data: NoteIn, auth: CurrentAuth,
     await service.terminate(session, data.message, auth)
     return await _detail(service, session, "Attempt terminated.")
 
+
+
+from typing import Any
+from app.services.detection_service import DetectionService, SUPPORTED_CLASSES, UNSUPPORTED_CLASSES
+
+
+@router.get(
+    "/monitor/proctoring/config",
+    summary="Get AI proctoring configuration, class capabilities, and model metadata",
+    responses=errors(*AUTHENTICATED),
+)
+async def get_proctoring_config(auth: CurrentAuth) -> dict[str, Any]:
+    svc = DetectionService.get_instance()
+    return {
+        "thresholds": svc.default_thresholds,
+        "cooldown_seconds": svc.cooldown_seconds,
+        "supported_classes": [
+            {"id": k, "class_name": v[0], "finding_type": v[1], "label": v[2]}
+            for k, v in SUPPORTED_CLASSES.items()
+        ],
+        "unsupported_classes": UNSUPPORTED_CLASSES,
+        "model_metadata": {
+            "object_model": "Ultralytics YOLOv8n (80 COCO classes)",
+            "face_model": "OpenCV YuNet 2023mar (5-point facial landmarks)",
+            "device": "CPU",
+        },
+    }

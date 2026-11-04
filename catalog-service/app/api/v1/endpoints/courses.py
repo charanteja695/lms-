@@ -17,6 +17,9 @@ from app.schemas.course import (
     CourseOut,
     CourseResponse,
     CourseUpdate,
+    BulkDeleteRequest,
+    BulkDeleteResponse,
+    CatalogCleanupSummaryResponse,
 )
 from app.services.course_service import CourseService
 from app.services.outbox import write_event
@@ -58,6 +61,56 @@ async def list_courses(query: Annotated[CourseListQuery, Query()], auth: Current
             sort_column="created_time",
             sort_order=SortOrder(query.sort_order),
         ),
+    )
+
+
+@router.get(
+    "/cleanup-summary",
+    response_model=CatalogCleanupSummaryResponse,
+    summary="Get catalog cleanup statistics",
+    description="Returns metrics on active, published, and draft courses, modules, and chapters. Requires admin or content.author.",
+    responses=errors(401, 403),
+)
+async def get_cleanup_summary(auth: CurrentAuth, db: DbSession) -> CatalogCleanupSummaryResponse:
+    if not (auth.role in ("super_admin", "admin") or auth.can("content.author")):
+        raise PermissionDeniedError()
+    summary = await CourseService(db).get_cleanup_summary()
+    return CatalogCleanupSummaryResponse(
+        message="Catalog cleanup summary retrieved successfully.",
+        **summary
+    )
+
+
+@router.post(
+    "/bulk-delete",
+    response_model=BulkDeleteResponse,
+    summary="Bulk delete or clear active courses",
+    description="Deletes selected courses or clears all active courses. Requires admin or content.author for selected; super_admin for clear_all_active.",
+    responses=errors(401, 403, 422),
+)
+async def bulk_delete_courses(data: BulkDeleteRequest, auth: CurrentAuth, db: DbSession) -> BulkDeleteResponse:
+    if data.clear_all_active:
+        if auth.role != "super_admin":
+            raise PermissionDeniedError("Only Super Admins can clear the entire active course catalog.")
+    else:
+        if not (auth.role in ("super_admin", "admin") or auth.can("content.author")):
+            raise PermissionDeniedError()
+
+    from app.core.ids import parse_public_id
+    parsed_ids = []
+    for cid in data.course_ids:
+        pid = parse_public_id(cid)
+        if pid is not None:
+            parsed_ids.append(pid)
+
+    count, titles = await CourseService(db).bulk_delete(
+        course_ids=parsed_ids if not data.clear_all_active else None,
+        clear_all_active=data.clear_all_active,
+    )
+    return BulkDeleteResponse(
+        message=f"Successfully deleted {count} course{'s' if count != 1 else ''}.",
+        deleted_count=count,
+        affected_courses=titles,
     )
 
 

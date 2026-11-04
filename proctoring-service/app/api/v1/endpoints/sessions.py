@@ -202,3 +202,63 @@ async def appeal_case(case_id: CaseIdParam, data: AppealIn, auth: RequireStudent
     service = CaseService(db, settings)
     case = await service.appeal(await service.get(case_id), auth, data.reason)
     return StudentCaseResponse(message="Your appeal has been recorded.", case=_student_case(case, service))
+
+
+import base64
+from typing import Any
+from app.models.session import Directive
+from app.schemas.proctoring import FrameDetectIn
+from app.services.detection_service import DetectionService
+
+
+@router.post(
+    "/sessions/{session_id}/detect-frame",
+    summary="Real-time AI proctoring detection using YOLOv8n and OpenCV YuNet",
+    description="Processes live camera frame through YOLOv8n (objects) and YuNet (faces), performs quality assessment, and applies consecutive-frame validation and cooldowns.",
+    responses=errors(*AUTHENTICATED, 404, 422),
+)
+async def detect_frame(
+    session_id: SessionIdParam,
+    data: FrameDetectIn,
+    auth: RequireStudent,
+    db: DbSession,
+    settings: SettingsDep,
+    redis: RedisDep,
+) -> dict[str, Any]:
+    session = await SessionService(db, settings, redis).get_owned(session_id, auth.user_id, lock=True)
+    raw_b64 = data.image_base64
+    if "," in raw_b64:
+        raw_b64 = raw_b64.split(",", 1)[1]
+    image_bytes = base64.b64decode(raw_b64)
+    detection_svc = DetectionService.get_instance()
+    result = detection_svc.process_frame(str(session.public_id), image_bytes)
+
+    # If any confirmed violations occurred, record AI findings on session
+    session_svc = SessionService(db, settings, redis)
+    for finding in result.get("findings", []):
+        if finding.get("confirmed") and not finding.get("in_cooldown"):
+            ftype = finding["type"]
+            fconf = finding["confidence"]
+            fdetail = finding.get("detail", {})
+            session_svc.add_finding(session, ftype, fconf, fdetail)
+            # Add a directive so heartbeat syncs the warning
+            db.add(Directive(session_id=session.id, kind="warn", message=finding.get("title", f"AI detected: {ftype}")))
+    await db.commit()
+    return result
+
+
+@router.get(
+    "/sessions/{session_id}/incidents",
+    summary="List AI detected incidents for this session",
+    responses=errors(*AUTHENTICATED, 404),
+)
+async def get_session_incidents(
+    session_id: SessionIdParam,
+    auth: CurrentAuth,
+    db: DbSession,
+    settings: SettingsDep,
+    redis: RedisDep,
+) -> dict[str, Any]:
+    session = await SessionService(db, settings, redis).get_owned(session_id, auth.user_id) if auth.role == "student" else await SessionService(db, settings, redis).get(session_id)
+    incidents = DetectionService.get_instance().get_session_incidents(str(session.public_id))
+    return {"session_id": str(session.public_id), "incidents": incidents}
