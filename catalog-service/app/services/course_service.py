@@ -52,12 +52,31 @@ class CourseService:
             raise NotFoundError("Course not found.", code="COURSE_NOT_FOUND")
         return course
 
-    async def list_courses(self, query: CourseListQuery, *, published_only: bool = False) -> tuple[list[Course], int, bool]:
+    async def list_courses(
+        self,
+        query: CourseListQuery,
+        *,
+        published_only: bool = False,
+        allowed_course_ids: set[int] | None = None,
+        status_filter: str | None = None,
+    ) -> tuple[list[Course], int, bool]:
         stmt = select(Course)
         if not query.include_archived:
             stmt = stmt.where(Course.archived_at.is_(None))
-        if published_only or query.published_only:
+        if status_filter:
+            if status_filter == "published":
+                stmt = stmt.where(Course.versions.any(CourseVersion.status == ContentStatus.PUBLISHED))
+            elif status_filter == "draft":
+                stmt = stmt.where(
+                    ~Course.versions.any(CourseVersion.status == ContentStatus.PUBLISHED)
+                    & Course.versions.any(CourseVersion.status == ContentStatus.DRAFT)
+                )
+            elif status_filter == "archived":
+                stmt = stmt.where(Course.archived_at.is_not(None))
+        elif published_only or query.published_only:
             stmt = stmt.where(Course.versions.any(CourseVersion.status == ContentStatus.PUBLISHED))
+        if allowed_course_ids is not None:
+            stmt = stmt.where(Course.public_id.in_(allowed_course_ids))
         if query.search_text:
             stmt = stmt.where(Course.title.ilike(contains_pattern(query.search_text)))
         stmt = stmt.order_by(Course.created_at.desc() if query.sort_order == "desc" else Course.created_at.asc())

@@ -1,3 +1,4 @@
+from app.services.institution_access import check_student_course_access, get_institutions_with_access_for_courses, get_student_accessible_course_ids
 from app.services.review_service import ReviewService
 from typing import Annotated
 
@@ -48,11 +49,35 @@ async def create_course(data: CourseCreate, auth: RequireAuthor, db: DbSession) 
 )
 async def list_courses(query: Annotated[CourseListQuery, Query()], auth: CurrentAuth, db: DbSession) -> CourseListResponse:
     is_admin = auth.role in ("super_admin", "admin") or auth.can("content.author")
-    published_only = query.published_only or not is_admin
-    courses, total, is_exact = await CourseService(db).list_courses(query, published_only=published_only)
+    is_student = auth.role == "student"
+    
+    allowed_ids = None
+    if is_student:
+        allowed_ids = await get_student_accessible_course_ids(auth.organization_id)
+        published_only = True
+    else:
+        published_only = query.published_only or not is_admin
+
+    courses, total, is_exact = await CourseService(db).list_courses(
+        query,
+        published_only=published_only,
+        allowed_course_ids=allowed_ids,
+    )
+    
+    courses_out = []
+    if courses:
+        inst_map = {}
+        if is_admin:
+            inst_map = await get_institutions_with_access_for_courses([c.public_id for c in courses])
+        for c in courses:
+            c_out = CourseOut.model_validate(c)
+            if is_admin:
+                c_out.institutions_with_access = inst_map.get(c.public_id, [])
+            courses_out.append(c_out)
+
     return CourseListResponse(
         message="Courses retrieved successfully.",
-        courses=[CourseOut.model_validate(course) for course in courses],
+        courses=courses_out,
         page_context=PageContext.build(
             page=query.page,
             per_page=query.per_page,
@@ -122,7 +147,19 @@ async def bulk_delete_courses(data: BulkDeleteRequest, auth: CurrentAuth, db: Db
 )
 async def get_course(course_id: CourseIdParam, auth: CurrentAuth, db: DbSession) -> CourseResponse:
     course = await CourseService(db).get(course_id)
-    return CourseResponse(message="Course retrieved successfully.", course=CourseOut.model_validate(course))
+    if auth.role == "student":
+        has_published = any(v.status == ContentStatus.PUBLISHED for v in course.versions)
+        has_access = await check_student_course_access(auth.organization_id, course.public_id)
+        if not has_published or not has_access:
+            raise PermissionDeniedError(
+                "Your institution has not been granted access to this course.",
+                code="COURSE_ACCESS_DENIED"
+            )
+    c_out = CourseOut.model_validate(course)
+    if auth.role in ("super_admin", "admin"):
+        inst_map = await get_institutions_with_access_for_courses([course.public_id])
+        c_out.institutions_with_access = inst_map.get(course.public_id, [])
+    return CourseResponse(message="Course retrieved successfully.", course=c_out)
 
 
 @router.patch(

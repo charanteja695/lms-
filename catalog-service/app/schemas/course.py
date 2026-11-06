@@ -40,6 +40,7 @@ class CourseOut(ResponseSchema):
     created_at: Timestamp
     updated_at: Timestamp
     versions: list[CourseVersionSummary] = Field(default_factory=list)
+    institutions_with_access: list[dict] = Field(default_factory=list)
 
 
 class CourseResponse(SuccessResponse):

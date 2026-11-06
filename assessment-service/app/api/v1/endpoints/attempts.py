@@ -106,6 +106,30 @@ async def create_attempt(
     key: IdempotencyKeyHeader,
 ) -> AttemptResponse:
     test = await TestService(db, settings, redis).load(test_id)
+    if auth.role == "student" and test.target_type == "course" and test.target_id:
+        try:
+            import asyncpg
+            conn = await asyncpg.connect("postgresql://lms:lms@127.0.0.1:5432/lms_subscription")
+            try:
+                row = await conn.fetchrow("""
+                    SELECT id FROM subscriptions
+                    WHERE organization_id = $1
+                      AND course_id = $2
+                      AND status = 'active'
+                      AND starts_at <= NOW()
+                      AND (ends_at IS NULL OR ends_at > NOW())
+                """, int(auth.organization_id or 0), int(test.target_id))
+                if not row:
+                    raise PermissionDeniedError(
+                        "Your institution has not been granted access to this course's assessments.",
+                        code="COURSE_ACCESS_DENIED",
+                    )
+            finally:
+                await conn.close()
+        except PermissionDeniedError:
+            raise
+        except Exception:
+            pass
     service = AttemptService(db, settings, redis)
     attempt = await service.prepare(test, auth, ctx, key=key)
     if data.start_now:

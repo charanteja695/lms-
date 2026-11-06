@@ -1,3 +1,4 @@
+from app.services.institution_access import check_student_course_access
 from fastapi import APIRouter
 from lms_common.envelopes import PageContext, SortOrder
 
@@ -53,6 +54,13 @@ async def create_draft(course_id: CourseIdParam, auth: RequireAuthor, db: DbSess
     responses=errors(401, 404),
 )
 async def get_version(course_id: CourseIdParam, version_id: VersionIdParam, auth: RequireReader, db: DbSession) -> CourseVersionDetailResponse:
+    if auth.role == "student":
+        has_access = await check_student_course_access(auth.organization_id, course_id)
+        if not has_access:
+            raise PermissionDeniedError(
+                "Your institution has not been granted access to this course.",
+                code="COURSE_ACCESS_DENIED"
+            )
     version = await VersionService(db).get_detail(course_id, version_id)
     if version.status not in (ContentStatus.PUBLISHED, ContentStatus.ARCHIVED) and not sees_drafts(auth):
         raise NotFoundError("Course version not found.", code="COURSE_VERSION_NOT_FOUND")  # a draft is its authors' business

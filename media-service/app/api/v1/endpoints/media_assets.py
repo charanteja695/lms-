@@ -407,6 +407,8 @@ async def stream_media(asset_id: AssetIdParam, db: DbSession, settings: Settings
                 "Accept-Ranges": "bytes",
                 "Content-Length": str(content_length),
                 "Content-Type": content_type,
+                "Content-Disposition": "inline",
+                "X-Content-Type-Options": "nosniff",
             }
             return StreamingResponse(chunk_generator(), status_code=206, headers=headers)
 
@@ -419,6 +421,8 @@ async def stream_media(asset_id: AssetIdParam, db: DbSession, settings: Settings
         "Accept-Ranges": "bytes",
         "Content-Length": str(file_size),
         "Content-Type": content_type,
+        "Content-Disposition": "inline",
+        "X-Content-Type-Options": "nosniff",
     }
     return StreamingResponse(full_generator(), status_code=200, headers=headers)
 
