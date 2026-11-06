@@ -1,0 +1,28 @@
+[project]
+name = "lms-proctoring-service"
+version = "1.0.0"
+description = "LMS proctoring microservice: pre-checks, session events, snapshots, risk scoring, live monitoring, integrity review"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = ["postgres: needs an embedded PostgreSQL (pgserver)"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "ASYNC"]
+ignore = ["S101", "S105", "B008", "UP046", "E501"]  # E501: the formatter owns line length
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "ASYNC240"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true

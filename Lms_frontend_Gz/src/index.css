@@ -1,0 +1,108 @@
+@import "tailwindcss";
+/* Plus Jakarta Sans, self-hosted (the page's security policy loads fonts only from this site) */
+@import "@fontsource-variable/plus-jakarta-sans";
+
+/*
+ * Colours from the GenZ Technologies logo (src/assets/Gen_z-logo.png), measured from its pixels. Each scale passes
+ * exactly through the logo's own colour, at the step the app uses most; the other steps keep its hue (OKLCH).
+ *   brand  green  #00663C (the arrow ring) at 600 - every primary action, link, focus ring, active item
+ *   navy   blue   #000670 (the infinity loop) at 900 - dark surfaces and headings that carry the brand
+ *   accent orange #FC3E00 (the "Z") at 500 - what must stand out: highlights, "new", key numbers. Use 600+ for text.
+ *   ink    the navy's hue, darkened - large dark surfaces (sidebar, sign-in panel), where full navy would shout
+ * Neutrals stay Tailwind's slate. Change a colour here and the whole application follows.
+ */
+@theme {
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Telugu", sans-serif;
+
+  /* GenZ Brand Green (#00663C) - balanced with luminous emerald for buttons, links & active highlights */
+  --color-brand-50: #edfcf2;
+  --color-brand-100: #d3f8e0;
+  --color-brand-200: #aaf0c5;
+  --color-brand-300: #73e3a1;
+  --color-brand-400: #38cf7c;
+  --color-brand-500: #10b566;
+  --color-brand-600: #00874e;
+  --color-brand-700: #00663c; /* Exact official logo green (#00663C) */
+  --color-brand-800: #005230;
+  --color-brand-900: #003b23;
+  --color-brand-950: #002214;
+
+  /* GenZ Navy Blue (#000670) - deep royal midnight-navy for executive contrast */
+  --color-navy-50: #f0f4ff;
+  --color-navy-100: #e0e9fe;
+  --color-navy-200: #c7d7fe;
+  --color-navy-300: #a4bdfc;
+  --color-navy-400: #7a9af9;
+  --color-navy-500: #4a6ff4;
+  --color-navy-600: #2d4ee6;
+  --color-navy-700: #1a35cc;
+  --color-navy-800: #1023a1;
+  --color-navy-900: #000670; /* Exact official logo navy loop (#000670) */
+  --color-navy-950: #050c33;
+
+  /* GenZ Accent Orange (#FC3E00) - radiant coral highlight from the logo's "Z" */
+  --color-accent-50: #fff5f0;
+  --color-accent-100: #ffe8de;
+  --color-accent-200: #ffd2bf;
+  --color-accent-300: #ffb194;
+  --color-accent-400: #ff7e54;
+  --color-accent-500: #fc3e00; /* Exact official logo accent Z (#FC3E00) */
+  --color-accent-600: #dc2f00;
+  --color-accent-700: #b52200;
+  --color-accent-800: #8f1b00;
+  --color-accent-900: #6b1400;
+  --color-accent-950: #420a00;
+
+  /* Canvas: ultra-clean, modern luminous pearl off-white */
+  --color-canvas: #f8faf9;
+
+  /* Ink: obsidian midnight */
+  --color-ink-950: #040a1f;
+  --color-ink-900: #081232;
+  --color-ink-800: #0f1e49;
+  --color-ink-700: #1a2c5f;
+
+  /* Soft UI depth: layered, low-contrast shadows */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  --shadow-lift: 0 10px 25px -3px rgb(0 10 40 / 0.07), 0 4px 10px -4px rgb(0 10 40 / 0.03);
+  --shadow-pop: 0 20px 40px -8px rgb(0 6 112 / 0.16), 0 6px 16px -4px rgb(0 0 0 / 0.06);
+  --shadow-brand: 0 4px 14px -2px rgb(0 135 78 / 0.35);
+}
+
+@layer components {
+  /* dropdowns: our own chevron instead of each browser's, so they match the inputs */
+  .select-chevron {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px;
+  }
+}
+
+@layer base {
+  html { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body {
+    @apply bg-canvas text-slate-900;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 135, 78, 0.035), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 100%, rgba(0, 6, 112, 0.03), transparent);
+    background-attachment: fixed;
+  }
+  :focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; }
+  /* native checkboxes, radios and range sliders in the logo green */
+  input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--color-brand-600); }
+  ::selection { background: var(--color-brand-100); color: var(--color-brand-900); }
+  h1, h2, h3 { letter-spacing: -0.015em; }
+  /* a grid cell may shrink below its content (one-line, truncated text), so no page scrolls sideways on a phone */
+  :where(.grid) > * { min-width: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+  }
+}
+
+/* slide-over panels (shared/ui/Drawer) */
+@keyframes drawer-in { from { transform: translateX(32px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes drawer-fade { from { opacity: 0; } to { opacity: 1; } }
+.drawer-panel { animation: drawer-in 260ms cubic-bezier(0.22, 1, 0.36, 1); }
+.drawer-backdrop { animation: drawer-fade 200ms ease-out; }

@@ -1,0 +1,392 @@
+{
+  "rules": [
+    {
+      "path": "/.well-known/jwks.json",
+      "service": "user-management"
+    },
+    {
+      "path": "/api/v1/admin/employers",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/admin/invoices",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/admin/jobs",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/admin/organizations",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/admin/prices",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/admin/quotes",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/admin/sla-policies",
+      "service": "support-service"
+    },
+    {
+      "path": "/api/v1/admins",
+      "service": "user-management"
+    },
+    {
+      "path": "/api/v1/agent",
+      "service": "support-service"
+    },
+    {
+      "path": "/api/v1/applications",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/attachments",
+      "service": "support-service"
+    },
+    {
+      "path": "/api/v1/attempts",
+      "service": "assessment-service"
+    },
+    {
+      "path": "/api/v1/audit",
+      "service": "proctoring-service"
+    },
+    {
+      "path": "/api/v1/audit-logs",
+      "service": "user-management"
+    },
+    {
+      "path": "/api/v1/auth",
+      "service": "user-management"
+    },
+    {
+      "path": "/api/v1/availability",
+      "service": "ai-tutor-service"
+    },
+    {
+      "path": "/api/v1/batches",
+      "service": "learning-service"
+    },
+    {
+      "path": "/api/v1/billing-profile",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/cases",
+      "service": "proctoring-service"
+    },
+    {
+      "path": "/api/v1/certificate-templates",
+      "service": "certificate-service"
+    },
+    {
+      "path": "/api/v1/certificates",
+      "service": "certificate-service"
+    },
+    {
+      "path": "/api/v1/companies",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/conversations",
+      "service": "ai-tutor-service"
+    },
+    {
+      "path": "/api/v1/course-requests",
+      "service": "subscription-service"
+    },
+    {
+      "path": "/api/v1/courses",
+      "service": "catalog-service"
+    },
+    {
+      "path": "/api/v1/dashboards",
+      "service": "analytics-service"
+    },
+    {
+      "path": "/api/v1/deliveries",
+      "service": "notification-service"
+    },
+    {
+      "path": "/api/v1/directory/companies",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/directory/institutions",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/directory/organizations",
+      "service": "user-management"
+    },
+    {
+      "path": "/api/v1/drives",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/employer/appeals",
+      "service": "ai-interview-service"
+    },
+    {
+      "path": "/api/v1/employer/applications",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/employer/interviews",
+      "service": "ai-interview-service"
+    },
+    {
+      "path": "/api/v1/employer/jobs",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/employer/plans",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/employer/profile",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/employers",
+      "service": "user-management"
+    },
+    {
+      "path": "/api/v1/enrollments",
+      "service": "learning-service"
+    },
+    {
+      "path": "/api/v1/escalations",
+      "service": "ai-tutor-service"
+    },
+    {
+      "path": "/api/v1/eval-runs",
+      "service": "ai-tutor-service"
+    },
+    {
+      "path": "/api/v1/eval-sets",
+      "service": "ai-tutor-service"
+    },
+    {
+      "path": "/api/v1/faq",
+      "service": "ai-tutor-service"
+    },
+    {
+      "path": "/api/v1/feedback",
+      "service": "ai-tutor-service"
+    },
+    {
+      "path": "/api/v1/grading",
+      "service": "assessment-service"
+    },
+    {
+      "path": "/api/v1/hierarchy",
+      "service": "user-management"
+    },
+    {
+      "path": "/api/v1/index",
+      "service": "ai-tutor-service"
+    },
+    {
+      "path": "/api/v1/institution",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/institutions",
+      "service": "user-management"
+    },
+    {
+      "path": "/api/v1/interview-plans",
+      "service": "ai-interview-service"
+    },
+    {
+      "path": "/api/v1/invoices",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/job-board",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/job-preferences",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/jobs",
+      "service": "user-management"
+    },
+    {
+      "path": "/api/v1/languages",
+      "service": "code-execution-service"
+    },
+    {
+      "path": "/api/v1/learning-paths",
+      "service": "catalog-service"
+    },
+    {
+      "path": "/api/v1/logs",
+      "service": "ai-gateway"
+    },
+    {
+      "path": "/api/v1/me",
+      "service": "subscription-service"
+    },
+    {
+      "path": "/api/v1/media",
+      "service": "media-service"
+    },
+    {
+      "path": "/api/v1/messages",
+      "service": "ai-tutor-service"
+    },
+    {
+      "path": "/api/v1/models",
+      "service": "ai-gateway"
+    },
+    {
+      "path": "/api/v1/monitor",
+      "service": "proctoring-service"
+    },
+    {
+      "path": "/api/v1/my/cases",
+      "service": "proctoring-service"
+    },
+    {
+      "path": "/api/v1/my/tests",
+      "service": "assessment-service"
+    },
+    {
+      "path": "/api/v1/notification-preferences",
+      "service": "notification-service"
+    },
+    {
+      "path": "/api/v1/notification-templates",
+      "service": "notification-service"
+    },
+    {
+      "path": "/api/v1/notifications",
+      "service": "notification-service"
+    },
+    {
+      "path": "/api/v1/orgs",
+      "service": "ai-gateway"
+    },
+    {
+      "path": "/api/v1/permissions",
+      "service": "user-management"
+    },
+    {
+      "path": "/api/v1/playback",
+      "service": "media-service"
+    },
+    {
+      "path": "/api/v1/prices",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/problems",
+      "service": "code-execution-service"
+    },
+    {
+      "path": "/api/v1/profile",
+      "service": "career-service"
+    },
+    {
+      "path": "/api/v1/prompts",
+      "service": "ai-gateway"
+    },
+    {
+      "path": "/api/v1/public/resumes",
+      "service": "career-service"
+    },
+    {
+      "path": "/api/v1/public/verify",
+      "service": "certificate-service"
+    },
+    {
+      "path": "/api/v1/questions",
+      "service": "assessment-service"
+    },
+    {
+      "path": "/api/v1/quotes",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/recommendations",
+      "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/reports",
+      "service": "analytics-service"
+    },
+    {
+      "path": "/api/v1/results",
+      "service": "assessment-service"
+    },
+    {
+      "path": "/api/v1/resume-options",
+      "service": "career-service"
+    },
+    {
+      "path": "/api/v1/resume-templates",
+      "service": "career-service"
+    },
+    {
+      "path": "/api/v1/resumes",
+      "service": "career-service"
+    },
+    {
+      "path": "/api/v1/review",
+      "service": "code-execution-service"
+    },
+    {
+      "path": "/api/v1/runs",
+      "service": "code-execution-service"
+    },
+    {
+      "path": "/api/v1/sessions",
+      "service": "proctoring-service"
+    },
+    {
+      "path": "/api/v1/store",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/student",
+      "service": "ai-interview-service"
+    },
+    {
+      "path": "/api/v1/students",
+      "service": "career-service"
+    },
+    {
+      "path": "/api/v1/submissions",
+      "service": "code-execution-service"
+    },
+    {
+      "path": "/api/v1/subscriptions",
+      "service": "subscription-service"
+    },
+    {
+      "path": "/api/v1/tests",
+      "service": "assessment-service"
+    },
+    {
+      "path": "/api/v1/tickets",
+      "service": "support-service"
+    },
+    {
+      "path": "/api/v1/users",
+      "service": "user-management"
+    },
+    {
+      "path": "/api/v1/webhooks",
+      "service": "billing-service"
+    }
+  ]
+}

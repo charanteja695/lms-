@@ -1,0 +1,12 @@
+{
+  "superAdmin": { "username": "", "password": "", "mfaCode": "" },
+  "admin": { "username": "", "password": "" },
+  "head": { "username": "", "password": "" },
+  "staff": { "username": "", "password": "" },
+  "student": { "username": "", "password": "" },
+  "learnerSignup": {
+    "comment": "Optional: lets the sign-up + course store journey run on the local stack. Leave out to skip it.",
+    "emailLogFile": "path to user-management's log when it runs with LOG_JSON=true (the console email backend)",
+    "razorpayKeySecret": "the RAZORPAY_KEY_SECRET billing-service runs with locally (a test secret, never a live one)"
+  }
+}

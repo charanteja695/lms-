@@ -1,0 +1,3135 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LMS Analytics Service",
+    "description": "Read-only dashboards and scheduled reports built from every other service's events (docs/PRODUCT.md §5.9): institution and platform-wide learning, exam-integrity, support, hiring and AI-usage/billing dashboards, all traceable to the events that produced them. PostgreSQL, not ClickHouse (D12) — see the README.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health/live": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Liveness probe",
+        "operationId": "live_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Live Health Live Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Readiness probe (database and Redis)",
+        "operationId": "ready_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboards/institution": {
+      "get": {
+        "tags": [
+          "Dashboards"
+        ],
+        "summary": "An institution's own funnel",
+        "operationId": "institution_dashboard_api_v1_dashboards_institution_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "description": "How many trailing days, including today",
+              "default": 7,
+              "title": "Days"
+            },
+            "description": "How many trailing days, including today"
+          },
+          {
+            "name": "organization_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Organization Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstitutionDashboardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboards/content": {
+      "get": {
+        "tags": [
+          "Dashboards"
+        ],
+        "summary": "Platform-wide learning funnel",
+        "operationId": "content_dashboard_api_v1_dashboards_content_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "description": "How many trailing days, including today",
+              "default": 7,
+              "title": "Days"
+            },
+            "description": "How many trailing days, including today"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentDashboardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboards/exam-integrity": {
+      "get": {
+        "tags": [
+          "Dashboards"
+        ],
+        "summary": "Exam and integrity trends",
+        "operationId": "exam_integrity_dashboard_api_v1_dashboards_exam_integrity_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "description": "How many trailing days, including today",
+              "default": 7,
+              "title": "Days"
+            },
+            "description": "How many trailing days, including today"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExamIntegrityDashboardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboards/support": {
+      "get": {
+        "tags": [
+          "Dashboards"
+        ],
+        "summary": "Ticket volume, SLAs and CSAT",
+        "operationId": "support_dashboard_api_v1_dashboards_support_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "description": "How many trailing days, including today",
+              "default": 7,
+              "title": "Days"
+            },
+            "description": "How many trailing days, including today"
+          },
+          {
+            "name": "organization_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Organization Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportDashboardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboards/hiring": {
+      "get": {
+        "tags": [
+          "Dashboards"
+        ],
+        "summary": "Hiring funnel",
+        "description": "Platform-wide for a careers manager, or one employer's own jobs for that employer's own team (send no `employer_id`: it defaults to the caller's).",
+        "operationId": "hiring_dashboard_api_v1_dashboards_hiring_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "description": "How many trailing days, including today",
+              "default": 7,
+              "title": "Days"
+            },
+            "description": "How many trailing days, including today"
+          },
+          {
+            "name": "employer_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Employer Id"
+            }
+          },
+          {
+            "name": "organization_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Organization Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HiringDashboardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboards/ai-usage": {
+      "get": {
+        "tags": [
+          "Dashboards"
+        ],
+        "summary": "AI requests, tokens and cost",
+        "operationId": "ai_usage_dashboard_api_v1_dashboards_ai_usage_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "description": "How many trailing days, including today",
+              "default": 7,
+              "title": "Days"
+            },
+            "description": "How many trailing days, including today"
+          },
+          {
+            "name": "organization_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Organization Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIUsageDashboardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboards/billing": {
+      "get": {
+        "tags": [
+          "Dashboards"
+        ],
+        "summary": "Invoiced vs collected revenue",
+        "operationId": "billing_dashboard_api_v1_dashboards_billing_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "description": "How many trailing days, including today",
+              "default": 7,
+              "title": "Days"
+            },
+            "description": "How many trailing days, including today"
+          },
+          {
+            "name": "organization_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Organization Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingDashboardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "My saved reports",
+        "operationId": "list_reports_api_v1_reports_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Save a scheduled report",
+        "operationId": "create_report_api_v1_reports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/reports/{report_id}": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "A saved report",
+        "operationId": "get_report_api_v1_reports__report_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "REPORT_NOT_FOUND",
+                  "message": "Report not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/{report_id}/deactivate": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Stop running a report",
+        "operationId": "deactivate_report_api_v1_reports__report_id__deactivate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "REPORT_NOT_FOUND",
+                  "message": "Report not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/{report_id}/run-now": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Run it immediately",
+        "operationId": "run_now_api_v1_reports__report_id__run_now_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRunResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "REPORT_NOT_FOUND",
+                  "message": "Report not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/{report_id}/runs": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Past runs",
+        "operationId": "list_runs_api_v1_reports__report_id__runs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRunPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "REPORT_NOT_FOUND",
+                  "message": "Report not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/{report_id}/runs/{run_id}/download": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Download a run's rendered file",
+        "operationId": "download_run_api_v1_reports__report_id__runs__run_id__download_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "REPORT_NOT_FOUND",
+                  "message": "Report not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "slug",
+                      "code": "INVALID_SLUG",
+                      "message": "Must be lower-case letters, digits and hyphens"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AIUsageDashboardOut": {
+        "properties": {
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "since": {
+            "type": "string",
+            "title": "Since"
+          },
+          "until": {
+            "type": "string",
+            "title": "Until"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "by_capability": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Capability"
+          },
+          "total_cost_cents": {
+            "type": "number",
+            "title": "Total Cost Cents"
+          },
+          "total_tokens": {
+            "type": "number",
+            "title": "Total Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "organization_id",
+          "since",
+          "until",
+          "calls",
+          "by_capability",
+          "total_cost_cents",
+          "total_tokens"
+        ],
+        "title": "AIUsageDashboardOut"
+      },
+      "AIUsageDashboardResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "dashboard": {
+            "$ref": "#/components/schemas/AIUsageDashboardOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "dashboard"
+        ],
+        "title": "AIUsageDashboardResponse"
+      },
+      "BillingDashboardOut": {
+        "properties": {
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "since": {
+            "type": "string",
+            "title": "Since"
+          },
+          "until": {
+            "type": "string",
+            "title": "Until"
+          },
+          "invoices_issued": {
+            "type": "integer",
+            "title": "Invoices Issued"
+          },
+          "invoiced_amount": {
+            "type": "number",
+            "title": "Invoiced Amount"
+          },
+          "invoices_paid": {
+            "type": "integer",
+            "title": "Invoices Paid"
+          },
+          "paid_amount": {
+            "type": "number",
+            "title": "Paid Amount"
+          },
+          "invoices_overdue": {
+            "type": "integer",
+            "title": "Invoices Overdue"
+          },
+          "overdue_amount": {
+            "type": "number",
+            "title": "Overdue Amount"
+          },
+          "invoices_voided": {
+            "type": "integer",
+            "title": "Invoices Voided"
+          },
+          "credit_notes": {
+            "type": "integer",
+            "title": "Credit Notes"
+          },
+          "credit_amount": {
+            "type": "number",
+            "title": "Credit Amount"
+          },
+          "plans_activated": {
+            "type": "integer",
+            "title": "Plans Activated"
+          },
+          "plans_expired": {
+            "type": "integer",
+            "title": "Plans Expired"
+          }
+        },
+        "type": "object",
+        "required": [
+          "organization_id",
+          "since",
+          "until",
+          "invoices_issued",
+          "invoiced_amount",
+          "invoices_paid",
+          "paid_amount",
+          "invoices_overdue",
+          "overdue_amount",
+          "invoices_voided",
+          "credit_notes",
+          "credit_amount",
+          "plans_activated",
+          "plans_expired"
+        ],
+        "title": "BillingDashboardOut"
+      },
+      "BillingDashboardResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "dashboard": {
+            "$ref": "#/components/schemas/BillingDashboardOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "dashboard"
+        ],
+        "title": "BillingDashboardResponse"
+      },
+      "ContentDashboardOut": {
+        "properties": {
+          "since": {
+            "type": "string",
+            "title": "Since"
+          },
+          "until": {
+            "type": "string",
+            "title": "Until"
+          },
+          "enrollments": {
+            "type": "integer",
+            "title": "Enrollments"
+          },
+          "topic_completions": {
+            "type": "integer",
+            "title": "Topic Completions"
+          },
+          "module_completions": {
+            "type": "integer",
+            "title": "Module Completions"
+          },
+          "eligible_for_final": {
+            "type": "integer",
+            "title": "Eligible For Final"
+          },
+          "courses_passed": {
+            "type": "integer",
+            "title": "Courses Passed"
+          },
+          "courses_failed": {
+            "type": "integer",
+            "title": "Courses Failed"
+          },
+          "pass_revoked": {
+            "type": "integer",
+            "title": "Pass Revoked"
+          },
+          "course_pass_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Pass Rate"
+          },
+          "average_pass_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Pass Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "since",
+          "until",
+          "enrollments",
+          "topic_completions",
+          "module_completions",
+          "eligible_for_final",
+          "courses_passed",
+          "courses_failed",
+          "pass_revoked",
+          "course_pass_rate",
+          "average_pass_percent"
+        ],
+        "title": "ContentDashboardOut"
+      },
+      "ContentDashboardResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "dashboard": {
+            "$ref": "#/components/schemas/ContentDashboardOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "dashboard"
+        ],
+        "title": "ContentDashboardResponse"
+      },
+      "Dashboard": {
+        "type": "string",
+        "enum": [
+          "institution",
+          "content",
+          "exam_integrity",
+          "support",
+          "hiring",
+          "ai_usage",
+          "billing"
+        ],
+        "title": "Dashboard",
+        "description": "A dashboard key names a fixed shape (§5.9): which events feed it and how the response is laid out. A\nscheduled report references one, plus the filters it is run with."
+      },
+      "ErrorDetail": {
+        "properties": {
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field",
+            "examples": [
+              "personal_info.phone"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "examples": [
+              "INVALID_PHONE"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Enter a valid phone number, e.g. +919876543210"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "code",
+          "message"
+        ],
+        "title": "ErrorDetail"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "error",
+            "title": "Status",
+            "default": "error"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "examples": [
+              "INVALID_DATA"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Some fields are missing or invalid."
+            ]
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            },
+            "type": "array",
+            "title": "Details"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id",
+            "examples": [
+              "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorResponse"
+      },
+      "ExamIntegrityDashboardOut": {
+        "properties": {
+          "since": {
+            "type": "string",
+            "title": "Since"
+          },
+          "until": {
+            "type": "string",
+            "title": "Until"
+          },
+          "attempts_finalized": {
+            "type": "integer",
+            "title": "Attempts Finalized"
+          },
+          "results": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Results"
+          },
+          "average_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Percent"
+          },
+          "integrity_flags": {
+            "type": "integer",
+            "title": "Integrity Flags"
+          },
+          "flags_by_stage": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Flags By Stage"
+          },
+          "integrity_decisions": {
+            "type": "integer",
+            "title": "Integrity Decisions"
+          },
+          "decisions_by_outcome": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Decisions By Outcome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "since",
+          "until",
+          "attempts_finalized",
+          "results",
+          "average_percent",
+          "integrity_flags",
+          "flags_by_stage",
+          "integrity_decisions",
+          "decisions_by_outcome"
+        ],
+        "title": "ExamIntegrityDashboardOut"
+      },
+      "ExamIntegrityDashboardResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "dashboard": {
+            "$ref": "#/components/schemas/ExamIntegrityDashboardOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "dashboard"
+        ],
+        "title": "ExamIntegrityDashboardResponse"
+      },
+      "HiringDashboardOut": {
+        "properties": {
+          "employer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer Id"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "since": {
+            "type": "string",
+            "title": "Since"
+          },
+          "until": {
+            "type": "string",
+            "title": "Until"
+          },
+          "applications_by_stage": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Applications By Stage"
+          },
+          "placements": {
+            "type": "integer",
+            "title": "Placements"
+          },
+          "average_placement_ctc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Placement Ctc"
+          },
+          "offers_extended": {
+            "type": "integer",
+            "title": "Offers Extended"
+          },
+          "offers_accepted": {
+            "type": "integer",
+            "title": "Offers Accepted"
+          },
+          "offers_declined": {
+            "type": "integer",
+            "title": "Offers Declined"
+          },
+          "offers_expired": {
+            "type": "integer",
+            "title": "Offers Expired"
+          },
+          "interviews_completed": {
+            "type": "integer",
+            "title": "Interviews Completed"
+          },
+          "ai_recommendations": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Ai Recommendations"
+          },
+          "human_overrides": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Human Overrides"
+          }
+        },
+        "type": "object",
+        "required": [
+          "employer_id",
+          "organization_id",
+          "since",
+          "until",
+          "applications_by_stage",
+          "placements",
+          "average_placement_ctc",
+          "offers_extended",
+          "offers_accepted",
+          "offers_declined",
+          "offers_expired",
+          "interviews_completed",
+          "ai_recommendations",
+          "human_overrides"
+        ],
+        "title": "HiringDashboardOut"
+      },
+      "HiringDashboardResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "dashboard": {
+            "$ref": "#/components/schemas/HiringDashboardOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "dashboard"
+        ],
+        "title": "HiringDashboardResponse"
+      },
+      "InstitutionDashboardOut": {
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "title": "Organization Id"
+          },
+          "since": {
+            "type": "string",
+            "title": "Since"
+          },
+          "until": {
+            "type": "string",
+            "title": "Until"
+          },
+          "enrollments": {
+            "type": "integer",
+            "title": "Enrollments"
+          },
+          "topic_completions": {
+            "type": "integer",
+            "title": "Topic Completions"
+          },
+          "module_completions": {
+            "type": "integer",
+            "title": "Module Completions"
+          },
+          "eligible_for_final": {
+            "type": "integer",
+            "title": "Eligible For Final"
+          },
+          "tests_finalized": {
+            "type": "integer",
+            "title": "Tests Finalized"
+          },
+          "tests_passed": {
+            "type": "integer",
+            "title": "Tests Passed"
+          },
+          "tests_failed": {
+            "type": "integer",
+            "title": "Tests Failed"
+          },
+          "tests_invalidated": {
+            "type": "integer",
+            "title": "Tests Invalidated"
+          },
+          "test_pass_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Pass Rate"
+          },
+          "certificates_issued": {
+            "type": "integer",
+            "title": "Certificates Issued"
+          },
+          "certificates_revoked": {
+            "type": "integer",
+            "title": "Certificates Revoked"
+          },
+          "students_placed": {
+            "type": "integer",
+            "title": "Students Placed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "organization_id",
+          "since",
+          "until",
+          "enrollments",
+          "topic_completions",
+          "module_completions",
+          "eligible_for_final",
+          "tests_finalized",
+          "tests_passed",
+          "tests_failed",
+          "tests_invalidated",
+          "test_pass_rate",
+          "certificates_issued",
+          "certificates_revoked",
+          "students_placed"
+        ],
+        "title": "InstitutionDashboardOut"
+      },
+      "InstitutionDashboardResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "dashboard": {
+            "$ref": "#/components/schemas/InstitutionDashboardOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "dashboard"
+        ],
+        "title": "InstitutionDashboardResponse"
+      },
+      "ReportCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 3,
+            "title": "Name"
+          },
+          "dashboard": {
+            "$ref": "#/components/schemas/Dashboard"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/ReportFilters"
+          },
+          "frequency": {
+            "$ref": "#/components/schemas/ReportFrequency",
+            "default": "weekly"
+          },
+          "format": {
+            "$ref": "#/components/schemas/ReportFormat",
+            "default": "csv"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "dashboard"
+        ],
+        "title": "ReportCreate"
+      },
+      "ReportFilters": {
+        "properties": {
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id",
+            "description": "Required for the institution dashboard; optional elsewhere"
+          },
+          "employer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer Id",
+            "description": "Hiring dashboard only: scopes it to one employer's own jobs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ReportFilters"
+      },
+      "ReportFormat": {
+        "type": "string",
+        "enum": [
+          "csv",
+          "json"
+        ],
+        "title": "ReportFormat"
+      },
+      "ReportFrequency": {
+        "type": "string",
+        "enum": [
+          "daily",
+          "weekly",
+          "monthly"
+        ],
+        "title": "ReportFrequency"
+      },
+      "ReportOut": {
+        "properties": {
+          "report_id": {
+            "type": "string",
+            "title": "Report Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "dashboard": {
+            "type": "string",
+            "title": "Dashboard"
+          },
+          "filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filters"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "frequency": {
+            "type": "string",
+            "title": "Frequency"
+          },
+          "next_run_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Next Run At",
+            "examples": [
+              "2026-09-22T10:30:00Z"
+            ]
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "examples": [
+              "2026-09-22T10:30:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "report_id",
+          "name",
+          "dashboard",
+          "filters",
+          "format",
+          "frequency",
+          "next_run_at",
+          "active",
+          "created_at"
+        ],
+        "title": "ReportOut"
+      },
+      "ReportPage": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/ReportOut"
+            },
+            "type": "array",
+            "title": "Reports"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "reports"
+        ],
+        "title": "ReportPage"
+      },
+      "ReportResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "report": {
+            "$ref": "#/components/schemas/ReportOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "report"
+        ],
+        "title": "ReportResponse"
+      },
+      "ReportRunOut": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "row_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Count"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "dashboard_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dashboard Snapshot"
+          },
+          "generated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-09-22T10:30:00Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "examples": [
+              "2026-09-22T10:30:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "status",
+          "period_start",
+          "period_end",
+          "row_count",
+          "content_type",
+          "error",
+          "dashboard_snapshot",
+          "generated_at",
+          "created_at"
+        ],
+        "title": "ReportRunOut"
+      },
+      "ReportRunPage": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/ReportRunOut"
+            },
+            "type": "array",
+            "title": "Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "runs"
+        ],
+        "title": "ReportRunPage"
+      },
+      "ReportRunResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "run": {
+            "$ref": "#/components/schemas/ReportRunOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "run"
+        ],
+        "title": "ReportRunResponse"
+      },
+      "SupportDashboardOut": {
+        "properties": {
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "since": {
+            "type": "string",
+            "title": "Since"
+          },
+          "until": {
+            "type": "string",
+            "title": "Until"
+          },
+          "tickets_created": {
+            "type": "integer",
+            "title": "Tickets Created"
+          },
+          "by_category": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Category"
+          },
+          "status_changes": {
+            "type": "integer",
+            "title": "Status Changes"
+          },
+          "by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Status"
+          },
+          "sla_breaches": {
+            "type": "integer",
+            "title": "Sla Breaches"
+          },
+          "breaches_by_kind": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Breaches By Kind"
+          },
+          "csat_responses": {
+            "type": "integer",
+            "title": "Csat Responses"
+          },
+          "average_csat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Csat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "organization_id",
+          "since",
+          "until",
+          "tickets_created",
+          "by_category",
+          "status_changes",
+          "by_status",
+          "sla_breaches",
+          "breaches_by_kind",
+          "csat_responses",
+          "average_csat"
+        ],
+        "title": "SupportDashboardOut"
+      },
+      "SupportDashboardResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "dashboard": {
+            "$ref": "#/components/schemas/SupportDashboardOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "dashboard"
+        ],
+        "title": "SupportDashboardResponse"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "description": "Access token issued by user-management's /auth/login",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

@@ -1,0 +1,6502 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LMS Support Service",
+    "description": "Support tickets for students: routed by category to the batch staff, platform support or the exam team, with SLA timers, canned replies, internal notes, CSAT ratings and reports. Receives hand-offs from ai-tutor-service.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health/live": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Liveness probe",
+        "operationId": "live_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Live Health Live Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Readiness probe (database and Redis)",
+        "operationId": "ready_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tickets": {
+      "post": {
+        "tags": [
+          "Tickets (student)"
+        ],
+        "summary": "Open a ticket",
+        "description": "Routed by category: learning doubts to your institution's staff, technical/billing/access to platform support, integrity to the exam team. An `Idempotency-Key` makes a retried request return the same ticket.",
+        "operationId": "create_ticket_api_v1_tickets_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Tickets (student)"
+        ],
+        "summary": "My tickets",
+        "operationId": "my_tickets_api_v1_tickets_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 20
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Per Page"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketPageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tickets/{ticket_id}": {
+      "get": {
+        "tags": [
+          "Tickets (student)"
+        ],
+        "summary": "One of my tickets, with its conversation",
+        "operationId": "get_ticket_api_v1_tickets__ticket_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/replies": {
+      "post": {
+        "tags": [
+          "Tickets (student)"
+        ],
+        "summary": "Reply on my ticket",
+        "description": "Replying to a resolved ticket reopens it (within the reopen window). A closed ticket cannot be replied to.",
+        "operationId": "reply_api_v1_tickets__ticket_id__replies_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplyCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/messages/{message_id}/attachments/{index}": {
+      "get": {
+        "tags": [
+          "Tickets (student)"
+        ],
+        "summary": "Download an attachment on my ticket",
+        "description": "A short-lived link (`S3_DOWNLOAD_URL_EXPIRES_SECONDS`) to the file; `index` is its position in the message's `attachments`.",
+        "operationId": "attachment_api_v1_tickets__ticket_id__messages__message_id__attachments__index__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          },
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentLinkResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/close": {
+      "post": {
+        "tags": [
+          "Tickets (student)"
+        ],
+        "summary": "Close my ticket",
+        "operationId": "close_ticket_api_v1_tickets__ticket_id__close_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/csat": {
+      "post": {
+        "tags": [
+          "Tickets (student)"
+        ],
+        "summary": "Rate the support I received",
+        "description": "Once per ticket, after it is resolved or closed. 1 (poor) to 5 (excellent).",
+        "operationId": "csat_api_v1_tickets__ticket_id__csat_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CsatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/attachments/upload-url": {
+      "post": {
+        "tags": [
+          "Attachments"
+        ],
+        "summary": "Get a URL to upload one attachment",
+        "description": "Checks the file type and size (`ATTACHMENT_ALLOWED_EXTENSIONS`, `ATTACHMENT_MAX_MB`) and returns a presigned POST. Upload the file to it, then list `{key, filename}` in the `attachments` of a new ticket or a reply.",
+        "operationId": "upload_url_api_v1_attachments_upload_url_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachmentUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentUploadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agent/tickets": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "The ticket queue",
+        "description": "The tickets this agent may see, active ones by default. `assignee` is `me`, `unassigned`, or a user id; `sort` is `due` (most urgent first), `activity` or `created`.",
+        "operationId": "list_queue_api_v1_agent_tickets_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TicketStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "queue",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Queue"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Queue"
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Priority"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 12
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "name": "assignee",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 20
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assignee"
+            }
+          },
+          {
+            "name": "breached",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Breached"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "course_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Course Id"
+            }
+          },
+          {
+            "name": "requester_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Requester Id"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(due|activity|created)$",
+              "default": "due",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Per Page"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketPageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/summary": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Queue counts and the oldest unanswered ticket",
+        "operationId": "summary_api_v1_agent_tickets_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agent/reports/sla": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "SLA compliance, response times and CSAT over a period",
+        "operationId": "sla_report_api_v1_agent_reports_sla_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlaReportResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/{ticket_id}": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "A ticket with its conversation and internal notes",
+        "operationId": "get_ticket_api_v1_agent_tickets__ticket_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Change priority or category",
+        "description": "Changing the priority recomputes the SLA due times. Changing the category may move the ticket to another queue, where it starts unassigned.",
+        "operationId": "update_api_v1_agent_tickets__ticket_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/{ticket_id}/transcript": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "The tutor conversation a ticket was handed off from",
+        "description": "Only for a ticket opened by ai-tutor (source `ai-tutor`); read from ai-tutor-service with the internal token once this service has decided the agent may handle the ticket. `404 NO_TRANSCRIPT` otherwise or if the student deleted it, `502 UPSTREAM_UNAVAILABLE` when ai-tutor does not answer.",
+        "operationId": "ticket_transcript_api_v1_agent_tickets__ticket_id__transcript_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranscriptResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "A service this depends on did not answer",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "UPSTREAM_UNAVAILABLE",
+                  "message": "A service this depends on is not answering. Please try again.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/{ticket_id}/assignees": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Who this ticket may be assigned to",
+        "description": "For someone who may assign it to another person (a support manager, or the head for their institution's batch_staff queue): the active people of the ticket's queue — the same rule `POST .../assign` enforces.",
+        "operationId": "ticket_assignees_api_v1_agent_tickets__ticket_id__assignees_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssigneesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/{ticket_id}/events": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "The audit trail of a ticket",
+        "operationId": "ticket_events_api_v1_agent_tickets__ticket_id__events_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/{ticket_id}/replies": {
+      "post": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Reply to the student, or leave an internal note",
+        "description": "A public reply is the first response for SLA purposes and assigns the ticket to the replier if nobody has it. `then` may move the ticket to `waiting_on_student` (pauses the SLA clock) or `resolved`.",
+        "operationId": "reply_api_v1_agent_tickets__ticket_id__replies_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentReplyCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/{ticket_id}/messages/{message_id}/attachments/{index}": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Download an attachment on a ticket I handle (internal notes included)",
+        "operationId": "attachment_api_v1_agent_tickets__ticket_id__messages__message_id__attachments__index__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          },
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentLinkResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/{ticket_id}/claim": {
+      "post": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Take a ticket",
+        "operationId": "claim_api_v1_agent_tickets__ticket_id__claim_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/{ticket_id}/assign": {
+      "post": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Assign a ticket to someone",
+        "description": "A support manager anywhere; an institution head within their own institution's queue. The assignee must be able to handle the queue.",
+        "operationId": "assign_api_v1_agent_tickets__ticket_id__assign_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/{ticket_id}/release": {
+      "post": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Hand a ticket back to its queue",
+        "operationId": "release_api_v1_agent_tickets__ticket_id__release_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/{ticket_id}/resolve": {
+      "post": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Mark resolved (asks the student for a CSAT rating)",
+        "operationId": "resolve_api_v1_agent_tickets__ticket_id__resolve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/{ticket_id}/reopen": {
+      "post": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Reopen a resolved ticket",
+        "operationId": "reopen_api_v1_agent_tickets__ticket_id__reopen_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/tickets/{ticket_id}/close": {
+      "post": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Close a ticket",
+        "operationId": "close_api_v1_agent_tickets__ticket_id__close_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/canned-replies": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Saved replies I may use",
+        "operationId": "list_canned_api_v1_agent_canned_replies_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "include_inactive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Inactive"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CannedListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Save a reply",
+        "operationId": "create_canned_api_v1_agent_canned_replies_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CannedCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CannedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/canned-replies/{canned_id}": {
+      "patch": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Edit or deactivate a saved reply",
+        "operationId": "update_canned_api_v1_agent_canned_replies__canned_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "canned_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Canned Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CannedUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CannedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/canned-replies/{canned_id}/render": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "A saved reply filled in for a ticket",
+        "description": "Replaces `{{student_first_name}}` and `{{ticket_subject}}`. Insert the result into a reply and edit it before sending.",
+        "operationId": "render_canned_api_v1_agent_canned_replies__canned_id__render_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "canned_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Canned Id"
+            }
+          },
+          {
+            "name": "ticket_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderedCannedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TICKET_NOT_FOUND",
+                  "message": "Ticket not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/sla-policies": {
+      "get": {
+        "tags": [
+          "Support administration"
+        ],
+        "summary": "SLA targets per queue and priority (defaults unless overridden)",
+        "operationId": "sla_policies_api_v1_admin_sla_policies_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlaPoliciesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Support administration"
+        ],
+        "summary": "Override an SLA target",
+        "description": "Applies to tickets created or re-prioritised from now on; existing tickets keep their due times until they change.",
+        "operationId": "put_sla_policy_api_v1_admin_sla_policies_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlaPolicyUpsert"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlaPoliciesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/sla-policies/{queue}/{priority}": {
+      "delete": {
+        "tags": [
+          "Support administration"
+        ],
+        "summary": "Go back to the default target",
+        "operationId": "reset_sla_policy_api_v1_admin_sla_policies__queue___priority__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Queue"
+            }
+          },
+          {
+            "name": "priority",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Priority"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlaPoliciesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/internal/tickets": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "summary": "Open a ticket for a student (ai-tutor-service's hand-off)",
+        "description": "Requires `X-Internal-Service-Token`. `Idempotency-Key` makes a retry return the ticket already opened.",
+        "operationId": "create_internal_api_v1_internal_tickets_post",
+        "parameters": [
+          {
+            "name": "X-Internal-Service-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Service-Token"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalTicketCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalTicketResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "subject",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentReplyCreate": {
+        "properties": {
+          "body": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Body"
+          },
+          "internal": {
+            "type": "boolean",
+            "title": "Internal",
+            "description": "An internal note: never shown to the student, does not stop the SLA clock",
+            "default": false
+          },
+          "then": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TicketStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optionally move the ticket on: waiting_on_student or resolved"
+          },
+          "canned_reply_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{9,18}$",
+                "examples": [
+                  "1755000000009001"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canned Reply Id"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentIn"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Attachments",
+            "description": "Files uploaded beforehand; at most ATTACHMENT_MAX_FILES"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "body"
+        ],
+        "title": "AgentReplyCreate"
+      },
+      "AssignRequest": {
+        "properties": {
+          "assignee_user_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{9,18}$",
+            "title": "Assignee User Id",
+            "examples": [
+              "1755000000003001"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "assignee_user_id"
+        ],
+        "title": "AssignRequest"
+      },
+      "AssigneeOut": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "name",
+          "role"
+        ],
+        "title": "AssigneeOut"
+      },
+      "AssigneesResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "assignees": {
+            "items": {
+              "$ref": "#/components/schemas/AssigneeOut"
+            },
+            "type": "array",
+            "title": "Assignees"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "assignees"
+        ],
+        "title": "AssigneesResponse"
+      },
+      "AttachmentIn": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Filename"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "filename"
+        ],
+        "title": "AttachmentIn",
+        "description": "A file already uploaded with an upload URL from `POST /attachments/upload-url`."
+      },
+      "AttachmentLink": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "url",
+          "expires_in"
+        ],
+        "title": "AttachmentLink"
+      },
+      "AttachmentLinkResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "attachment": {
+            "$ref": "#/components/schemas/AttachmentLink"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "attachment"
+        ],
+        "title": "AttachmentLinkResponse"
+      },
+      "AttachmentOut": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "content_type",
+          "size_bytes"
+        ],
+        "title": "AttachmentOut"
+      },
+      "AttachmentUpload": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Send this back in a message's `attachments` once the upload has finished"
+          },
+          "upload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Upload",
+            "description": "A presigned POST: `url` and the form `fields` to send with the file"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "upload",
+          "expires_in"
+        ],
+        "title": "AttachmentUpload"
+      },
+      "AttachmentUploadRequest": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Filename"
+          },
+          "content_type": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Content Type"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Size Bytes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "filename",
+          "content_type",
+          "size_bytes"
+        ],
+        "title": "AttachmentUploadRequest"
+      },
+      "AttachmentUploadResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "attachment": {
+            "$ref": "#/components/schemas/AttachmentUpload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "attachment"
+        ],
+        "title": "AttachmentUploadResponse"
+      },
+      "CannedCreate": {
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/CannedScope",
+            "default": "organization"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Body"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "body"
+        ],
+        "title": "CannedCreate"
+      },
+      "CannedListResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "canned_replies": {
+            "items": {
+              "$ref": "#/components/schemas/CannedOut"
+            },
+            "type": "array",
+            "title": "Canned Replies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "canned_replies"
+        ],
+        "title": "CannedListResponse"
+      },
+      "CannedOut": {
+        "properties": {
+          "canned_reply_id": {
+            "type": "string",
+            "title": "Canned Reply Id"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "canned_reply_id",
+          "scope",
+          "organization_id",
+          "title",
+          "body",
+          "active"
+        ],
+        "title": "CannedOut"
+      },
+      "CannedResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "canned_reply": {
+            "$ref": "#/components/schemas/CannedOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "canned_reply"
+        ],
+        "title": "CannedResponse"
+      },
+      "CannedScope": {
+        "type": "string",
+        "enum": [
+          "platform",
+          "organization"
+        ],
+        "title": "CannedScope"
+      },
+      "CannedUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CannedUpdate"
+      },
+      "Category": {
+        "type": "string",
+        "enum": [
+          "learning",
+          "technical",
+          "billing",
+          "integrity",
+          "access",
+          "other"
+        ],
+        "title": "Category"
+      },
+      "CsatRequest": {
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Rating"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rating"
+        ],
+        "title": "CsatRequest"
+      },
+      "ErrorDetail": {
+        "properties": {
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field",
+            "examples": [
+              "personal_info.phone"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "examples": [
+              "INVALID_PHONE"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Enter a valid phone number, e.g. +919876543210"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "code",
+          "message"
+        ],
+        "title": "ErrorDetail"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "error",
+            "title": "Status",
+            "default": "error"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "examples": [
+              "INVALID_DATA"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Some fields are missing or invalid."
+            ]
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            },
+            "type": "array",
+            "title": "Details"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id",
+            "examples": [
+              "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorResponse"
+      },
+      "EventsResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/TicketEventOut"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "events"
+        ],
+        "title": "EventsResponse"
+      },
+      "InternalTicketCreate": {
+        "properties": {
+          "requester_user_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{9,18}$",
+            "title": "Requester User Id",
+            "examples": [
+              "1755000000003001"
+            ]
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{9,18}$",
+                "examples": [
+                  "1755000000007003"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Subject"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Description"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category",
+            "default": "learning"
+          },
+          "source": {
+            "$ref": "#/components/schemas/Source",
+            "default": "ai-tutor"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the tutor handed over (low_confidence, user_requested, sensitive_topic); kept in the audit trail"
+          },
+          "course_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{9,18}$",
+                "examples": [
+                  "1755000000001001"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "requester_user_id",
+          "subject",
+          "description"
+        ],
+        "title": "InternalTicketCreate",
+        "description": "Opened by another service on a person's behalf (the tutor's hand-off). ``Idempotency-Key`` makes a retry safe."
+      },
+      "InternalTicketOut": {
+        "properties": {
+          "ticket_id": {
+            "type": "string",
+            "title": "Ticket Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "queue": {
+            "type": "string",
+            "title": "Queue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticket_id",
+          "status",
+          "queue"
+        ],
+        "title": "InternalTicketOut"
+      },
+      "InternalTicketResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/InternalTicketOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "ticket"
+        ],
+        "title": "InternalTicketResponse"
+      },
+      "MessageOut": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "title": "Message Id"
+          },
+          "seq": {
+            "type": "integer",
+            "title": "Seq"
+          },
+          "author_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author User Id"
+          },
+          "author_role": {
+            "type": "string",
+            "title": "Author Role"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentOut"
+            },
+            "type": "array",
+            "title": "Attachments",
+            "description": "Download one with .../messages/{message_id}/attachments/{index}"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "examples": [
+              "2026-09-22T10:30:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id",
+          "seq",
+          "author_user_id",
+          "author_role",
+          "kind",
+          "body",
+          "created_at"
+        ],
+        "title": "MessageOut"
+      },
+      "MessageResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/TicketOut"
+          },
+          "reply": {
+            "$ref": "#/components/schemas/MessageOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "ticket",
+          "reply"
+        ],
+        "title": "MessageResponse"
+      },
+      "PageContext": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "examples": [
+              1
+            ]
+          },
+          "per_page": {
+            "type": "integer",
+            "title": "Per Page",
+            "examples": [
+              20
+            ]
+          },
+          "total_records": {
+            "type": "integer",
+            "title": "Total Records",
+            "description": "Capped; see total_is_exact",
+            "examples": [
+              57
+            ]
+          },
+          "total_is_exact": {
+            "type": "boolean",
+            "title": "Total Is Exact",
+            "description": "False when more records match than were counted",
+            "examples": [
+              true
+            ]
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages",
+            "examples": [
+              3
+            ]
+          },
+          "has_more_page": {
+            "type": "boolean",
+            "title": "Has More Page",
+            "examples": [
+              true
+            ]
+          },
+          "sort_column": {
+            "type": "string",
+            "title": "Sort Column",
+            "examples": [
+              "created_time"
+            ]
+          },
+          "sort_order": {
+            "$ref": "#/components/schemas/SortOrder"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "per_page",
+          "total_records",
+          "total_is_exact",
+          "total_pages",
+          "has_more_page",
+          "sort_column",
+          "sort_order"
+        ],
+        "title": "PageContext"
+      },
+      "Priority": {
+        "type": "string",
+        "enum": [
+          "low",
+          "normal",
+          "high",
+          "urgent"
+        ],
+        "title": "Priority"
+      },
+      "Queue": {
+        "type": "string",
+        "enum": [
+          "batch_staff",
+          "platform_support",
+          "exam_team"
+        ],
+        "title": "Queue"
+      },
+      "QueueSummaryOut": {
+        "properties": {
+          "queue": {
+            "type": "string",
+            "title": "Queue"
+          },
+          "open": {
+            "type": "integer",
+            "title": "Open"
+          },
+          "assigned": {
+            "type": "integer",
+            "title": "Assigned"
+          },
+          "waiting_on_student": {
+            "type": "integer",
+            "title": "Waiting On Student"
+          },
+          "unassigned": {
+            "type": "integer",
+            "title": "Unassigned"
+          },
+          "breached": {
+            "type": "integer",
+            "title": "Breached"
+          },
+          "oldest_unanswered_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Unanswered Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queue",
+          "open",
+          "assigned",
+          "waiting_on_student",
+          "unassigned",
+          "breached",
+          "oldest_unanswered_minutes"
+        ],
+        "title": "QueueSummaryOut"
+      },
+      "RenderedCanned": {
+        "properties": {
+          "body": {
+            "type": "string",
+            "title": "Body"
+          }
+        },
+        "type": "object",
+        "required": [
+          "body"
+        ],
+        "title": "RenderedCanned"
+      },
+      "RenderedCannedResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "rendered": {
+            "$ref": "#/components/schemas/RenderedCanned"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "rendered"
+        ],
+        "title": "RenderedCannedResponse"
+      },
+      "ReplyCreate": {
+        "properties": {
+          "body": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Body"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentIn"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Attachments",
+            "description": "Files uploaded beforehand; at most ATTACHMENT_MAX_FILES"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "body"
+        ],
+        "title": "ReplyCreate"
+      },
+      "SlaPoliciesResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/SlaPolicyOut"
+            },
+            "type": "array",
+            "title": "Policies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "policies"
+        ],
+        "title": "SlaPoliciesResponse"
+      },
+      "SlaPolicyOut": {
+        "properties": {
+          "queue": {
+            "type": "string",
+            "title": "Queue"
+          },
+          "priority": {
+            "type": "string",
+            "title": "Priority"
+          },
+          "first_response_minutes": {
+            "type": "integer",
+            "title": "First Response Minutes"
+          },
+          "resolution_minutes": {
+            "type": "integer",
+            "title": "Resolution Minutes"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queue",
+          "priority",
+          "first_response_minutes",
+          "resolution_minutes",
+          "is_default"
+        ],
+        "title": "SlaPolicyOut"
+      },
+      "SlaPolicyUpsert": {
+        "properties": {
+          "queue": {
+            "$ref": "#/components/schemas/Queue"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "first_response_minutes": {
+            "type": "integer",
+            "maximum": 43200.0,
+            "minimum": 1.0,
+            "title": "First Response Minutes"
+          },
+          "resolution_minutes": {
+            "type": "integer",
+            "maximum": 129600.0,
+            "minimum": 1.0,
+            "title": "Resolution Minutes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "queue",
+          "priority",
+          "first_response_minutes",
+          "resolution_minutes"
+        ],
+        "title": "SlaPolicyUpsert"
+      },
+      "SlaReportOut": {
+        "properties": {
+          "tickets": {
+            "type": "integer",
+            "title": "Tickets"
+          },
+          "resolved": {
+            "type": "integer",
+            "title": "Resolved"
+          },
+          "first_response_breached": {
+            "type": "integer",
+            "title": "First Response Breached"
+          },
+          "resolution_breached": {
+            "type": "integer",
+            "title": "Resolution Breached"
+          },
+          "first_response_compliance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Response Compliance"
+          },
+          "resolution_compliance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Compliance"
+          },
+          "avg_first_response_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg First Response Minutes"
+          },
+          "avg_resolution_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Resolution Minutes"
+          },
+          "csat_responses": {
+            "type": "integer",
+            "title": "Csat Responses"
+          },
+          "csat_average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Csat Average"
+          },
+          "reopened": {
+            "type": "integer",
+            "title": "Reopened"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tickets",
+          "resolved",
+          "first_response_breached",
+          "resolution_breached",
+          "first_response_compliance",
+          "resolution_compliance",
+          "avg_first_response_minutes",
+          "avg_resolution_minutes",
+          "csat_responses",
+          "csat_average",
+          "reopened",
+          "truncated"
+        ],
+        "title": "SlaReportOut"
+      },
+      "SlaReportResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "report": {
+            "$ref": "#/components/schemas/SlaReportOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "report"
+        ],
+        "title": "SlaReportResponse"
+      },
+      "SortOrder": {
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "title": "SortOrder"
+      },
+      "Source": {
+        "type": "string",
+        "enum": [
+          "portal",
+          "ai-tutor"
+        ],
+        "title": "Source"
+      },
+      "SummaryResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "queues": {
+            "items": {
+              "$ref": "#/components/schemas/QueueSummaryOut"
+            },
+            "type": "array",
+            "title": "Queues"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "queues"
+        ],
+        "title": "SummaryResponse"
+      },
+      "TicketCreate": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Subject"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Description"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "course_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{9,18}$",
+                "examples": [
+                  "1755000000001001"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Id"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentIn"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Attachments",
+            "description": "Files uploaded beforehand; at most ATTACHMENT_MAX_FILES"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "subject",
+          "description",
+          "category"
+        ],
+        "title": "TicketCreate"
+      },
+      "TicketDetailResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/TicketOut"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/MessageOut"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "requester_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requester Name"
+          },
+          "assignee_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "ticket",
+          "messages"
+        ],
+        "title": "TicketDetailResponse"
+      },
+      "TicketEventOut": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "actor_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor User Id"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "examples": [
+              "2026-09-22T10:30:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "actor_user_id",
+          "detail",
+          "created_at"
+        ],
+        "title": "TicketEventOut"
+      },
+      "TicketOut": {
+        "properties": {
+          "ticket_id": {
+            "type": "string",
+            "title": "Ticket Id"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "queue": {
+            "type": "string",
+            "title": "Queue"
+          },
+          "priority": {
+            "type": "string",
+            "title": "Priority"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref"
+          },
+          "course_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Id"
+          },
+          "requester_user_id": {
+            "type": "string",
+            "title": "Requester User Id"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "assignee_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee User Id"
+          },
+          "first_response_due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-09-22T10:30:00Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Response Due At"
+          },
+          "resolution_due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-09-22T10:30:00Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Due At"
+          },
+          "first_response_breached": {
+            "type": "boolean",
+            "title": "First Response Breached"
+          },
+          "resolution_breached": {
+            "type": "boolean",
+            "title": "Resolution Breached"
+          },
+          "first_response_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-09-22T10:30:00Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Response At"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-09-22T10:30:00Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-09-22T10:30:00Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "reopened_count": {
+            "type": "integer",
+            "title": "Reopened Count"
+          },
+          "csat_requested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-09-22T10:30:00Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Csat Requested At"
+          },
+          "csat_rating": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Csat Rating"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "examples": [
+              "2026-09-22T10:30:00Z"
+            ]
+          },
+          "last_activity_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-09-22T10:30:00Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Activity At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticket_id",
+          "subject",
+          "category",
+          "queue",
+          "priority",
+          "status",
+          "source",
+          "course_id",
+          "requester_user_id",
+          "organization_id",
+          "assignee_user_id",
+          "first_response_due_at",
+          "resolution_due_at",
+          "first_response_breached",
+          "resolution_breached",
+          "first_response_at",
+          "resolved_at",
+          "closed_at",
+          "reopened_count",
+          "csat_requested_at",
+          "csat_rating",
+          "created_at",
+          "last_activity_at"
+        ],
+        "title": "TicketOut"
+      },
+      "TicketPageResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "tickets": {
+            "items": {
+              "$ref": "#/components/schemas/TicketOut"
+            },
+            "type": "array",
+            "title": "Tickets"
+          },
+          "page_context": {
+            "$ref": "#/components/schemas/PageContext"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "tickets",
+          "page_context"
+        ],
+        "title": "TicketPageResponse"
+      },
+      "TicketResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/TicketOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "ticket"
+        ],
+        "title": "TicketResponse"
+      },
+      "TicketStatus": {
+        "type": "string",
+        "enum": [
+          "open",
+          "assigned",
+          "waiting_on_student",
+          "resolved",
+          "closed"
+        ],
+        "title": "TicketStatus",
+        "description": "docs/PRODUCT.md §5.5: open → assigned → waiting_on_student → resolved → closed."
+      },
+      "TicketUpdate": {
+        "properties": {
+          "priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Priority"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TicketUpdate"
+      },
+      "TranscriptMessageOut": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "title": "Message Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id",
+          "role",
+          "kind",
+          "content",
+          "created_at"
+        ],
+        "title": "TranscriptMessageOut"
+      },
+      "TranscriptOut": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/TranscriptMessageOut"
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "mode",
+          "title",
+          "messages"
+        ],
+        "title": "TranscriptOut",
+        "description": "The tutor conversation behind a hand-off, as ai-tutor-service holds it (message ids let an agent promote an answer to the FAQ)."
+      },
+      "TranscriptResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "transcript": {
+            "$ref": "#/components/schemas/TranscriptOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "transcript"
+        ],
+        "title": "TranscriptResponse"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "description": "Access token issued by user-management's /auth/login",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

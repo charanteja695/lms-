@@ -1,0 +1,5253 @@
+{
+  "info": {
+    "name": "LMS User Management API",
+    "description": "Generated from the service's OpenAPI schema by scripts/generate_api_artifacts.py. Run 'Log in' first: tokens are stored automatically. Creating a user, admin or institution stores its user_id / organization_id for the following requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8001"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "my_user_id",
+      "value": ""
+    },
+    {
+      "key": "user_id",
+      "value": "358672738860850316"
+    },
+    {
+      "key": "organization_id",
+      "value": "358672738414054064"
+    },
+    {
+      "key": "session_id",
+      "value": "358672738835009029"
+    },
+    {
+      "key": "job_id",
+      "value": ""
+    },
+    {
+      "key": "mfa_token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Liveness probe",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/health/live",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health",
+                "live"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Readiness probe (database and Redis)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/health/ready",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health",
+                "ready"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Public keys for verifying access tokens",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/.well-known/jwks.json",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                ".well-known",
+                "jwks.json"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Log in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ],
+              "query": []
+            },
+            "description": "Log in with email **or** username. Returns tokens and the signed-in user. If two-factor authentication is on, returns `code: MFA_REQUIRED` with an `mfa_challenge` instead: call `POST /auth/mfa/verify`. If `user.must_change_password` or `user.mfa_setup_required` is true, finish that step before using other endpoints.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.status === 'success' && body.token) {",
+                  "  pm.collectionVariables.set('access_token', body.token.access_token);",
+                  "  pm.collectionVariables.set('refresh_token', body.token.refresh_token);",
+                  "  pm.collectionVariables.set('my_user_id', body.user.user_id);",
+                  "}",
+                  "if (body.mfa_challenge) { pm.collectionVariables.set('mfa_token', body.mfa_challenge.mfa_token); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log out",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ],
+              "query": []
+            },
+            "description": "Ends the current session. Send `{\"all_sessions\": true}` to log out of every device.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh tokens",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/refresh-token",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh-token"
+              ],
+              "query": []
+            },
+            "description": "Exchange a refresh token for a new access token **and** a new refresh token. Each refresh token works once; reusing an old one ends the session. Browsers send no body and the header `X-Session-Transport: cookie`; the refresh token then travels only in an httpOnly cookie.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.status === 'success' && body.token) {",
+                  "  pm.collectionVariables.set('access_token', body.token.access_token);",
+                  "  pm.collectionVariables.set('refresh_token', body.token.refresh_token);",
+                  "  pm.collectionVariables.set('my_user_id', body.user.user_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Request a password reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/forgot-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "forgot-password"
+              ],
+              "query": []
+            },
+            "description": "Emails a one-time code and a reset link. The response is always the same, whether or not the account exists.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify the reset code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "verify-otp"
+              ],
+              "query": []
+            },
+            "description": "Exchanges the emailed code for a short-lived `reset_token`.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set a new password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/reset-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "reset-password"
+              ],
+              "query": []
+            },
+            "description": "Use the `reset_token` from verify-otp, or the `token` from an emailed reset or account set-up link. All existing sessions are ended.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change your password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/change-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "change-password"
+              ],
+              "query": []
+            },
+            "description": "Requires the current password. Ends all sessions, including this one.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List your active sessions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/sessions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "sessions"
+              ],
+              "query": []
+            },
+            "description": "Devices where you are currently logged in, most recently active first."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log out a device",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/sessions/{{session_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "sessions",
+                "{{session_id}}"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Complete login with a two-factor code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/mfa/verify",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "mfa",
+                "verify"
+              ],
+              "query": []
+            },
+            "description": "Send the `mfa_token` from login with either the current 6-digit `code` or one unused `recovery_code`.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Two-factor status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/mfa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "mfa"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start two-factor set-up",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/mfa/setup",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "mfa",
+                "setup"
+              ],
+              "query": []
+            },
+            "description": "Confirms the password and returns a secret and `otpauth://` URI to show as a QR code. Nothing changes until `POST /auth/mfa/enable` succeeds.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Turn on two-factor authentication",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/mfa/enable",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "mfa",
+                "enable"
+              ],
+              "query": []
+            },
+            "description": "Confirms set-up with the first code and returns recovery codes. They are shown only once.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Turn off two-factor authentication",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/mfa/disable",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "mfa",
+                "disable"
+              ],
+              "query": []
+            },
+            "description": "Not allowed for roles where two-factor authentication is mandatory (`MFA_REQUIRED_FOR_ROLE`).",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replace recovery codes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/mfa/recovery-codes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "mfa",
+                "recovery-codes"
+              ],
+              "query": []
+            },
+            "description": "Invalidates all previous recovery codes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get my profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update my contact details",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ],
+              "query": []
+            },
+            "description": "Users can change their own phone numbers, language, time zone and address. Names, date of birth and role are managed by their institution.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "What I can do",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me/permissions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "permissions"
+              ],
+              "query": []
+            },
+            "description": "Menu sections, visible and creatable roles, list filters and other rights of the signed-in person. Clients show screens and buttons from this instead of re-implementing rules; every request is still checked."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Options for the create/edit user form",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/form-options",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "form-options"
+              ],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "staff",
+                  "description": "Role being filled in",
+                  "disabled": true
+                },
+                {
+                  "key": "user_id",
+                  "value": "",
+                  "description": "User being edited",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Roles you may choose and, for the chosen `role`, which sections and fields apply and which are required. Pass `user_id` when editing. Call again when the role changes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create a student",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ],
+              "query": []
+            },
+            "description": "Create an admin, institution head, staff member or student within your part of the hierarchy. `credentials` says how the person gets access: an emailed set-up link, the initial password you set, or a temporary password generated for a student without email (returned only in this response).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"student\",\n  \"organization_id\": \"358672738414054064\",\n  \"account\": {\n    \"email\": \"aarav.reddy@example.com\"\n  },\n  \"personal_info\": {\n    \"first_name\": \"Aarav\",\n    \"last_name\": \"Reddy\",\n    \"gender\": \"male\",\n    \"date_of_birth\": \"2012-04-15\"\n  },\n  \"address\": {\n    \"line1\": \"Plot 42, Road No. 5\",\n    \"line2\": \"Jubilee Hills\",\n    \"city\": \"Hyderabad\",\n    \"state\": \"Telangana\",\n    \"postal_code\": \"500033\",\n    \"country\": \"IN\"\n  },\n  \"student\": {\n    \"admission_number\": \"ADM/2024/0457\",\n    \"admission_date\": \"2024-06-01\",\n    \"guardians\": [\n      {\n        \"full_name\": \"Suresh Reddy\",\n        \"relationship\": \"father\",\n        \"phone\": \"+919876543210\",\n        \"email\": \"suresh.reddy@example.com\",\n        \"occupation\": \"Engineer\",\n        \"is_primary\": true\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.status !== 'success') { return; }",
+                  "const record = body.user || body.admin || body.institution;",
+                  "if (record && record.user_id) { pm.collectionVariables.set('user_id', record.user_id); }",
+                  "if (record && record.organization_id) { pm.collectionVariables.set('organization_id', record.organization_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create a staff member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ],
+              "query": []
+            },
+            "description": "Create an admin, institution head, staff member or student within your part of the hierarchy. `credentials` says how the person gets access: an emailed set-up link, the initial password you set, or a temporary password generated for a student without email (returned only in this response).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"staff\",\n  \"organization_id\": \"358672738414054064\",\n  \"account\": {\n    \"email\": \"priya.sharma@example.com\",\n    \"username\": \"priya.sharma\"\n  },\n  \"personal_info\": {\n    \"first_name\": \"Priya\",\n    \"last_name\": \"Sharma\",\n    \"gender\": \"female\",\n    \"phone\": \"+919812345678\"\n  },\n  \"employment\": {\n    \"employee_code\": \"EMP-1024\",\n    \"designation\": \"Mathematics Teacher\",\n    \"department\": \"Mathematics\",\n    \"employment_type\": \"full_time\",\n    \"date_of_joining\": \"2023-06-12\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.status !== 'success') { return; }",
+                  "const record = body.user || body.admin || body.institution;",
+                  "if (record && record.user_id) { pm.collectionVariables.set('user_id', record.user_id); }",
+                  "if (record && record.organization_id) { pm.collectionVariables.set('organization_id', record.organization_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create an institution head",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ],
+              "query": []
+            },
+            "description": "Create an admin, institution head, staff member or student within your part of the hierarchy. `credentials` says how the person gets access: an emailed set-up link, the initial password you set, or a temporary password generated for a student without email (returned only in this response).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"institution_head\",\n  \"organization_id\": \"358672738414054064\",\n  \"account\": {\n    \"email\": \"ramesh.iyer@example.com\"\n  },\n  \"personal_info\": {\n    \"first_name\": \"Ramesh\",\n    \"last_name\": \"Iyer\",\n    \"phone\": \"+919900112233\"\n  },\n  \"employment\": {\n    \"employee_code\": \"EMP-0001\",\n    \"designation\": \"Principal\",\n    \"employment_type\": \"full_time\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.status !== 'success') { return; }",
+                  "const record = body.user || body.admin || body.institution;",
+                  "if (record && record.user_id) { pm.collectionVariables.set('user_id', record.user_id); }",
+                  "if (record && record.organization_id) { pm.collectionVariables.set('organization_id', record.organization_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number, starting at 1",
+                  "disabled": true
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "description": "Records per page (max 100)",
+                  "disabled": true
+                },
+                {
+                  "key": "role",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "'deleted' is available to super admins only",
+                  "disabled": true
+                },
+                {
+                  "key": "organization_id",
+                  "value": "",
+                  "description": "Members of this institution",
+                  "disabled": true
+                },
+                {
+                  "key": "manager_user_id",
+                  "value": "",
+                  "description": "People who report to this user",
+                  "disabled": true
+                },
+                {
+                  "key": "created_by_user_id",
+                  "value": "",
+                  "description": "Accounts created by this user",
+                  "disabled": true
+                },
+                {
+                  "key": "gender",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "department",
+                  "value": "",
+                  "description": "Exact department name, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "employment_type",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "email_verified",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "program",
+                  "value": "",
+                  "description": "Students: exact program, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "branch",
+                  "value": "",
+                  "description": "Students: exact branch, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "year_of_study",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "section",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "graduation_year",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "scope",
+                  "value": "",
+                  "description": "Admins holding this scope",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_column",
+                  "value": "created_time",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Only users you are allowed to see are returned. `search_text` matches name, email, username, phone, employee code and admission number."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Download the import template (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/import/template",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "import",
+                "template"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Import users from CSV",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/import",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "import"
+              ],
+              "query": []
+            },
+            "description": "Upload a CSV based on the template. Each row follows the same rules as `POST /users`. Use `dry_run=true` to validate first. `mode=all_or_nothing` creates every row or none; `skip_invalid` creates valid rows and reports the rest. Imported users receive an account set-up email.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "CSV from /users/import/template"
+                },
+                {
+                  "key": "dry_run",
+                  "value": "true",
+                  "type": "text"
+                },
+                {
+                  "key": "mode",
+                  "value": "all_or_nothing",
+                  "type": "text",
+                  "description": "or skip_invalid"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Import a large CSV in the background",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/import-jobs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "import-jobs"
+              ],
+              "query": []
+            },
+            "description": "Same rules and columns as `POST /users/import`, for files up to 50,000 rows. The job appears under `GET /jobs`; when it completes you are emailed and can download a report with one line per created user (including temporary passwords for students without email) and per problem.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "CSV from /users/import/template"
+                },
+                {
+                  "key": "dry_run",
+                  "value": "true",
+                  "type": "text"
+                },
+                {
+                  "key": "mode",
+                  "value": "all_or_nothing",
+                  "type": "text",
+                  "description": "or skip_invalid"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export users in the background",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/export-jobs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "export-jobs"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "role",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "'deleted' is available to super admins only",
+                  "disabled": true
+                },
+                {
+                  "key": "organization_id",
+                  "value": "",
+                  "description": "Members of this institution",
+                  "disabled": true
+                },
+                {
+                  "key": "manager_user_id",
+                  "value": "",
+                  "description": "People who report to this user",
+                  "disabled": true
+                },
+                {
+                  "key": "created_by_user_id",
+                  "value": "",
+                  "description": "Accounts created by this user",
+                  "disabled": true
+                },
+                {
+                  "key": "gender",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "department",
+                  "value": "",
+                  "description": "Exact department name, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "employment_type",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "email_verified",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "program",
+                  "value": "",
+                  "description": "Students: exact program, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "branch",
+                  "value": "",
+                  "description": "Students: exact branch, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "year_of_study",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "section",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "graduation_year",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "scope",
+                  "value": "",
+                  "description": "Admins holding this scope",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_column",
+                  "value": "created_time",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "For very large exports. Same filters as `GET /users` (query string). Returns a job; the requester is emailed when the file is ready at `GET /jobs/{job_id}/download`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.job) { pm.collectionVariables.set('job_id', body.job.job_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export users (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/export",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "export"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "role",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "'deleted' is available to super admins only",
+                  "disabled": true
+                },
+                {
+                  "key": "organization_id",
+                  "value": "",
+                  "description": "Members of this institution",
+                  "disabled": true
+                },
+                {
+                  "key": "manager_user_id",
+                  "value": "",
+                  "description": "People who report to this user",
+                  "disabled": true
+                },
+                {
+                  "key": "created_by_user_id",
+                  "value": "",
+                  "description": "Accounts created by this user",
+                  "disabled": true
+                },
+                {
+                  "key": "gender",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "department",
+                  "value": "",
+                  "description": "Exact department name, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "employment_type",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "email_verified",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "program",
+                  "value": "",
+                  "description": "Students: exact program, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "branch",
+                  "value": "",
+                  "description": "Students: exact branch, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "year_of_study",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "section",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "graduation_year",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "scope",
+                  "value": "",
+                  "description": "Admins holding this scope",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_column",
+                  "value": "created_time",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Accepts the same filters as `GET /users` and exports every matching user you are allowed to see (up to EXPORT_MAX_ROWS). Every export is recorded in the audit log."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get a user",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{user_id}}"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change phone and designation",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{user_id}}"
+              ],
+              "query": []
+            },
+            "description": "Partial update: only the sections and fields you send are changed. Send `null` to clear an optional value. Changing role or institution signs the user out.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personal_info\": {\n    \"phone\": \"+919812300000\"\n  },\n  \"employment\": {\n    \"designation\": \"Senior Mathematics Teacher\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replace a student's guardians",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{user_id}}"
+              ],
+              "query": []
+            },
+            "description": "Partial update: only the sections and fields you send are changed. Send `null` to clear an optional value. Changing role or institution signs the user out.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"student\": {\n    \"guardians\": [\n      {\n        \"full_name\": \"Suresh Reddy\",\n        \"relationship\": \"father\",\n        \"phone\": \"+919876543210\",\n        \"is_primary\": true\n      },\n      {\n        \"full_name\": \"Kavya Reddy\",\n        \"relationship\": \"mother\",\n        \"phone\": \"+919876500000\"\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Move to another institution and manager",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{user_id}}"
+              ],
+              "query": []
+            },
+            "description": "Partial update: only the sections and fields you send are changed. Send `null` to clear an optional value. Changing role or institution signs the user out.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organization_id\": \"358672738414054064\",\n  \"manager_user_id\": \"358672738860850316\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete a user",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{user_id}}"
+              ],
+              "query": []
+            },
+            "description": "Deactivates and hides the user permanently. The record is kept for audit history."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activate or suspend a user",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{user_id}}",
+                "status"
+              ],
+              "query": []
+            },
+            "description": "A suspended user keeps their data but cannot log in, and is signed out immediately.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign a user out everywhere",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}/revoke",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{user_id}}",
+                "revoke"
+              ],
+              "query": []
+            },
+            "description": "Ends all of the user's sessions immediately. The account stays active and can log in again."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set a temporary password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}/password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{user_id}}",
+                "password"
+              ],
+              "query": []
+            },
+            "description": "For people who cannot use the emailed reset (e.g. students without email). The user must choose a new password at next sign-in, and all their sessions end.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset a user's two-factor authentication",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}/mfa/reset",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{user_id}}",
+                "mfa",
+                "reset"
+              ],
+              "query": []
+            },
+            "description": "For a lost or replaced phone. Removes the enrolment and recovery codes and signs the user out."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admins",
+      "item": [
+        {
+          "name": "Create an admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admins",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admins"
+              ],
+              "query": []
+            },
+            "description": "Super admins only. Without `account.password`, an account set-up link is emailed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account\": {\n    \"email\": \"anita.verma@example.com\"\n  },\n  \"personal_info\": {\n    \"first_name\": \"Anita\",\n    \"last_name\": \"Verma\",\n    \"phone\": \"+919845012345\"\n  },\n  \"employment\": {\n    \"designation\": \"Regional Education Manager\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.status !== 'success') { return; }",
+                  "const record = body.user || body.admin || body.institution;",
+                  "if (record && record.user_id) { pm.collectionVariables.set('user_id', record.user_id); }",
+                  "if (record && record.organization_id) { pm.collectionVariables.set('organization_id', record.organization_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List admins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admins",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admins"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number, starting at 1",
+                  "disabled": true
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "description": "Records per page (max 100)",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "scope",
+                  "value": "",
+                  "description": "Admins holding this scope",
+                  "disabled": true
+                },
+                {
+                  "key": "email_verified",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_column",
+                  "value": "created_time",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export admins in the background",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admins/export-jobs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admins",
+                "export-jobs"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "scope",
+                  "value": "",
+                  "description": "Admins holding this scope",
+                  "disabled": true
+                },
+                {
+                  "key": "email_verified",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_column",
+                  "value": "created_time",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.job) { pm.collectionVariables.set('job_id', body.job.job_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export admins (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admins/export",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admins",
+                "export"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "scope",
+                  "value": "",
+                  "description": "Admins holding this scope",
+                  "disabled": true
+                },
+                {
+                  "key": "email_verified",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_column",
+                  "value": "created_time",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get an admin",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admins/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admins",
+                "{{user_id}}"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update an admin",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admins/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admins",
+                "{{user_id}}"
+              ],
+              "query": []
+            },
+            "description": "Partial update: only the sections and fields you send are changed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete an admin",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admins/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admins",
+                "{{user_id}}"
+              ],
+              "query": []
+            },
+            "description": "Refused with `ADMIN_HAS_INSTITUTIONS` while the admin still owns institutions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activate or suspend an admin",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admins/{{user_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admins",
+                "{{user_id}}",
+                "status"
+              ],
+              "query": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign an admin out everywhere",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admins/{{user_id}}/revoke",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admins",
+                "{{user_id}}",
+                "revoke"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset an admin's two-factor authentication",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admins/{{user_id}}/mfa/reset",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admins",
+                "{{user_id}}",
+                "mfa",
+                "reset"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Institutions",
+      "item": [
+        {
+          "name": "Create an institution",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/institutions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions"
+              ],
+              "query": []
+            },
+            "description": "Super admins must set `admin_user_id`. Admins always own the institutions they create.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Springfield High School\",\n  \"code\": \"SPH-HYD\",\n  \"type\": \"school\",\n  \"admin_user_id\": \"358672738860850316\",\n  \"contact\": {\n    \"email\": \"office@springfieldhigh.edu.in\",\n    \"phone\": \"+914023456789\",\n    \"website\": \"https://www.springfieldhigh.edu.in\"\n  },\n  \"address\": {\n    \"line1\": \"Plot 42, Road No. 5\",\n    \"line2\": \"Jubilee Hills\",\n    \"city\": \"Hyderabad\",\n    \"state\": \"Telangana\",\n    \"postal_code\": \"500033\",\n    \"country\": \"IN\"\n  },\n  \"timezone\": \"Asia/Kolkata\",\n  \"registration_number\": \"TS-SCH-2004-1187\",\n  \"affiliation\": \"CBSE\",\n  \"established_year\": 2004\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.status !== 'success') { return; }",
+                  "const record = body.user || body.admin || body.institution;",
+                  "if (record && record.user_id) { pm.collectionVariables.set('user_id', record.user_id); }",
+                  "if (record && record.organization_id) { pm.collectionVariables.set('organization_id', record.organization_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List institutions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/institutions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number, starting at 1",
+                  "disabled": true
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "description": "Records per page (max 100)",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "'deleted' is available to super admins only",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "admin_user_id",
+                  "value": "",
+                  "description": "Institutions owned by this admin",
+                  "disabled": true
+                },
+                {
+                  "key": "country",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "state",
+                  "value": "",
+                  "description": "Exact state name, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "city",
+                  "value": "",
+                  "description": "Exact city name, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "affiliation",
+                  "value": "",
+                  "description": "Exact affiliation, e.g. CBSE",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_column",
+                  "value": "created_time",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Super admins see all, admins see the institutions they own, members see their own institution. `search_text` matches name, code and city."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export institutions in the background",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/institutions/export-jobs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "export-jobs"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "'deleted' is available to super admins only",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "admin_user_id",
+                  "value": "",
+                  "description": "Institutions owned by this admin",
+                  "disabled": true
+                },
+                {
+                  "key": "country",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "state",
+                  "value": "",
+                  "description": "Exact state name, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "city",
+                  "value": "",
+                  "description": "Exact city name, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "affiliation",
+                  "value": "",
+                  "description": "Exact affiliation, e.g. CBSE",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_column",
+                  "value": "created_time",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.job) { pm.collectionVariables.set('job_id', body.job.job_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export institutions (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/institutions/export",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "export"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "'deleted' is available to super admins only",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "admin_user_id",
+                  "value": "",
+                  "description": "Institutions owned by this admin",
+                  "disabled": true
+                },
+                {
+                  "key": "country",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "state",
+                  "value": "",
+                  "description": "Exact state name, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "city",
+                  "value": "",
+                  "description": "Exact city name, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "affiliation",
+                  "value": "",
+                  "description": "Exact affiliation, e.g. CBSE",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_column",
+                  "value": "created_time",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Accepts the same filters as `GET /institutions`, including member counts per institution."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get an institution",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/institutions/{{organization_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "{{organization_id}}"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update an institution",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/institutions/{{organization_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "{{organization_id}}"
+              ],
+              "query": []
+            },
+            "description": "Partial update: only the fields you send are changed. Only super admins can change `admin_user_id`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete an institution",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/institutions/{{organization_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "{{organization_id}}"
+              ],
+              "query": []
+            },
+            "description": "Hides the institution and blocks all its members. Records are kept for audit history."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activate or suspend an institution",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/institutions/{{organization_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "{{organization_id}}",
+                "status"
+              ],
+              "query": []
+            },
+            "description": "Suspending signs out every member immediately and blocks their logins.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign out every member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/institutions/{{organization_id}}/revoke",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "{{organization_id}}",
+                "revoke"
+              ],
+              "query": []
+            },
+            "description": "Ends all sessions of everyone in the institution. Accounts stay active."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Employers",
+      "item": [
+        {
+          "name": "Create an employer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/employers",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employers"
+              ],
+              "query": []
+            },
+            "description": "Hiring companies for the job portal. Super admins must set `admin_user_id` (an admin with the careers.manage scope); admins with that scope own the employers they create.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List employers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/employers",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employers"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number, starting at 1",
+                  "disabled": true
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "description": "Records per page (max 100)",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "'deleted' is available to super admins only",
+                  "disabled": true
+                },
+                {
+                  "key": "industry",
+                  "value": "",
+                  "description": "Exact industry, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "admin_user_id",
+                  "value": "",
+                  "description": "Employers owned by this admin",
+                  "disabled": true
+                },
+                {
+                  "key": "country",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "state",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "city",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_column",
+                  "value": "created_time",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Super admins see all, admins see the employers they own, employer members see their own employer. `search_text` matches name, code and city."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export employers in the background",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/employers/export-jobs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employers",
+                "export-jobs"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "'deleted' is available to super admins only",
+                  "disabled": true
+                },
+                {
+                  "key": "industry",
+                  "value": "",
+                  "description": "Exact industry, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "admin_user_id",
+                  "value": "",
+                  "description": "Employers owned by this admin",
+                  "disabled": true
+                },
+                {
+                  "key": "country",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "state",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "city",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_column",
+                  "value": "created_time",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.job) { pm.collectionVariables.set('job_id', body.job.job_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export employers (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/employers/export",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employers",
+                "export"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "'deleted' is available to super admins only",
+                  "disabled": true
+                },
+                {
+                  "key": "industry",
+                  "value": "",
+                  "description": "Exact industry, case-insensitive",
+                  "disabled": true
+                },
+                {
+                  "key": "admin_user_id",
+                  "value": "",
+                  "description": "Employers owned by this admin",
+                  "disabled": true
+                },
+                {
+                  "key": "country",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "state",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "city",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_column",
+                  "value": "created_time",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Accepts the same filters as `GET /employers`, including member counts per employer."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get an employer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/employers/{{organization_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employers",
+                "{{organization_id}}"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update an employer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/employers/{{organization_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employers",
+                "{{organization_id}}"
+              ],
+              "query": []
+            },
+            "description": "Partial update: only the fields you send are changed. Only super admins can change `admin_user_id`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete an employer",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/employers/{{organization_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employers",
+                "{{organization_id}}"
+              ],
+              "query": []
+            },
+            "description": "Hides the employer and blocks all its members. Records are kept for audit history."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activate or suspend an employer",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/employers/{{organization_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employers",
+                "{{organization_id}}",
+                "status"
+              ],
+              "query": []
+            },
+            "description": "Suspending signs out every employer admin and recruiter immediately.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign out every member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/employers/{{organization_id}}/revoke",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employers",
+                "{{organization_id}}",
+                "revoke"
+              ],
+              "query": []
+            },
+            "description": "Ends all sessions of everyone in the employer. Accounts stay active."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Jobs",
+      "item": [
+        {
+          "name": "List my background jobs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/jobs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobs"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number, starting at 1",
+                  "disabled": true
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "description": "Records per page (max 100)",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get a job's status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/jobs/{{job_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobs",
+                "{{job_id}}"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Download a completed export",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/jobs/{{job_id}}/download",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobs",
+                "{{job_id}}",
+                "download"
+              ],
+              "query": []
+            },
+            "description": "Only the person who requested the export can download it, until `expires_time`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Audit log",
+      "item": [
+        {
+          "name": "List audit log entries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/audit-logs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number, starting at 1",
+                  "disabled": true
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "description": "Records per page (max 100)",
+                  "disabled": true
+                },
+                {
+                  "key": "category",
+                  "value": "",
+                  "description": "auth, user, institution, employer or job",
+                  "disabled": true
+                },
+                {
+                  "key": "action",
+                  "value": "user.status_changed",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "actor_user_id",
+                  "value": "",
+                  "description": "Changes made by this person",
+                  "disabled": true
+                },
+                {
+                  "key": "user_id",
+                  "value": "",
+                  "description": "History of this user (as actor or subject)",
+                  "disabled": true
+                },
+                {
+                  "key": "organization_id",
+                  "value": "",
+                  "description": "Everything in this institution",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Who did what and when, newest first. Super admins see everything; admins see their institutions and their own actions; institution heads see their institution. Use `user_id` for one person's history."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Directory",
+      "item": [
+        {
+          "name": "Look up organisations by name or code",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/directory/organizations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "directory",
+                "organizations"
+              ],
+              "query": [
+                {
+                  "key": "search_text",
+                  "value": "",
+                  "description": "Case-insensitive 'contains' search, at least 2 characters",
+                  "disabled": true
+                },
+                {
+                  "key": "created_from",
+                  "value": "",
+                  "description": "Created on or after this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "created_to",
+                  "value": "",
+                  "description": "Created on or before this date (YYYY-MM-DD, UTC)",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number, starting at 1",
+                  "disabled": true
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "description": "Records per page (max 100)",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "description": "institution or employer",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "One organisation's name",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/directory/organizations/{{organization_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "directory",
+                "organizations",
+                "{{organization_id}}"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Permissions",
+      "item": [
+        {
+          "name": "Every permission there is",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/permissions/catalog",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "permissions",
+                "catalog"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Each member role's permissions (1/0)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/permissions/roles",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "permissions",
+                "roles"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change a role's permissions",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/permissions/roles/{role}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "permissions",
+                "roles",
+                "{role}"
+              ],
+              "query": []
+            },
+            "description": "Applies to everyone with the role. Their open sessions pick it up on their next token refresh (within seconds); nobody is signed out.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "One person's permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}/permissions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{user_id}}",
+                "permissions"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Grant or remove permissions for one person",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}/permissions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{user_id}}",
+                "permissions"
+              ],
+              "query": []
+            },
+            "description": "true grants, false removes, null goes back to what their role gives. For an admin this edits their scopes. Takes effect on their next token refresh (within seconds); they stay signed in.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('response uses the standard envelope', function () {",
+                  "  const type = pm.response.headers.get('Content-Type') || '';",
+                  "  if (!type.includes('application/json')) { return; }",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('code');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

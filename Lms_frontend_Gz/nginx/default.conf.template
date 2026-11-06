@@ -1,0 +1,61 @@
+# Rendered by the nginx image at start (envsubst): ${API_UPSTREAM}, ${API_MAX_BODY}.
+# Serves the built app and forwards /api to the API gateway on the same origin.
+
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    server_tokens off;
+
+    # Behind Caddy (https on a server) the visitor's address arrives in X-Forwarded-For; trust it only from private
+    # (container) addresses, so a visitor connecting directly cannot pretend to be someone else.
+    set_real_ip_from 10.0.0.0/8;
+    set_real_ip_from 172.16.0.0/12;
+    set_real_ip_from 192.168.0.0/16;
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+
+    # Security headers live in one snippet, included wherever a location adds its own header (nginx drops inherited
+    # add_header lines in a block that has any of its own).
+    include /etc/nginx/conf.d/security-headers.inc;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+
+    location = /healthz {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    # Docker's DNS, re-asked every 10 s: a restarted gateway gets a new address and the site keeps working.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
+    location /api/ {
+        set $api_upstream ${API_UPSTREAM};
+        proxy_pass $api_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        # Replaced, not appended: the gateway (TRUST_PROXY_HEADERS=true) takes the first entry as the caller.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        # Long-polled code runs and streamed tutor replies.
+        proxy_read_timeout 120s;
+        proxy_buffering off;
+        client_max_body_size ${API_MAX_BODY};
+    }
+
+    # Hashed build files never change: cache them for a year.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        include /etc/nginx/conf.d/security-headers.inc;
+        try_files $uri =404;
+    }
+
+    # Every other path is a page of the single-page app; index.html must always be fresh.
+    location / {
+        add_header Cache-Control "no-cache" always;
+        include /etc/nginx/conf.d/security-headers.inc;
+        try_files $uri /index.html;
+    }
+}

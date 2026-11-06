@@ -1,0 +1,15 @@
+# Career module
+
+> Status: **Done** · Backend: `lms-backend/career-service` · Roadmap: Phase 8
+> Gated by the single `career` section (students; institution staff/heads; `careers.manage` admins). The shared-resume page is public.
+
+Sections (see [src/modules/README.md](../README.md) for the layout rules):
+
+- `profile/` — the student's skill profile: headline, summary, contact, links, target roles, and items by kind. Certificates, completed courses and assessment scores are **verified** (added by the platform from certificate/learning/assessment events, read-only); education, experience, projects, skills and achievements are self-declared (add, edit, delete, reorder). `form/itemFields.ts` holds each kind's fields and the form ↔ `data` mapping (server field errors `data.<field>` land on the field). Staff and careers managers look a student up (`/career/students`, a picker from `user-management/common`'s `useStudentOptions`) and read the profile.
+- `resumes/` — two screens (design canvas https://claude.ai/artifact/AWD2YGNPrXjKEsuX6iH2Tt). **List** (`pages/ResumesListPage`): cards with the live ATS score; "New resume" is one pop-up (`components/NewResumeDialog` + `new/`) — start from (profile, upload old resume, LinkedIn PDF, empty), experience level, role (typed or a suggestion) — every choice served by `GET /resume-options`. A file start adds a review step (`new/ImportReview`): the student keeps the entries career-service read and checked, sent with `POST /profile/items/bulk`. **Editor** (`pages/ResumeEditorPage`): one workspace that saves itself (`hooks/useResumeDraft`: 0.8 s after typing stops, each save carries the revision the last one returned; `STALE_DRAFT` reloads) — header (name, save state, experience level, look, Download/share), sections on the left (drag or arrows to reorder, show/hide, tick entries, reword points with AI), the live document in the middle, and tabs on the right: **Score** (the server's `path_to_100`, each fix opens the right section or tab), **Job match** (job post saved on the resume, keyword gap, tailored summary), **AI write** (summary in a server-offered tone, polish, writing checks). Download, share link and versions are one pop-up (`tools/ShareDialog`).
+- AI help (summary, polish, bullet rewrite, tailored summary) goes through career-service, which marks any suggestion that mentions something not in the student's facts; those can't be applied (`components/tools/SuggestionList`). Nothing is saved until the student applies a suggestion and saves the draft.
+- `public/` — `/resume/:token` in `shared/layout/PublicLayout`, the shared resume and its PDF; unknown, revoked and expired links all read "not available".
+
+**Nav:** one "Career" item; `CareerHomePage` sends students to their profile and staff/careers managers to the student lookup.
+
+**Template preview:** "Preview" beside the template picker opens the saved resume in that template as a PDF (`export/pdf?template_key=&inline=true`; nothing is saved).

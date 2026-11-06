@@ -1,0 +1,6240 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LMS Career Service",
+    "description": "A student's verified skill profile and AI-assisted resume builder: platform-verified certificates, courses and assessment scores next to self-declared entries (labelled), ATS-safe templates, versions, rule-based ATS score and keyword gap, AI suggestions checked against the student's own facts, PDF, JSON Resume and public share links.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health/live": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Liveness probe",
+        "operationId": "live_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Live Health Live Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Readiness probe (database and Redis)",
+        "operationId": "ready_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profile": {
+      "get": {
+        "tags": [
+          "Skill profile"
+        ],
+        "summary": "My skill profile",
+        "description": "Personal details from user-management (verified), my own entries (self-declared) and the items the platform added — certificates, completed courses, assessment scores (verified, read-only). A revoked certificate stays listed with `active: false` and the reason, but never reaches a resume.",
+        "operationId": "my_profile_api_v1_profile_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Skill profile"
+        ],
+        "summary": "Update headline, summary, contact details, links, target roles",
+        "operationId": "update_profile_api_v1_profile_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/items": {
+      "post": {
+        "tags": [
+          "Skill profile"
+        ],
+        "summary": "Add an education, experience, project, skill or achievement",
+        "description": "`data` depends on `kind` (see docs/API.md). Certificates, courses and assessment scores cannot be added by hand (`403 VERIFIED_KIND`).",
+        "operationId": "add_item_api_v1_profile_items_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/items/order": {
+      "put": {
+        "tags": [
+          "Skill profile"
+        ],
+        "summary": "Reorder one kind of item",
+        "operationId": "reorder_api_v1_profile_items_order_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemReorder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/items/{item_id}": {
+      "patch": {
+        "tags": [
+          "Skill profile"
+        ],
+        "summary": "Edit one of my own entries",
+        "operationId": "update_item_api_v1_profile_items__item_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Skill profile"
+        ],
+        "summary": "Delete one of my own entries",
+        "operationId": "delete_item_api_v1_profile_items__item_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/students/{user_id}/profile": {
+      "get": {
+        "tags": [
+          "Skill profile (staff)"
+        ],
+        "summary": "A student's profile (institution staff for their own institution, careers managers)",
+        "description": "Verified items and the student's self-declared entries, labelled. Read only.",
+        "operationId": "student_profile_api_v1_students__user_id__profile_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resume-templates": {
+      "get": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "Resume templates",
+        "description": "Every template is single-column plain text with standard headings, so an applicant tracking system reads it in order.",
+        "operationId": "templates_api_v1_resume_templates_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplatesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/resumes": {
+      "get": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "My resumes",
+        "operationId": "list_resumes_api_v1_resumes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Per Page"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "Create a resume",
+        "description": "Starts from everything in the profile (education, projects, experience, skills, certificates…) in a sensible order, unless `blank`. Keep one resume per target role.",
+        "operationId": "create_resume_api_v1_resumes_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}": {
+      "get": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "A resume: its draft, the document it resolves to now, and its ATS score",
+        "description": "`draft` is what you edit (send its `draft_revision` back as `expected_revision`). `document` is what a reader sees: verified entries are marked `verified: true`, entries deleted from the profile or revoked are gone.",
+        "operationId": "get_resume_api_v1_resumes__resume_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "Edit a resume",
+        "description": "Send the `draft_revision` you loaded as `expected_revision`: if the resume changed since (another tab), `409 STALE_DRAFT`. Sections are reordered by the order of `draft.sections`; items by the order of each section's `items`. A section may only hold items of its own kind, and only your own entries can carry their own `bullets`.",
+        "operationId": "update_resume_api_v1_resumes__resume_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "Delete a resume (its share link stops working at once)",
+        "operationId": "delete_resume_api_v1_resumes__resume_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/duplicate": {
+      "post": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "Copy a resume (for another target role)",
+        "operationId": "duplicate_api_v1_resumes__resume_id__duplicate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate or conflicting data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "DUPLICATE_DATA",
+                  "message": "A record with the same details already exists.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/versions": {
+      "get": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "Saved versions, newest first",
+        "operationId": "versions_api_v1_resumes__resume_id__versions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "Save a version",
+        "description": "Freezes the draft and the document it resolves to right now, with its ATS score. The newest 50 are kept.",
+        "operationId": "save_version_api_v1_resumes__resume_id__versions_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/versions/{version_no}": {
+      "get": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "One saved version with its document",
+        "operationId": "get_version_api_v1_resumes__resume_id__versions__version_no__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_no",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version No"
+            }
+          },
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/versions/{version_no}/restore": {
+      "post": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "Restore a version into the draft",
+        "description": "The current draft is saved as a version first, so nothing is lost.",
+        "operationId": "restore_api_v1_resumes__resume_id__versions__version_no__restore_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_no",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version No"
+            }
+          },
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/ats": {
+      "post": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "ATS score with the fixes that raise it",
+        "description": "Computed by fixed rules, so the same resume always scores the same. With a job description (the request's, or the one saved on the resume) the score includes keyword match. `fixes` are ordered most valuable first.",
+        "operationId": "ats_api_v1_resumes__resume_id__ats_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/keyword-gap": {
+      "post": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "Keyword gap against a job description",
+        "description": "`add_from_profile` are terms the job wants that your profile already supports but this resume leaves out. `not_in_profile` are terms you have not recorded anywhere: add them only if they are true.",
+        "operationId": "keyword_gap_api_v1_resumes__resume_id__keyword_gap_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/grammar": {
+      "post": {
+        "tags": [
+          "Resumes"
+        ],
+        "summary": "Grammar and tone check (rule-based, no AI)",
+        "description": "Repeated words, spacing, first person, weak openings, filler and buzzwords, across the summary and every bullet you wrote.",
+        "operationId": "grammar_api_v1_resumes__resume_id__grammar_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrammarResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/ai/summary": {
+      "post": {
+        "tags": [
+          "Resumes: AI and export"
+        ],
+        "summary": "Suggest a summary",
+        "description": "The result is a **suggestion**: anything it says that is not in your profile (a number, a name, a link, a keyword you do not have) is listed in `warnings` and `applicable` is false. Nothing is saved; apply a suggestion by editing your resume.",
+        "operationId": "ai_summary_api_v1_resumes__resume_id__ai_summary_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SummaryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The AI assistant is unavailable",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "AI_UNAVAILABLE",
+                  "message": "The AI assistant is not available right now. Please try again in a few minutes.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/ai/rewrite": {
+      "post": {
+        "tags": [
+          "Resumes: AI and export"
+        ],
+        "summary": "Rewrite bullets with impact",
+        "description": "The result is a **suggestion**: anything it says that is not in your profile (a number, a name, a link, a keyword you do not have) is listed in `warnings` and `applicable` is false. Nothing is saved; apply a suggestion by editing your resume.",
+        "operationId": "ai_rewrite_api_v1_resumes__resume_id__ai_rewrite_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RewriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The AI assistant is unavailable",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "AI_UNAVAILABLE",
+                  "message": "The AI assistant is not available right now. Please try again in a few minutes.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/ai/polish": {
+      "post": {
+        "tags": [
+          "Resumes: AI and export"
+        ],
+        "summary": "Correct grammar and tone of a text",
+        "description": "The result is a **suggestion**: anything it says that is not in your profile (a number, a name, a link, a keyword you do not have) is listed in `warnings` and `applicable` is false. Nothing is saved; apply a suggestion by editing your resume.",
+        "operationId": "ai_polish_api_v1_resumes__resume_id__ai_polish_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The AI assistant is unavailable",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "AI_UNAVAILABLE",
+                  "message": "The AI assistant is not available right now. Please try again in a few minutes.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/ai/tailor": {
+      "post": {
+        "tags": [
+          "Resumes: AI and export"
+        ],
+        "summary": "Tailor to a job description",
+        "description": "The keyword gap (rule-based) for the job, and optionally a summary that leans on the keywords your facts support. The result is a **suggestion**: anything it says that is not in your profile (a number, a name, a link, a keyword you do not have) is listed in `warnings` and `applicable` is false. Nothing is saved; apply a suggestion by editing your resume.",
+        "operationId": "ai_tailor_api_v1_resumes__resume_id__ai_tailor_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TailorRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The AI assistant is unavailable",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "AI_UNAVAILABLE",
+                  "message": "The AI assistant is not available right now. Please try again in a few minutes.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/export/pdf": {
+      "get": {
+        "tags": [
+          "Resumes: AI and export"
+        ],
+        "summary": "Download as PDF",
+        "description": "Server-rendered with the resume's template, from the current draft or from a saved `version_no`. `template_key` renders it with another template instead, to preview that template with the student's own data (nothing is saved); `inline=true` asks the browser to show it rather than download it. The PDF uses standard fonts: characters outside Latin-1 (for example Devanagari) print as `?`, and `X-Unrenderable-Characters` says how many.",
+        "operationId": "export_pdf_api_v1_resumes__resume_id__export_pdf_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          },
+          {
+            "name": "version_no",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version No"
+            }
+          },
+          {
+            "name": "template_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Preview with this template instead of the resume's own",
+              "title": "Template Key"
+            },
+            "description": "Preview with this template instead of the resume's own"
+          },
+          {
+            "name": "inline",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Inline"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The PDF",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/export/json-resume": {
+      "get": {
+        "tags": [
+          "Resumes: AI and export"
+        ],
+        "summary": "Download as JSON Resume",
+        "operationId": "export_json_api_v1_resumes__resume_id__export_json_resume_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          },
+          {
+            "name": "version_no",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version No"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/{resume_id}/share": {
+      "post": {
+        "tags": [
+          "Resumes: AI and export"
+        ],
+        "summary": "Create a public share link",
+        "description": "Pins the link to a saved version (a fresh snapshot of the draft by default), so later edits never change what was sent. Sharing again replaces the previous link. Contact details are hidden unless `show_contact`. The link expires (30 days by default) and can be revoked.",
+        "operationId": "share_api_v1_resumes__resume_id__share_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Resumes: AI and export"
+        ],
+        "summary": "Revoke the public link",
+        "operationId": "unshare_api_v1_resumes__resume_id__share_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_TOKEN",
+                  "message": "Your access token is invalid or has expired.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/resumes/{token}": {
+      "get": {
+        "tags": [
+          "Public share"
+        ],
+        "summary": "A shared resume as JSON Resume",
+        "description": "No login. An unknown, revoked, expired or deleted link is one and the same `404 SHARE_NOT_FOUND`.",
+        "operationId": "public_resume_api_v1_public_resumes__token__get",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/resumes/{token}/pdf": {
+      "get": {
+        "tags": [
+          "Public share"
+        ],
+        "summary": "A shared resume as PDF",
+        "operationId": "public_pdf_api_v1_public_resumes__token__pdf_get",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The PDF",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited, or the institution's AI allowance is used up (`QUOTA_EXCEEDED`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "TOO_MANY_REQUESTS",
+                  "message": "Too many requests. Please try again later.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/internal/resumes/{resume_id}/snapshot": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "summary": "Freeze a student's resume as a new version and return it",
+        "description": "Requires `X-Internal-Service-Token`. `user_id` must own the resume (`404` otherwise). The version is labelled with `label`, so the student can see in their version list exactly what was sent with an application.",
+        "operationId": "snapshot_api_v1_internal_resumes__resume_id__snapshot_post",
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resume Id"
+            }
+          },
+          {
+            "name": "X-Internal-Service-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Service-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnapshotRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "PERMISSION_DENIED",
+                  "message": "You do not have permission to perform this action.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "RESUME_NOT_FOUND",
+                  "message": "Resume not found.",
+                  "details": [],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "code": "INVALID_DATA",
+                  "message": "Some fields are missing or invalid.",
+                  "details": [
+                    {
+                      "field": "title",
+                      "code": "REQUIRED",
+                      "message": "This field is required"
+                    }
+                  ],
+                  "request_id": "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AtsRequest": {
+        "properties": {
+          "job_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Description",
+            "description": "Defaults to the one saved on the resume"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AtsRequest"
+      },
+      "AtsResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "ats": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "ats"
+        ],
+        "title": "AtsResponse"
+      },
+      "DraftIn": {
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/SummaryIn"
+          },
+          "personal": {
+            "$ref": "#/components/schemas/PersonalIn"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SectionIn"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Sections"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DraftIn"
+      },
+      "ErrorDetail": {
+        "properties": {
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field",
+            "examples": [
+              "personal_info.phone"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "examples": [
+              "INVALID_PHONE"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Enter a valid phone number, e.g. +919876543210"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "code",
+          "message"
+        ],
+        "title": "ErrorDetail"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "error",
+            "title": "Status",
+            "default": "error"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "examples": [
+              "INVALID_DATA"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Some fields are missing or invalid."
+            ]
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            },
+            "type": "array",
+            "title": "Details"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id",
+            "examples": [
+              "5f0c2b9ad4e84d6c9d1f3a7e2b8c4d10"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorResponse"
+      },
+      "GrammarResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "issues": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "issues"
+        ],
+        "title": "GrammarResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ItemCreate": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ItemKind"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "data"
+        ],
+        "title": "ItemCreate"
+      },
+      "ItemKind": {
+        "type": "string",
+        "enum": [
+          "education",
+          "experience",
+          "project",
+          "skill",
+          "achievement",
+          "certificate",
+          "course",
+          "skill_score"
+        ],
+        "title": "ItemKind"
+      },
+      "ItemOut": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "title": "Item Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          },
+          "derived": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Derived"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "inactive_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inactive Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "kind",
+          "verified",
+          "label",
+          "source",
+          "active",
+          "data",
+          "derived",
+          "position"
+        ],
+        "title": "ItemOut"
+      },
+      "ItemReorder": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ItemKind"
+          },
+          "item_ids": {
+            "items": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{9,18}$",
+              "examples": [
+                "1755000000050001"
+              ]
+            },
+            "type": "array",
+            "maxItems": 60,
+            "title": "Item Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "item_ids"
+        ],
+        "title": "ItemReorder"
+      },
+      "ItemResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "item": {
+            "$ref": "#/components/schemas/ItemOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "item"
+        ],
+        "title": "ItemResponse"
+      },
+      "ItemUpdate": {
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ItemUpdate"
+      },
+      "ItemsResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "items"
+        ],
+        "title": "ItemsResponse"
+      },
+      "LinkIn": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "url"
+        ],
+        "title": "LinkIn"
+      },
+      "LinkOut": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "url"
+        ],
+        "title": "LinkOut"
+      },
+      "PageContext": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "examples": [
+              1
+            ]
+          },
+          "per_page": {
+            "type": "integer",
+            "title": "Per Page",
+            "examples": [
+              20
+            ]
+          },
+          "total_records": {
+            "type": "integer",
+            "title": "Total Records",
+            "description": "Capped; see total_is_exact",
+            "examples": [
+              57
+            ]
+          },
+          "total_is_exact": {
+            "type": "boolean",
+            "title": "Total Is Exact",
+            "description": "False when more records match than were counted",
+            "examples": [
+              true
+            ]
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages",
+            "examples": [
+              3
+            ]
+          },
+          "has_more_page": {
+            "type": "boolean",
+            "title": "Has More Page",
+            "examples": [
+              true
+            ]
+          },
+          "sort_column": {
+            "type": "string",
+            "title": "Sort Column",
+            "examples": [
+              "created_time"
+            ]
+          },
+          "sort_order": {
+            "$ref": "#/components/schemas/SortOrder"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "per_page",
+          "total_records",
+          "total_is_exact",
+          "total_pages",
+          "has_more_page",
+          "sort_column",
+          "sort_order"
+        ],
+        "title": "PageContext"
+      },
+      "PersonalIn": {
+        "properties": {
+          "show_phone": {
+            "type": "boolean",
+            "title": "Show Phone",
+            "default": true
+          },
+          "show_location": {
+            "type": "boolean",
+            "title": "Show Location",
+            "default": true
+          },
+          "show_links": {
+            "type": "boolean",
+            "title": "Show Links",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PersonalIn"
+      },
+      "PersonalOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "name_verified": {
+            "type": "boolean",
+            "title": "Name Verified",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "email"
+        ],
+        "title": "PersonalOut"
+      },
+      "ProfileOut": {
+        "properties": {
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/LinkOut"
+            },
+            "type": "array",
+            "title": "Links"
+          },
+          "target_roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Roles"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "headline",
+          "summary",
+          "phone",
+          "location",
+          "links",
+          "target_roles",
+          "revision"
+        ],
+        "title": "ProfileOut"
+      },
+      "ProfileResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileOut"
+          },
+          "personal": {
+            "$ref": "#/components/schemas/PersonalOut"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "profile",
+          "personal",
+          "items"
+        ],
+        "title": "ProfileResponse"
+      },
+      "ProfileUpdate": {
+        "properties": {
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "links": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LinkIn"
+                },
+                "type": "array",
+                "maxItems": 6
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Links"
+          },
+          "target_roles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Roles"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ProfileUpdate"
+      },
+      "ResumeCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "target_role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Role"
+          },
+          "template_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Key"
+          },
+          "job_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Description"
+          },
+          "blank": {
+            "type": "boolean",
+            "title": "Blank",
+            "description": "Start with no sections instead of everything in the profile",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "ResumeCreate"
+      },
+      "ResumeDetail": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "resume": {
+            "$ref": "#/components/schemas/ResumeOut"
+          },
+          "job_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Description"
+          },
+          "draft": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Draft"
+          },
+          "document": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Document"
+          },
+          "ats": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "resume",
+          "job_description",
+          "draft",
+          "document",
+          "ats"
+        ],
+        "title": "ResumeDetail"
+      },
+      "ResumeOut": {
+        "properties": {
+          "resume_id": {
+            "type": "string",
+            "title": "Resume Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "target_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Role"
+          },
+          "template_key": {
+            "type": "string",
+            "title": "Template Key"
+          },
+          "draft_revision": {
+            "type": "integer",
+            "title": "Draft Revision"
+          },
+          "latest_version_no": {
+            "type": "integer",
+            "title": "Latest Version No"
+          },
+          "shared": {
+            "type": "boolean",
+            "title": "Shared",
+            "default": false
+          },
+          "share_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-09-22T10:30:00Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Expires At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "examples": [
+              "2026-09-22T10:30:00Z"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "examples": [
+              "2026-09-22T10:30:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "resume_id",
+          "title",
+          "target_role",
+          "template_key",
+          "draft_revision",
+          "latest_version_no",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ResumeOut"
+      },
+      "ResumePage": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "resumes": {
+            "items": {
+              "$ref": "#/components/schemas/ResumeOut"
+            },
+            "type": "array",
+            "title": "Resumes"
+          },
+          "page_context": {
+            "$ref": "#/components/schemas/PageContext"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "resumes",
+          "page_context"
+        ],
+        "title": "ResumePage"
+      },
+      "ResumeResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "resume": {
+            "$ref": "#/components/schemas/ResumeOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "resume"
+        ],
+        "title": "ResumeResponse"
+      },
+      "ResumeUpdate": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "description": "The draft_revision you loaded; a stale one is refused with 409 STALE_DRAFT"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "target_role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Role"
+          },
+          "template_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Key"
+          },
+          "job_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Description"
+          },
+          "draft": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DraftIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision"
+        ],
+        "title": "ResumeUpdate"
+      },
+      "RewriteRequest": {
+        "properties": {
+          "bullets": {
+            "items": {
+              "type": "string",
+              "maxLength": 300,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Bullets"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context",
+            "description": "For example the role or project the bullets belong to"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "bullets"
+        ],
+        "title": "RewriteRequest"
+      },
+      "SectionIn": {
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/SectionKey"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Defaults to the standard heading; a non-standard heading lowers the ATS score"
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible",
+            "default": true
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SectionItemIn"
+            },
+            "type": "array",
+            "maxItems": 60,
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "title": "SectionIn"
+      },
+      "SectionItemIn": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{9,18}$",
+            "title": "Item Id",
+            "examples": [
+              "1755000000050001"
+            ]
+          },
+          "bullets": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 300,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bullets",
+            "description": "This resume's own wording for a self-declared item; ignored for verified items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item_id"
+        ],
+        "title": "SectionItemIn"
+      },
+      "SectionKey": {
+        "type": "string",
+        "enum": [
+          "summary",
+          "experience",
+          "education",
+          "projects",
+          "skills",
+          "certificates",
+          "courses",
+          "skill_scores",
+          "achievements"
+        ],
+        "title": "SectionKey"
+      },
+      "ShareOut": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "url_path": {
+            "type": "string",
+            "title": "Url Path"
+          },
+          "version_no": {
+            "type": "integer",
+            "title": "Version No"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-09-22T10:30:00Z"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "show_contact": {
+            "type": "boolean",
+            "title": "Show Contact"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "url_path",
+          "version_no",
+          "expires_at",
+          "show_contact"
+        ],
+        "title": "ShareOut"
+      },
+      "ShareRequest": {
+        "properties": {
+          "version_no": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version No",
+            "description": "Defaults to a fresh snapshot of the current draft"
+          },
+          "expires_in_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 365.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In Days"
+          },
+          "show_contact": {
+            "type": "boolean",
+            "title": "Show Contact",
+            "description": "Show email, phone and location on the public page (off by default)",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ShareRequest"
+      },
+      "ShareResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "share": {
+            "$ref": "#/components/schemas/ShareOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "share"
+        ],
+        "title": "ShareResponse"
+      },
+      "SnapshotRequest": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{9,18}$",
+            "title": "User Id",
+            "examples": [
+              "1755000000003001"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_id",
+          "label"
+        ],
+        "title": "SnapshotRequest"
+      },
+      "SnapshotResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "resume_id": {
+            "type": "string",
+            "title": "Resume Id"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "target_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Role"
+          },
+          "version_no": {
+            "type": "integer",
+            "title": "Version No"
+          },
+          "template_key": {
+            "type": "string",
+            "title": "Template Key"
+          },
+          "ats_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ats Score"
+          },
+          "document": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Document"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "resume_id",
+          "user_id",
+          "title",
+          "target_role",
+          "version_no",
+          "template_key",
+          "ats_score",
+          "document"
+        ],
+        "title": "SnapshotResponse"
+      },
+      "SortOrder": {
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "title": "SortOrder"
+      },
+      "SuggestionResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "suggestion": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Suggestion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "suggestion"
+        ],
+        "title": "SuggestionResponse"
+      },
+      "SuggestionsResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "suggestions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "suggestions"
+        ],
+        "title": "SuggestionsResponse"
+      },
+      "SummaryIn": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SummaryIn"
+      },
+      "SummaryRequest": {
+        "properties": {
+          "tone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone",
+            "description": "professional (default), warm or concise"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SummaryRequest"
+      },
+      "TailorRequest": {
+        "properties": {
+          "job_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Description"
+          },
+          "include_summary": {
+            "type": "boolean",
+            "title": "Include Summary",
+            "description": "Also ask the AI for a summary that leans on the keywords you genuinely have",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TailorRequest"
+      },
+      "TemplateOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "ats_safe": {
+            "type": "boolean",
+            "title": "Ats Safe"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "description",
+          "ats_safe"
+        ],
+        "title": "TemplateOut"
+      },
+      "TemplatesResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateOut"
+            },
+            "type": "array",
+            "title": "Templates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "templates"
+        ],
+        "title": "TemplatesResponse"
+      },
+      "TextRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "tone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "TextRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VersionCreate": {
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "VersionCreate"
+      },
+      "VersionDetail": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "version": {
+            "$ref": "#/components/schemas/VersionOut"
+          },
+          "document": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Document"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "version",
+          "document"
+        ],
+        "title": "VersionDetail"
+      },
+      "VersionOut": {
+        "properties": {
+          "version_no": {
+            "type": "integer",
+            "title": "Version No"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "template_key": {
+            "type": "string",
+            "title": "Template Key"
+          },
+          "ats_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ats Score"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "examples": [
+              "2026-09-22T10:30:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "version_no",
+          "label",
+          "source",
+          "template_key",
+          "ats_score",
+          "note",
+          "created_at"
+        ],
+        "title": "VersionOut"
+      },
+      "VersionResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "version": {
+            "$ref": "#/components/schemas/VersionOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "version"
+        ],
+        "title": "VersionResponse"
+      },
+      "VersionsResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status",
+            "default": "success"
+          },
+          "code": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Code",
+            "default": "SUCCESS"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Operation completed successfully."
+            ]
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/VersionOut"
+            },
+            "type": "array",
+            "title": "Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "versions"
+        ],
+        "title": "VersionsResponse"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "description": "Access token issued by user-management's /auth/login",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

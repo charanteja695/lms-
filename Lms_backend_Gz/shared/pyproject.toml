@@ -1,0 +1,26 @@
+[project]
+name = "lms-common"
+version = "0.1.0"
+description = "Code every LMS microservice reuses: JWT/JWKS verification, response envelopes, pagination, public ids, event consumption and shared access-revocation state. Contains no business logic."
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.8,<3",
+    "PyJWT[crypto]>=2.9,<3",
+    "redis>=5.0.1,<8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "fakeredis>=2.23"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["lms_common*"]
+
+[tool.setuptools.package-data]
+lms_common = ["py.typed"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

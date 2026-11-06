@@ -1,0 +1,72 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+from app.api.v1.endpoints import health
+from app.api.v1.router import api_router
+from app.core.config import Settings, get_settings
+from app.core.error_handlers import register_exception_handlers
+from app.core.logging import configure_logging
+from app.db.redis import build_redis
+from app.db.session import build_engine, build_sessionmaker
+from app.middleware.request_context import RequestContextMiddleware
+from app.middleware.security_headers import SecurityHeadersMiddleware
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    engine = build_engine(settings)
+    app.state.engine = engine
+    app.state.sessionmaker = build_sessionmaker(engine)
+    app.state.redis = build_redis(settings)
+    try:
+        yield
+    finally:
+        await app.state.redis.aclose()
+        await engine.dispose()
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or get_settings()
+    configure_logging(settings.LOG_LEVEL, settings.LOG_JSON)
+
+    app = FastAPI(
+        title="LMS Billing Service",
+        version=settings.APP_VERSION,
+        description="Quotes, GST invoices, payments, credit notes and employer job-post plans (docs/PRODUCT.md §5.10): money in integer paise, gap-free "
+        "numbering per financial year, issued invoices immutable (corrections are credit notes), manual payments always available, the payment gateway a "
+        "contract only.",
+        docs_url="/docs" if settings.DOCS_ENABLED else None,
+        redoc_url="/redoc" if settings.DOCS_ENABLED else None,
+        openapi_url="/openapi.json" if settings.DOCS_ENABLED else None,
+        lifespan=lifespan,
+    )
+    register_exception_handlers(app)
+
+    # Middleware added last runs first.
+    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.TRUSTED_HOSTS)
+    if settings.CORS_ORIGINS:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.CORS_ORIGINS,
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Signature", "X-Razorpay-Signature"],
+            expose_headers=["X-Request-ID", "Retry-After"],
+            max_age=600,
+        )
+    app.add_middleware(SecurityHeadersMiddleware, enable_hsts=settings.is_production_like)
+    app.add_middleware(RequestContextMiddleware)
+
+    app.include_router(health.router)
+    app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+    return app
+
+
+app = create_app()

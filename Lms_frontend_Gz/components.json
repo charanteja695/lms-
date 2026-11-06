@@ -1,0 +1,15 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": { "config": "", "css": "src/index.css", "baseColor": "slate", "cssVariables": false, "prefix": "" },
+  "aliases": {
+    "components": "@/shared/effects",
+    "ui": "@/shared/ui",
+    "lib": "@/core/lib",
+    "utils": "@/core/lib/utils",
+    "hooks": "@/core/hooks"
+  },
+  "registries": { "@react-bits": "https://reactbits.dev/r/{name}.json" }
+}

@@ -1,0 +1,8 @@
+# Rendered at start with ${STORAGE_ORIGIN} (envsubst), included by default.conf in every block that sets headers.
+# The browser uploads to and reads from object storage directly (presigned URLs), so that origin is allowed too
+# (frame-src: PDF lessons open in the browser's own viewer inside the player).
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ${STORAGE_ORIGIN} https://cdn.razorpay.com; media-src 'self' blob: ${STORAGE_ORIGIN}; frame-src 'self' ${STORAGE_ORIGIN} https://api.razorpay.com https://checkout.razorpay.com; connect-src 'self' ${STORAGE_ORIGIN} https://api.razorpay.com https://lumberjack.razorpay.com; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+# Camera and microphone for proctored exams and spoken interviews, on this site only.
+add_header Permissions-Policy "camera=(self), microphone=(self), geolocation=()" always;
