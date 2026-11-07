@@ -214,7 +214,8 @@ export function StudentLearningPage() {
     skip: !courseId,
   });
 
-  const versionId = course?.versions?.[course.versions.length - 1]?.version_id;
+  const publishedVersion = course?.versions?.find((v) => v.status === "published");
+  const versionId = publishedVersion?.version_id || course?.versions?.[course.versions.length - 1]?.version_id;
   const { data: versionDetail, isLoading: isVersionLoading } = useGetVersionQuery(
     { courseId: courseId ?? "", versionId: versionId ?? "" },
     { skip: !courseId || !versionId }
@@ -1518,11 +1519,12 @@ export function StudentLearningPage() {
 
               <button
                 type="button"
-                disabled={!isLessonCompleted}
+                disabled={!isLessonCompleted || !(activeTopic as any)?.topic_test_id}
                 onClick={handleStartChapterTest}
+                title={!(activeTopic as any)?.topic_test_id ? "No test configured for this chapter" : undefined}
                 className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-blue-600 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs transition-colors"
               >
-                {!isLessonCompleted && <Lock size={13} />} Start chapter test
+                {(!isLessonCompleted || !(activeTopic as any)?.topic_test_id) && <Lock size={13} />} Start chapter test
               </button>
 
               {currentActiveModule && (
@@ -1743,13 +1745,17 @@ export function StudentLearningPage() {
                                 <span className="text-emerald-700 font-bold text-[10px] bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
                                   <Check size={10} /> Passed
                                 </span>
-                              ) : (
+                              ) : (t as any).topic_test_id ? (
                                 <Link
                                   to={`/courses/${courseId}/chapters/${t.topic_id}/test`}
                                   className="text-blue-600 font-bold text-[11px] hover:underline"
                                 >
                                   Take test
                                 </Link>
+                              ) : (
+                                <span className="text-slate-400 text-[10px] italic">
+                                  No test
+                                </span>
                               )}
                             </div>
                           </div>

@@ -6,11 +6,15 @@ import {
   useResumeAttemptMutation,
   useSaveAnswerMutation,
   useSubmitAttemptMutation,
+  useLazyGetResultQuery,
 } from "@/modules/assessments/attempts/api/attemptsApi";
 import { ConfirmModal } from "@/modules/catalog/courses/components/common/ConfirmModal";
 import { Icon, PageLoader } from "@/shared/ui";
 import { useNotify } from "@/core/hooks/useNotify";
 import { cn } from "@/core/lib/cn";
+import { storage } from "@/core/lib/storage";
+import { useAppSelector } from "@/app/hooks";
+import { AssessmentErrorBoundary } from "./AssessmentErrorBoundary";
 
 export interface QuestionOption {
   id: string;
@@ -55,6 +59,7 @@ export function StudentAssessmentRunner({
 }: StudentAssessmentRunnerProps) {
   const navigate = useNavigate();
   const notify = useNotify();
+  const accessToken = useAppSelector((state) => state.auth.accessToken);
   const finalReturnUrl = returnUrl || `/courses/${courseId}/learn`;
 
   const [prepareAttempt, { isLoading: isPreparingAttempt }] = usePrepareAttemptMutation();
@@ -62,6 +67,7 @@ export function StudentAssessmentRunner({
   const [resumeAttempt] = useResumeAttemptMutation();
   const [saveAnswerMutation] = useSaveAnswerMutation();
   const [submitAttemptMutation, { isLoading: isSubmittingAttempt }] = useSubmitAttemptMutation();
+  const [fetchResult] = useLazyGetResultQuery();
 
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<LoadedQuestion[]>([]);
@@ -263,21 +269,25 @@ export function StudentAssessmentRunner({
     try {
       await submitAttemptMutation(attemptId).unwrap();
 
-      // Fetch official result from assessment service
-      const res = await fetch(`/api/v1/attempts/${attemptId}/result`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-        },
-      });
-      const resultData = await res.json();
-      const r = resultData?.result || resultData;
+      // Fetch official result from assessment service via RTK Query or authenticated fetch
+      let r: any = null;
+      try {
+        r = await fetchResult(attemptId).unwrap();
+      } catch {
+        const token = accessToken || storage.readSession()?.token || "";
+        const res = await fetch(`/api/v1/attempts/${attemptId}/result`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const resultData = await res.json();
+        r = resultData?.result || resultData;
+      }
 
-      const score = Number(r.score ?? r.total_marks_awarded ?? 0);
-      const totalMarks = Number(r.max_marks ?? r.total_marks ?? questions.length * 10);
+      const score = Number(r?.score ?? r?.total_marks_awarded ?? 0);
+      const totalMarks = Number(r?.max_score ?? r?.max_marks ?? r?.total_marks ?? (questions.length * 10));
       const pct = Math.round(
-        Number(r.percentage ?? (totalMarks > 0 ? (score / totalMarks) * 100 : 0))
+        Number(r?.percent ?? r?.percentage ?? (totalMarks > 0 ? (score / totalMarks) * 100 : 0))
       );
-      const passed = Boolean(r.passed ?? pct >= passMarkPercent);
+      const passed = Boolean(r?.result === "pass" || r?.passed || pct >= passMarkPercent);
 
       setTestResult({ score, totalMarks, pct, passed });
 
@@ -290,12 +300,61 @@ export function StudentAssessmentRunner({
         notify.error(`Test score: ${pct}%. Pass mark is ${passMarkPercent}%.`);
       }
     } catch (err: any) {
-      notify.error(err?.data?.message || "Failed to submit assessment.");
+      notify.error(err?.data?.message || err?.message || "Failed to submit assessment.");
     }
   };
 
   if (isPreparingAttempt || isStartingAttempt) {
     return <PageLoader label={`Loading ${contextType} assessment...`} />;
+  }
+
+  // If error starting attempt or accessing test
+  if (loadError) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6 pb-12 pt-4">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 text-xs text-slate-500 font-medium pb-3 border-b border-slate-200">
+          <Link to="/courses/my" className="hover:text-[#00663C] transition-colors">
+            Courses
+          </Link>
+          <span>/</span>
+          <Link to={finalReturnUrl} className="hover:text-[#00663C] transition-colors">
+            {courseTitle}
+          </Link>
+          <span>/</span>
+          <span className="text-slate-800 font-bold">{contextTitle}</span>
+        </div>
+
+        {/* Error State */}
+        <div className="rounded-2xl border border-rose-200 bg-white p-10 text-center max-w-lg mx-auto space-y-4 shadow-2xs">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto ring-1 ring-rose-200">
+            <Icon name="alertTriangle" size={28} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-[#0A1530]">Assessment Unavailable</h3>
+            <p className="text-xs text-rose-700 bg-rose-50 p-2.5 rounded-xl border border-rose-200 mt-2 max-w-sm mx-auto leading-relaxed">
+              {loadError}
+            </p>
+          </div>
+          <div className="pt-2 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(finalReturnUrl)}
+              className="px-5 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs transition-colors"
+            >
+              Back to course
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // If no questions in test bank or test not configured
@@ -323,8 +382,7 @@ export function StudentAssessmentRunner({
           <div>
             <h3 className="text-lg font-bold text-[#0A1530]">No questions available yet</h3>
             <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
-              {loadError ||
-                `This ${contextType} currently has no approved questions configured in the exam bank. Please check back later or review the course materials.`}
+              {`This ${contextType} currently has no approved questions configured in the exam bank. Please check back later or review the course materials.`}
             </p>
           </div>
           <button
@@ -339,7 +397,14 @@ export function StudentAssessmentRunner({
     );
   }
 
-  const currentQ = questions[currentIndex]!;
+  const currentQ = questions[currentIndex] || questions[0];
+  if (!currentQ) {
+    return (
+      <div className="max-w-4xl mx-auto p-8 text-center text-slate-500">
+        Question data is loading...
+      </div>
+    );
+  }
   const minutes = Math.floor((secondsRemaining ?? 0) / 60);
   const seconds = (secondsRemaining ?? 0) % 60;
   const timeFormatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
@@ -349,7 +414,8 @@ export function StudentAssessmentRunner({
   const displayTitle = testTitle || contextTitle;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5 pb-12 pt-2">
+    <AssessmentErrorBoundary returnUrl={finalReturnUrl} fallbackTitle={`${contextType === "chapter" ? "Chapter" : "Module"} Test Error`}>
+      <div className="max-w-5xl mx-auto space-y-5 pb-12 pt-2">
       {/* 1. Header with Breadcrumb and Exit Button */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-200">
         <div className="space-y-1">
@@ -648,6 +714,7 @@ export function StudentAssessmentRunner({
         description={`You have answered ${answeredCount} of ${questions.length} questions (${questions.length - answeredCount} unanswered). You cannot change your answers after submission.`}
         confirmLabel="Confirm & Submit"
       />
-    </div>
+      </div>
+    </AssessmentErrorBoundary>
   );
 }

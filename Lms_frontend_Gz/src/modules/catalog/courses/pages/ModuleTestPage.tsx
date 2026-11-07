@@ -9,6 +9,7 @@ import {
 import { useListMyCoursesQuery } from "@/modules/learning/common/api/myCoursesApi";
 import { useGetMyTestQuery } from "@/modules/assessments/attempts/api/attemptsApi";
 import { StudentAssessmentRunner } from "@/modules/catalog/courses/components/assessment/StudentAssessmentRunner";
+import { AssessmentErrorBoundary } from "@/modules/catalog/courses/components/assessment/AssessmentErrorBoundary";
 import { Icon, PageLoader } from "@/shared/ui";
 import { cn } from "@/core/lib/cn";
 
@@ -22,16 +23,27 @@ export function ModuleTestPage() {
   const { courseId, moduleId } = useParams<{ courseId: string; moduleId: string }>();
 
   // 1. Fetch course & version detail
-  const { data: course, isLoading: isCourseLoading } = useGetCourseQuery(courseId ?? "", {
+  const {
+    data: course,
+    isLoading: isCourseLoading,
+    isError: isCourseError,
+    error: courseError,
+  } = useGetCourseQuery(courseId ?? "", {
     skip: !courseId,
   });
-  const versionId = course?.versions?.[course.versions.length - 1]?.version_id;
-  const { data: versionDetail, isLoading: isVersionLoading } = useGetVersionQuery(
+  const publishedVersion = course?.versions?.find((v) => v.status === "published");
+  const versionId = publishedVersion?.version_id || course?.versions?.[course.versions.length - 1]?.version_id;
+  const {
+    data: versionDetail,
+    isLoading: isVersionLoading,
+    isError: isVersionError,
+    error: versionError,
+  } = useGetVersionQuery(
     { courseId: courseId ?? "", versionId: versionId ?? "" },
     { skip: !courseId || !versionId }
   );
 
-  const { data: enrollmentsData } = useListEnrollmentsQuery({ status: "active", per_page: 50 });
+  const { data: enrollmentsData, isLoading: isEnrollmentsLoading } = useListEnrollmentsQuery({ status: "active", per_page: 50 });
   const { data: myCourses } = useListMyCoursesQuery();
 
   const enrollment = useMemo(() => {
@@ -129,29 +141,94 @@ export function ModuleTestPage() {
     }
   };
 
-  if (isCourseLoading || isVersionLoading || isUnlockLoading) {
+  if (isCourseLoading || (versionId && isVersionLoading) || isEnrollmentsLoading || (enrollment?.enrollment_id && isUnlockLoading)) {
     return <PageLoader label="Loading module test configuration..." />;
+  }
+
+  if (isCourseError || (!isCourseLoading && !course)) {
+    return (
+      <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-2xl border border-red-200 text-center space-y-4 shadow-sm">
+        <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+          <Icon name="alert-triangle" size={24} />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800">Course Access Restricted</h3>
+        <p className="text-sm text-slate-500">
+          {(courseError as any)?.data?.message ||
+            "Unable to load course details. Please verify your enrollment or institutional approval."}
+        </p>
+        <Link
+          to="/courses/my"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#00663C] text-white rounded-xl text-sm font-semibold hover:bg-[#00522F]"
+        >
+          <Icon name="arrow-left" size={16} /> Back to My Courses
+        </Link>
+      </div>
+    );
+  }
+
+  if (isVersionError) {
+    return (
+      <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-2xl border border-amber-200 text-center space-y-4 shadow-sm">
+        <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+          <Icon name="alert-triangle" size={24} />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800">Curriculum Structure Unavailable</h3>
+        <p className="text-sm text-slate-500">
+          {(versionError as any)?.data?.message ||
+            "Could not load the syllabus structure for this course version."}
+        </p>
+        <Link
+          to={`/courses/${courseId}/learn`}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#00663C] text-white rounded-xl text-sm font-semibold hover:bg-[#00522F]"
+        >
+          <Icon name="arrow-left" size={16} /> Return to Course Room
+        </Link>
+      </div>
+    );
+  }
+
+  if (!currentModule && !isCourseLoading && !isVersionLoading) {
+    return (
+      <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-2xl border border-amber-200 text-center space-y-4 shadow-sm">
+        <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+          <Icon name="info" size={24} />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800">Module Not Found</h3>
+        <p className="text-sm text-slate-500">
+          The requested module could not be found in this course syllabus.
+        </p>
+        <Link
+          to={`/courses/${courseId}/learn`}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#00663C] text-white rounded-xl text-sm font-semibold hover:bg-[#00522F]"
+        >
+          <Icon name="arrow-left" size={16} /> Return to Course Room
+        </Link>
+      </div>
+    );
   }
 
   // If student clicked "Start module test" (or has an ongoing open attempt), render the assessment runner
   if (isTakingTest || (testDetail?.open_attempt_id && isTakingTest)) {
     return (
-      <StudentAssessmentRunner
-        testId={moduleTestId}
-        testTitle={testDetail?.title || moduleTitle}
-        courseId={courseId ?? ""}
-        courseTitle={courseTitle}
-        contextTitle={moduleTitle}
-        contextType="module"
-        passMarkPercent={passMarkPercent}
-        onTestPassed={handleModuleTestPassed}
-        returnUrl={`/courses/${courseId}/learn`}
-      />
+      <AssessmentErrorBoundary courseId={courseId}>
+        <StudentAssessmentRunner
+          testId={moduleTestId}
+          testTitle={testDetail?.title || moduleTitle}
+          courseId={courseId ?? ""}
+          courseTitle={courseTitle}
+          contextTitle={moduleTitle}
+          contextType="module"
+          passMarkPercent={passMarkPercent}
+          onTestPassed={handleModuleTestPassed}
+          returnUrl={`/courses/${courseId}/learn`}
+        />
+      </AssessmentErrorBoundary>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12 pt-2">
+    <AssessmentErrorBoundary courseId={courseId}>
+      <div className="max-w-4xl mx-auto space-y-6 pb-12 pt-2">
       {/* 1. Header with Breadcrumb: Courses / Course Name / Module Name */}
       <div className="pb-3 border-b border-slate-200 space-y-1">
         <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
@@ -270,6 +347,12 @@ export function ModuleTestPage() {
           </button>
 
           {/* Locked Explanation */}
+          {!moduleTestId && (
+            <p className="text-xs text-slate-600 bg-slate-100 p-2.5 rounded-xl border border-slate-200">
+              No assessment has been configured by the instructor for this module yet.
+            </p>
+          )}
+
           {!allChapterTestsPassed && unpassedChapters.length > 0 && (
             <p className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
               Complete and pass all chapter tests in this module to unlock the module test. Missing:{" "}
@@ -286,5 +369,6 @@ export function ModuleTestPage() {
         </div>
       </div>
     </div>
+    </AssessmentErrorBoundary>
   );
 }

@@ -5,6 +5,7 @@ import { useAppSelector } from "@/app/hooks";
 import { useGetCourseQuery, useGetVersionQuery } from "@/modules/catalog/courses/api/coursesApi";
 import { useGetMyTestQuery } from "@/modules/assessments/attempts/api/attemptsApi";
 import { ConfirmModal } from "@/modules/catalog/courses/components/common/ConfirmModal";
+import { AssessmentErrorBoundary } from "@/modules/catalog/courses/components/assessment/AssessmentErrorBoundary";
 import { PageLoader } from "@/shared/ui";
 import { useNotify } from "@/core/hooks/useNotify";
 import { cn } from "@/core/lib/cn";
@@ -47,9 +48,20 @@ export function FinalExamPage() {
   const accessToken = useAppSelector((state) => state.auth.accessToken);
 
   // 1. Fetch course & version detail to locate final_test_id
-  const { data: course, isLoading: isCourseLoading } = useGetCourseQuery(courseId ?? "", { skip: !courseId });
-  const versionId = course?.versions?.[course.versions.length - 1]?.version_id;
-  const { data: versionDetail, isLoading: isVersionLoading } = useGetVersionQuery(
+  const {
+    data: course,
+    isLoading: isCourseLoading,
+    isError: isCourseError,
+    error: courseError,
+  } = useGetCourseQuery(courseId ?? "", { skip: !courseId });
+  const publishedVersion = course?.versions?.find((v) => v.status === "published");
+  const versionId = publishedVersion?.version_id || course?.versions?.[course.versions.length - 1]?.version_id;
+  const {
+    data: versionDetail,
+    isLoading: isVersionLoading,
+    isError: isVersionError,
+    error: versionError,
+  } = useGetVersionQuery(
     { courseId: courseId ?? "", versionId: versionId ?? "" },
     { skip: !courseId || !versionId }
   );
@@ -656,8 +668,74 @@ export function FinalExamPage() {
     isTestLoading,
   });
 
-  if (isCourseLoading || isVersionLoading || isTestLoading) {
+  if ((isCourseLoading || (versionId && isVersionLoading) || (finalTestId && isTestLoading)) && !testError && !isCourseError) {
     return <PageLoader label="Loading proctored examination..." />;
+  }
+
+  if (isCourseError || (!isCourseLoading && !course)) {
+    return (
+      <AssessmentErrorBoundary courseId={courseId}>
+        <div className="max-w-3xl mx-auto py-12 px-4 space-y-6">
+          <nav className="flex items-center gap-2 text-xs text-slate-500">
+            <Link to="/courses/my" className="hover:text-slate-800 transition-colors">Courses</Link>
+            <span className="text-slate-400">/</span>
+            <span className="text-slate-900 font-semibold">Final Exam</span>
+          </nav>
+
+          <div className="rounded-2xl border border-red-200 bg-white p-10 text-center space-y-4 shadow-2xs">
+            <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h2 className="text-lg font-bold text-[#0A1530]">Course Access Restricted</h2>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              {(courseError as any)?.data?.message || "Unable to access this course. Please verify your enrollment or institutional approval."}
+            </p>
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate("/courses/my")}
+                className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer"
+              >
+                My Courses
+              </button>
+            </div>
+          </div>
+        </div>
+      </AssessmentErrorBoundary>
+    );
+  }
+
+  if (isVersionError) {
+    return (
+      <AssessmentErrorBoundary courseId={courseId}>
+        <div className="max-w-3xl mx-auto py-12 px-4 space-y-6">
+          <nav className="flex items-center gap-2 text-xs text-slate-500">
+            <Link to="/courses/my" className="hover:text-slate-800 transition-colors">Courses</Link>
+            <span className="text-slate-400">/</span>
+            <span className="text-slate-900 font-semibold">Final Exam</span>
+          </nav>
+
+          <div className="rounded-2xl border border-amber-200 bg-white p-10 text-center space-y-4 shadow-2xs">
+            <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h2 className="text-lg font-bold text-[#0A1530]">Curriculum Structure Unavailable</h2>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              {(versionError as any)?.data?.message || "Unable to load curriculum structure for this exam."}
+            </p>
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate("/courses/my")}
+                className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer"
+              >
+                My Courses
+              </button>
+            </div>
+          </div>
+        </div>
+      </AssessmentErrorBoundary>
+    );
   }
 
   // Empty state if no test configured
@@ -665,45 +743,47 @@ export function FinalExamPage() {
     const errorMsg =
       (testError as any)?.data?.message ||
       ((testError as any)?.status === 404
-        ? "You must be enrolled in this course to take the final certification exam."
+        ? "The final certification exam for this course is not yet published or available."
         : "This course does not have an approved final certification exam configured yet.");
 
     return (
-      <div className="max-w-3xl mx-auto py-12 px-4 space-y-6">
-        <nav className="flex items-center gap-2 text-xs text-slate-500">
-          <Link to="/courses/my" className="hover:text-slate-800 transition-colors">Courses</Link>
-          <span className="text-slate-400">/</span>
-          <Link to={`/courses/${courseId}/learn`} className="hover:text-slate-800 transition-colors truncate max-w-[200px]">{courseTitle}</Link>
-          <span className="text-slate-400">/</span>
-          <span className="text-slate-900 font-semibold">Final Exam</span>
-        </nav>
+      <AssessmentErrorBoundary courseId={courseId}>
+        <div className="max-w-3xl mx-auto py-12 px-4 space-y-6">
+          <nav className="flex items-center gap-2 text-xs text-slate-500">
+            <Link to="/courses/my" className="hover:text-slate-800 transition-colors">Courses</Link>
+            <span className="text-slate-400">/</span>
+            <Link to={`/courses/${courseId}/learn`} className="hover:text-slate-800 transition-colors truncate max-w-[200px]">{courseTitle}</Link>
+            <span className="text-slate-400">/</span>
+            <span className="text-slate-900 font-semibold">Final Exam</span>
+          </nav>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center space-y-4 shadow-2xs">
-          <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-            <AlertTriangle className="w-6 h-6" />
-          </div>
-          <h2 className="text-lg font-bold text-[#0A1530]">Final Exam Access</h2>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">
-            {errorMsg}
-          </p>
-          <div className="pt-2 flex items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate("/courses/my")}
-              className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
-            >
-              My Courses
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate(`/courses/${courseId}/learn`)}
-              className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer"
-            >
-              Back to Course
-            </button>
+          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center space-y-4 shadow-2xs">
+            <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h2 className="text-lg font-bold text-[#0A1530]">Final Exam Access</h2>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              {errorMsg}
+            </p>
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate("/courses/my")}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+              >
+                My Courses
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(`/courses/${courseId}/learn`)}
+                className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer"
+              >
+                Back to Course
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </AssessmentErrorBoundary>
     );
   }
 
@@ -713,7 +793,8 @@ export function FinalExamPage() {
   const warningCount = malpracticeIncidents.length;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12 pt-4 px-4">
+    <AssessmentErrorBoundary courseId={courseId}>
+      <div className="max-w-5xl mx-auto space-y-6 pb-12 pt-4 px-4">
       {/* MALPRACTICE WARNING MODAL */}
       <MalpracticeWarningModal
         incident={activeWarningIncident}
@@ -1212,5 +1293,6 @@ export function FinalExamPage() {
         tone="primary"
       />
     </div>
+    </AssessmentErrorBoundary>
   );
 }

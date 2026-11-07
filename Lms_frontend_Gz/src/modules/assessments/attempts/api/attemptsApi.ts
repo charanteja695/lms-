@@ -126,6 +126,7 @@ export const {
   useFinishSectionMutation,
   useSubmitAttemptMutation,
   useGetResultQuery,
+  useLazyGetResultQuery,
   useListAttemptsQuery,
   useGetAttemptEventsQuery,
   usePauseAttemptMutation,
