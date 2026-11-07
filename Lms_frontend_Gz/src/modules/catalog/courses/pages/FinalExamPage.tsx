@@ -55,7 +55,7 @@ export function FinalExamPage() {
     error: courseError,
   } = useGetCourseQuery(courseId ?? "", { skip: !courseId });
   const publishedVersion = course?.versions?.find((v) => v.status === "published");
-  const versionId = publishedVersion?.version_id || course?.versions?.[course.versions.length - 1]?.version_id;
+  const versionId = publishedVersion?.version_id;
   const {
     data: versionDetail,
     isLoading: isVersionLoading,
@@ -668,7 +668,7 @@ export function FinalExamPage() {
     isTestLoading,
   });
 
-  if ((isCourseLoading || (versionId && isVersionLoading) || (finalTestId && isTestLoading)) && !testError && !isCourseError) {
+  if (isCourseLoading || (versionId && isVersionLoading)) {
     return <PageLoader label="Loading proctored examination..." />;
   }
 
@@ -703,6 +703,44 @@ export function FinalExamPage() {
         </div>
       </AssessmentErrorBoundary>
     );
+  }
+
+  // Handle course without a published version
+  if (!publishedVersion) {
+    return (
+      <AssessmentErrorBoundary courseId={courseId}>
+        <div className="max-w-3xl mx-auto py-12 px-4 space-y-6">
+          <nav className="flex items-center gap-2 text-xs text-slate-500">
+            <Link to="/courses/my" className="hover:text-slate-800 transition-colors">Courses</Link>
+            <span className="text-slate-400">/</span>
+            <span className="text-slate-900 font-semibold">Final Exam</span>
+          </nav>
+
+          <div className="rounded-2xl border border-amber-200 bg-white p-10 text-center space-y-4 shadow-2xs">
+            <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h2 className="text-lg font-bold text-[#0A1530]">Curriculum Not Published</h2>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              This course does not have a published curriculum version available yet. Students can only access published courses.
+            </p>
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate("/courses/my")}
+                className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer"
+              >
+                My Courses
+              </button>
+            </div>
+          </div>
+        </div>
+      </AssessmentErrorBoundary>
+    );
+  }
+
+  if (finalTestId && isTestLoading && !testError) {
+    return <PageLoader label="Loading proctored examination..." />;
   }
 
   if (isVersionError) {

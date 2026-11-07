@@ -12,8 +12,6 @@ import { ConfirmModal } from "@/modules/catalog/courses/components/common/Confir
 import { Icon, PageLoader } from "@/shared/ui";
 import { useNotify } from "@/core/hooks/useNotify";
 import { cn } from "@/core/lib/cn";
-import { storage } from "@/core/lib/storage";
-import { useAppSelector } from "@/app/hooks";
 import { AssessmentErrorBoundary } from "./AssessmentErrorBoundary";
 
 export interface QuestionOption {
@@ -59,7 +57,6 @@ export function StudentAssessmentRunner({
 }: StudentAssessmentRunnerProps) {
   const navigate = useNavigate();
   const notify = useNotify();
-  const accessToken = useAppSelector((state) => state.auth.accessToken);
   const finalReturnUrl = returnUrl || `/courses/${courseId}/learn`;
 
   const [prepareAttempt, { isLoading: isPreparingAttempt }] = usePrepareAttemptMutation();
@@ -85,14 +82,22 @@ export function StudentAssessmentRunner({
   const [isConfirmSubmitOpen, setIsConfirmSubmitOpen] = useState(false);
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [resultFetchError, setResultFetchError] = useState<string | null>(null);
+  const [isFetchingResult, setIsFetchingResult] = useState(false);
   const hasInitializedRef = useRef<string | null>(null);
 
   // 1. Initialize or resume attempt against the server
   useEffect(() => {
-    if (!testId || hasInitializedRef.current === testId) return;
+    if (!testId) {
+      setIsInitializing(false);
+      return;
+    }
+    if (hasInitializedRef.current === testId) return;
     hasInitializedRef.current = testId;
 
     async function initTest() {
+      setIsInitializing(true);
       try {
         setLoadError(null);
         // Prepare/fetch attempt from assessment service
@@ -169,6 +174,8 @@ export function StudentAssessmentRunner({
       } catch (err: any) {
         console.error("Failed to start assessment attempt:", err);
         setLoadError(err?.data?.message || err?.message || "Failed to load assessment.");
+      } finally {
+        setIsInitializing(false);
       }
     }
 
@@ -262,24 +269,15 @@ export function StudentAssessmentRunner({
     }
   };
 
-  // 5. Submit Attempt to Server
-  const handleFinalSubmit = async () => {
-    if (!attemptId) return;
-
+  // 5. Submit Attempt to Server and Safe Result Retrieval
+  const loadAttemptResult = async (targetAttemptId: string) => {
+    setIsFetchingResult(true);
+    setResultFetchError(null);
     try {
-      await submitAttemptMutation(attemptId).unwrap();
-
-      // Fetch official result from assessment service via RTK Query or authenticated fetch
-      let r: any = null;
-      try {
-        r = await fetchResult(attemptId).unwrap();
-      } catch {
-        const token = accessToken || storage.readSession()?.token || "";
-        const res = await fetch(`/api/v1/attempts/${attemptId}/result`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        const resultData = await res.json();
-        r = resultData?.result || resultData;
+      const res = await fetchResult(targetAttemptId).unwrap();
+      const r = (res as any)?.result || res;
+      if (!r) {
+        throw new Error("Assessment result is not available yet.");
       }
 
       const score = Number(r?.score ?? r?.total_marks_awarded ?? 0);
@@ -300,12 +298,82 @@ export function StudentAssessmentRunner({
         notify.error(`Test score: ${pct}%. Pass mark is ${passMarkPercent}%.`);
       }
     } catch (err: any) {
+      console.error("Failed to retrieve assessment result:", err);
+      const errMsg =
+        err?.data?.message ||
+        err?.message ||
+        "Failed to retrieve your assessment result. Your attempt was submitted successfully.";
+      setResultFetchError(errMsg);
+    } finally {
+      setIsFetchingResult(false);
+    }
+  };
+
+  const handleFinalSubmit = async () => {
+    if (!attemptId) return;
+
+    try {
+      await submitAttemptMutation(attemptId).unwrap();
+      await loadAttemptResult(attemptId);
+    } catch (err: any) {
       notify.error(err?.data?.message || err?.message || "Failed to submit assessment.");
     }
   };
 
-  if (isPreparingAttempt || isStartingAttempt) {
+  if (isInitializing || isPreparingAttempt || isStartingAttempt) {
     return <PageLoader label={`Loading ${contextType} assessment...`} />;
+  }
+
+  if (isFetchingResult) {
+    return <PageLoader label="Calculating your assessment results..." />;
+  }
+
+  if (resultFetchError && attemptId) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6 pb-12 pt-4">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 text-xs text-slate-500 font-medium pb-3 border-b border-slate-200">
+          <Link to="/courses/my" className="hover:text-[#00663C] transition-colors">
+            Courses
+          </Link>
+          <span>/</span>
+          <Link to={finalReturnUrl} className="hover:text-[#00663C] transition-colors">
+            {courseTitle}
+          </Link>
+          <span>/</span>
+          <span className="text-slate-800 font-bold">{contextTitle}</span>
+        </div>
+
+        <div className="rounded-2xl border border-amber-200 bg-white p-10 text-center max-w-lg mx-auto space-y-4 shadow-2xs">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto ring-1 ring-amber-200">
+            <Icon name="alertTriangle" size={28} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-[#0A1530]">Retrieving Assessment Result</h3>
+            <p className="text-xs text-amber-800 bg-amber-50 p-2.5 rounded-xl border border-amber-200 mt-2 max-w-sm mx-auto leading-relaxed">
+              {resultFetchError}
+            </p>
+          </div>
+          <div className="pt-2 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              disabled={isFetchingResult}
+              onClick={() => loadAttemptResult(attemptId)}
+              className="px-5 py-2.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs transition-colors disabled:opacity-60"
+            >
+              {isFetchingResult ? "Checking..." : "Retry Result"}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(finalReturnUrl)}
+              className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors"
+            >
+              Back to course
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // If error starting attempt or accessing test
@@ -357,8 +425,8 @@ export function StudentAssessmentRunner({
     );
   }
 
-  // If no questions in test bank or test not configured
-  if (!testId || questions.length === 0) {
+  // If no questions in test bank or test not configured (only after initialization completes)
+  if (!testId || (!isInitializing && questions.length === 0)) {
     return (
       <div className="max-w-4xl mx-auto space-y-6 pb-12 pt-4">
         {/* Breadcrumb */}

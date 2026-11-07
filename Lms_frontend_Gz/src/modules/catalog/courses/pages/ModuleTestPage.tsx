@@ -17,6 +17,7 @@ interface ChapterStatusItem {
   topic_id: string;
   title: string;
   isPassed: boolean;
+  hasTest: boolean;
 }
 
 export function ModuleTestPage() {
@@ -32,7 +33,7 @@ export function ModuleTestPage() {
     skip: !courseId,
   });
   const publishedVersion = course?.versions?.find((v) => v.status === "published");
-  const versionId = publishedVersion?.version_id || course?.versions?.[course.versions.length - 1]?.version_id;
+  const versionId = publishedVersion?.version_id;
   const {
     data: versionDetail,
     isLoading: isVersionLoading,
@@ -44,7 +45,7 @@ export function ModuleTestPage() {
   );
 
   const { data: enrollmentsData, isLoading: isEnrollmentsLoading } = useListEnrollmentsQuery({ status: "active", per_page: 50 });
-  const { data: myCourses } = useListMyCoursesQuery();
+  const { data: myCourses, isLoading: isMyCoursesLoading } = useListMyCoursesQuery();
 
   const enrollment = useMemo(() => {
     const list = enrollmentsData?.items ?? [];
@@ -53,7 +54,9 @@ export function ModuleTestPage() {
       const found = list.find((e) => String(e.enrollment_id) === String(courseMatch.enrollment_id));
       if (found) return found;
     }
-    return list[0];
+    const directMatch = list.find((e: any) => String(e.course_id) === String(courseId));
+    if (directMatch) return directMatch;
+    return null;
   }, [enrollmentsData, myCourses, courseId]);
 
   const { data: unlockState, isLoading: isUnlockLoading } = useGetUnlockStateQuery(
@@ -84,19 +87,30 @@ export function ModuleTestPage() {
   // Real topics list with completion / test passed state
   const topicsList = useMemo(() => {
     if (moduleUnlock?.topics && moduleUnlock.topics.length > 0) {
-      return moduleUnlock.topics;
+      return moduleUnlock.topics.map((t: any) => {
+        const modTopic = (currentModule as any)?.topics?.find((ct: any) => String(ct.topic_id) === String(t.topic_id));
+        return {
+          ...t,
+          topic_test_id: t.topic_test_id ?? modTopic?.topic_test_id,
+        };
+      });
     }
     return (currentModule as any)?.topics ?? [];
   }, [moduleUnlock, currentModule]);
 
-  // All chapter tests must be passed
+  // Enforce module test prerequisites according to business rules:
+  // - Chapters with configured tests must have passed those tests.
+  // - Chapters without configured tests must follow the explicitly defined completion rule.
+  // - The module test must remain locked until all required prerequisites are satisfied.
   const chaptersStatus: ChapterStatusItem[] = useMemo(() => {
     return topicsList.map((t: any, idx: number) => {
-      const isPassed = Boolean(t.test_passed || t.completed);
+      const hasTest = Boolean(t.topic_test_id);
+      const isPassed = hasTest ? Boolean(t.test_passed) : Boolean(t.completed);
       return {
         topic_id: t.topic_id,
         title: t.title || `Chapter ${idx + 1}`,
         isPassed,
+        hasTest,
       };
     });
   }, [topicsList]);
@@ -129,7 +143,11 @@ export function ModuleTestPage() {
   const moduleTitle = currentModule?.title || "Module Test";
 
   const handleModuleTestPassed = async () => {
-    if (enrollment?.enrollment_id && moduleId) {
+    if (!enrollment?.enrollment_id) {
+      console.warn("[ModuleTestPage] Enrollment unavailable; skipping completion mutation.");
+      return;
+    }
+    if (moduleId) {
       try {
         await completeItemMutation({
           enrollmentId: enrollment.enrollment_id,
@@ -141,7 +159,7 @@ export function ModuleTestPage() {
     }
   };
 
-  if (isCourseLoading || (versionId && isVersionLoading) || isEnrollmentsLoading || (enrollment?.enrollment_id && isUnlockLoading)) {
+  if (isCourseLoading || (versionId && isVersionLoading)) {
     return <PageLoader label="Loading module test configuration..." />;
   }
 
@@ -155,6 +173,52 @@ export function ModuleTestPage() {
         <p className="text-sm text-slate-500">
           {(courseError as any)?.data?.message ||
             "Unable to load course details. Please verify your enrollment or institutional approval."}
+        </p>
+        <Link
+          to="/courses/my"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#00663C] text-white rounded-xl text-sm font-semibold hover:bg-[#00522F]"
+        >
+          <Icon name="arrow-left" size={16} /> Back to My Courses
+        </Link>
+      </div>
+    );
+  }
+
+  // Handle no published curriculum version
+  if (!publishedVersion) {
+    return (
+      <div className="max-w-xl mx-auto my-12 p-8 bg-white border border-amber-200 rounded-2xl shadow-card text-center space-y-4">
+        <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+          <Icon name="alert-triangle" size={24} />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800">Curriculum Not Published</h3>
+        <p className="text-sm text-slate-500">
+          This course does not have a published curriculum version available yet. Students can only access published courses.
+        </p>
+        <Link
+          to="/courses/my"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#00663C] text-white rounded-xl text-sm font-semibold hover:bg-[#00522F]"
+        >
+          <Icon name="arrow-left" size={16} /> Back to My Courses
+        </Link>
+      </div>
+    );
+  }
+
+  if (isEnrollmentsLoading || (enrollment?.enrollment_id && isUnlockLoading)) {
+    return <PageLoader label="Loading module test configuration..." />;
+  }
+
+  // Handle missing active enrollment for this course
+  if (!isEnrollmentsLoading && !isMyCoursesLoading && enrollmentsData && !enrollment) {
+    return (
+      <div className="max-w-xl mx-auto my-12 p-8 bg-white border border-amber-200 rounded-2xl shadow-card text-center space-y-4">
+        <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+          <Icon name="alert-triangle" size={24} />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800">Course Enrollment Required</h3>
+        <p className="text-sm text-slate-500">
+          You are not actively enrolled in this course. Assessment attempts and progress can only be recorded for enrolled students.
         </p>
         <Link
           to="/courses/my"
@@ -305,14 +369,14 @@ export function ModuleTestPage() {
                   {ch.isPassed && <Icon name="check" size={12} />}
                 </span>
                 <span className="flex-1 truncate">
-                  {ch.title} test {ch.isPassed ? "passed" : "not passed yet"}
+                  {ch.title} {ch.hasTest ? `test ${ch.isPassed ? "passed" : "not passed yet"}` : `lesson ${ch.isPassed ? "completed" : "not completed yet"}`}
                 </span>
                 {!ch.isPassed && (
                   <Link
-                    to={`/courses/${courseId}/chapters/${ch.topic_id}/test`}
+                    to={ch.hasTest ? `/courses/${courseId}/chapters/${ch.topic_id}/test` : `/courses/${courseId}/learn`}
                     className="text-[11px] font-bold text-[#00663C] hover:underline shrink-0"
                   >
-                    Take test
+                    {ch.hasTest ? "Take test" : "Go to lesson"}
                   </Link>
                 )}
               </div>
@@ -355,7 +419,7 @@ export function ModuleTestPage() {
 
           {!allChapterTestsPassed && unpassedChapters.length > 0 && (
             <p className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
-              Complete and pass all chapter tests in this module to unlock the module test. Missing:{" "}
+              Complete and satisfy all chapter prerequisites in this module to unlock the module test. Missing:{" "}
               <b>{unpassedChapters.map((c: ChapterStatusItem) => c.title).join(", ")}</b>.
             </p>
           )}

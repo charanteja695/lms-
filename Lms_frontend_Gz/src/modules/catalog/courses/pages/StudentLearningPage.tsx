@@ -215,7 +215,7 @@ export function StudentLearningPage() {
   });
 
   const publishedVersion = course?.versions?.find((v) => v.status === "published");
-  const versionId = publishedVersion?.version_id || course?.versions?.[course.versions.length - 1]?.version_id;
+  const versionId = publishedVersion?.version_id;
   const { data: versionDetail, isLoading: isVersionLoading } = useGetVersionQuery(
     { courseId: courseId ?? "", versionId: versionId ?? "" },
     { skip: !courseId || !versionId }
@@ -236,7 +236,8 @@ export function StudentLearningPage() {
       const found = list.find((e) => String(e.enrollment_id) === String(courseMatch.enrollment_id));
       if (found) return found;
     }
-    return list[0];
+    const directMatch = list.find((e: any) => String(e.course_id) === String(courseId));
+    return directMatch || null;
   }, [enrollmentsData, myCourses, courseId]);
 
   const { data: unlockState } = useGetUnlockStateQuery(enrollment?.enrollment_id ?? "", {
@@ -643,11 +644,11 @@ export function StudentLearningPage() {
   const isLessonCompleted = activeChapterProgress === 100;
 
   const handleMarkCompleted = async () => {
-    persistProgress(duration, duration, true);
     if (!enrollment?.enrollment_id || !activeItem?.topic_item_id) {
-      notify.success("Lesson marked as completed! Chapter test unlocked.");
+      notify.error("Course enrollment required. You must be actively enrolled in this course to save progress.");
       return;
     }
+    persistProgress(duration, duration, true);
     try {
       await completeItemMutation({
         enrollmentId: enrollment.enrollment_id,
@@ -696,7 +697,7 @@ export function StudentLearningPage() {
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
 
-  if (isCourseLoading || isVersionLoading || isEnrollmentsLoading) {
+  if (isCourseLoading || (versionId && isVersionLoading)) {
     return <PageLoader label="Loading your learning room..." />;
   }
 
@@ -719,6 +720,32 @@ export function StudentLearningPage() {
         </button>
       </div>
     );
+  }
+
+  // Handle course without a published version
+  if (!publishedVersion) {
+    return (
+      <div className="max-w-xl mx-auto py-20 px-4 text-center font-sans">
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 border border-amber-200">
+          <ShieldAlert size={32} />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 mb-2">Curriculum Not Published</h2>
+        <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+          This course does not have a published curriculum version available yet. Students can only access published courses.
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate("/courses/my")}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 text-sm font-bold text-white hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
+        >
+          Back to My Courses
+        </button>
+      </div>
+    );
+  }
+
+  if (isEnrollmentsLoading) {
+    return <PageLoader label="Loading your learning room..." />;
   }
 
   const courseTitle = course?.title || "Complete Python Mastery";

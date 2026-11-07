@@ -24,7 +24,7 @@ export function ChapterTestPage() {
   });
 
   const publishedVersion = course?.versions?.find((v) => v.status === "published");
-  const versionId = publishedVersion?.version_id || course?.versions?.[course.versions.length - 1]?.version_id;
+  const versionId = publishedVersion?.version_id;
 
   const {
     data: versionDetail,
@@ -35,8 +35,8 @@ export function ChapterTestPage() {
     { skip: !courseId || !versionId }
   );
 
-  const { data: enrollmentsData } = useListEnrollmentsQuery({ status: "active", per_page: 50 });
-  const { data: myCourses } = useListMyCoursesQuery();
+  const { data: enrollmentsData, isLoading: isEnrollmentsLoading } = useListEnrollmentsQuery({ status: "active", per_page: 50 });
+  const { data: myCourses, isLoading: isMyCoursesLoading } = useListMyCoursesQuery();
   const [completeItemMutation] = useCompleteItemMutation();
 
   const enrollment = useMemo(() => {
@@ -46,7 +46,9 @@ export function ChapterTestPage() {
       const found = list.find((e) => String(e.enrollment_id) === String(courseMatch.enrollment_id));
       if (found) return found;
     }
-    return list[0];
+    const directMatch = list.find((e: any) => String(e.course_id) === String(courseId));
+    if (directMatch) return directMatch;
+    return null;
   }, [enrollmentsData, myCourses, courseId]);
 
   // Find active chapter from version
@@ -65,7 +67,11 @@ export function ChapterTestPage() {
   const testId = currentChapter?.topic_test_id;
 
   const handleTestPassed = async () => {
-    if (enrollment?.enrollment_id && chapterId) {
+    if (!enrollment?.enrollment_id) {
+      console.warn("[ChapterTestPage] Enrollment unavailable; skipping completion mutation.");
+      return;
+    }
+    if (chapterId) {
       try {
         await completeItemMutation({
           enrollmentId: enrollment.enrollment_id,
@@ -96,6 +102,56 @@ export function ChapterTestPage() {
         </div>
         <h2 className="text-lg font-bold text-slate-900">Course Access Restricted</h2>
         <p className="text-xs text-slate-500 max-w-md mx-auto">{errorMsg}</p>
+        <div className="pt-2">
+          <Link
+            to="/courses/my"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] transition-colors"
+          >
+            Back to My Courses
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle no published curriculum version
+  if (!publishedVersion) {
+    return (
+      <div className="max-w-xl mx-auto my-12 p-8 bg-white border border-amber-200 rounded-2xl shadow-card text-center space-y-4">
+        <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+          <Icon name="alertTriangle" size={24} />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Curriculum Not Published</h2>
+        <p className="text-xs text-slate-500 max-w-md mx-auto">
+          This course does not have a published curriculum version available yet. Students can only access published courses.
+        </p>
+        <div className="pt-2">
+          <Link
+            to="/courses/my"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] transition-colors"
+          >
+            Back to My Courses
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (isEnrollmentsLoading || isMyCoursesLoading) {
+    return <PageLoader label="Loading chapter assessment..." />;
+  }
+
+  // Handle missing active enrollment for this course
+  if (!isEnrollmentsLoading && !isMyCoursesLoading && !enrollment) {
+    return (
+      <div className="max-w-xl mx-auto my-12 p-8 bg-white border border-amber-200 rounded-2xl shadow-card text-center space-y-4">
+        <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+          <Icon name="alertTriangle" size={24} />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Course Enrollment Required</h2>
+        <p className="text-xs text-slate-500 max-w-md mx-auto">
+          You are not actively enrolled in this course. Assessment attempts and progress can only be recorded for enrolled students.
+        </p>
         <div className="pt-2">
           <Link
             to="/courses/my"

@@ -45,7 +45,11 @@ export function refreshSession(api: Pick<BaseQueryApi, "getState" | "dispatch" |
         api.dispatch(credentialsReceived({ token: data.token, user: data.user }));
         return true;
       }
-      api.dispatch(loggedOut());
+      // Only dispatch loggedOut if authentication refresh genuinely fails (401, 403, or invalid token)
+      const errStatus = result.error?.status;
+      if (errStatus === 401 || errStatus === 403 || (errStatus === 400 && String((result.error?.data as any)?.detail || "").includes("token"))) {
+        api.dispatch(loggedOut());
+      }
       return false;
     })().finally(() => {
       refreshInFlight = null;
@@ -75,9 +79,12 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
         }
       }
     } else {
-      api.dispatch(loggedOut());
-      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-        window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+      const state = api.getState() as AuthAwareState;
+      // Only redirect to login if authentication refresh genuinely failed and cleared credentials
+      if (!state.auth?.accessToken) {
+        if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+          window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+        }
       }
     }
   }
