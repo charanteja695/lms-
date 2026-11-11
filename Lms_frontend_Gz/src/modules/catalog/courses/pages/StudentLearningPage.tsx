@@ -16,6 +16,7 @@ import {
 } from "@/modules/certificates/issued/api/certificatesApi";
 import { PageLoader } from "@/shared/ui";
 import { useNotify } from "@/core/hooks/useNotify";
+import { env } from "@/core/config/env";
 import { cn } from "@/core/lib/cn";
 import {
   Play,
@@ -259,35 +260,47 @@ export function StudentLearningPage() {
 
   // Modules List from unlockState or versionDetail
   const modulesList = useMemo(() => {
-    if (unlockState?.modules && unlockState.modules.length > 0) {
-      return unlockState.modules;
+    const rawModules = versionDetail?.modules ?? [];
+    const unlockMods = unlockState?.modules ?? [];
+
+    if (rawModules.length === 0 && unlockMods.length > 0) {
+      return unlockMods;
     }
-    return (versionDetail?.modules ?? []).map((m, mIdx) => ({
-      module_id: m.module_id,
-      title: m.title,
-      position: m.position || mIdx + 1,
-      unlocked: true,
-      completed: false,
-      test_passed: false,
-      topics: (m.topics ?? []).map((t, tIdx) => ({
-        topic_id: t.topic_id,
-        title: t.title,
-        position: t.position || tIdx + 1,
-        unlocked: true,
-        completed: false,
-        test_passed: false,
-        completed_items: 0,
-        required_items: t.items?.length || 1,
-        items: (t.items ?? []).map((it, itIdx) => ({
-          topic_item_id: it.topic_item_id,
-          title: it.title,
-          item_type: (it as any).kind || (it as any).item_type || "notes",
-          position: it.position || itIdx + 1,
-          required: true,
-          completed: false,
-        })),
-      })),
-    }));
+
+    return rawModules.map((m, mIdx) => {
+      const unlockMod = unlockMods.find((um) => String(um.module_id) === String(m.module_id));
+      return {
+        module_id: m.module_id,
+        title: m.title,
+        position: m.position || mIdx + 1,
+        unlocked: unlockMod ? unlockMod.unlocked : true,
+        completed: unlockMod ? unlockMod.completed : false,
+        test_passed: unlockMod ? Boolean((unlockMod as any).test_passed) : false,
+        topics: (m.topics ?? []).map((t, tIdx) => {
+          const unlockTopic = unlockMod?.topics?.find((ut: any) => String(ut.topic_id) === String(t.topic_id));
+          return {
+            topic_id: t.topic_id,
+            title: t.title,
+            position: t.position || tIdx + 1,
+            topic_test_id: t.topic_test_id,
+            unlocked: unlockTopic ? unlockTopic.unlocked : true,
+            completed: unlockTopic ? unlockTopic.completed : false,
+            test_passed: unlockTopic ? Boolean(unlockTopic.test_passed) : false,
+            completed_items: unlockTopic ? unlockTopic.completed_items : 0,
+            required_items: t.items?.length || 1,
+            items: (t.items ?? []).map((it, itIdx) => ({
+              topic_item_id: it.topic_item_id,
+              title: it.title,
+              item_type: (it as any).kind || (it as any).item_type || "notes",
+              position: it.position || itIdx + 1,
+              required: it.required ?? true,
+              completed: false,
+              media_id: (it as any).media_id || null,
+            })),
+          };
+        }),
+      };
+    });
   }, [unlockState, versionDetail]);
 
   // Set default expanded modules
@@ -322,6 +335,22 @@ export function StudentLearningPage() {
   }, [modulesList, activeTopic]);
 
   const activeItem = activeTopic?.items?.[0];
+
+  const currentVideoItem = useMemo(() => {
+    return activeTopic?.items?.find((it: any) => it.item_type === "video") || null;
+  }, [activeTopic]);
+
+  const currentPdfItem = useMemo(() => {
+    return activeTopic?.items?.find((it: any) => it.item_type === "pdf") || null;
+  }, [activeTopic]);
+
+  const realVideoUrl = useMemo(() => {
+    const mediaId = (currentVideoItem as any)?.media_id;
+    if (mediaId) {
+      return `${env.apiBaseUrl}/media/stream/${mediaId}`;
+    }
+    return null;
+  }, [currentVideoItem]);
 
   // Helper: Calculate Chapter Completion Percentage
   const getChapterProgress = useCallback(
@@ -550,7 +579,7 @@ export function StudentLearningPage() {
     setIsQualityMenuOpen(false);
 
     const targetOpt = QUALITY_OPTIONS.find((o) => o.id === targetQuality) ?? QUALITY_OPTIONS[0]!;
-    const targetSrc = (activeTopic as any)?.media_url || targetOpt.src;
+    const targetSrc = realVideoUrl || (activeTopic as any)?.media_url || targetOpt.src;
 
     if (vid) {
       if (vid.src !== targetSrc) {
@@ -574,6 +603,18 @@ export function StudentLearningPage() {
 
     notify.info(`Video resolution switched to ${targetQuality} (${targetOpt.resolution})`);
   };
+
+  // Synchronize video player source when switching chapters or when media URL loads
+  useEffect(() => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    const targetOpt = QUALITY_OPTIONS.find((o) => o.id === videoQuality) ?? QUALITY_OPTIONS[0]!;
+    const nextSrc = realVideoUrl || (activeTopic as any)?.media_url || targetOpt.src;
+    if (vid.src !== nextSrc) {
+      vid.src = nextSrc;
+      vid.load();
+    }
+  }, [realVideoUrl, videoQuality, activeTopic?.topic_id]);
 
   // Fullscreen Handler for Player Container
   const handleFullscreen = () => {
@@ -1247,7 +1288,7 @@ export function StudentLearningPage() {
             {/* HTML5 Video Element */}
             <video
               ref={videoRef}
-              src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+              src={realVideoUrl || (QUALITY_OPTIONS.find((q) => q.id === videoQuality) || QUALITY_OPTIONS[0]!).src}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               onEnded={handleVideoEnded}
@@ -1489,8 +1530,8 @@ export function StudentLearningPage() {
                     <FileText size={20} />
                   </div>
                   <div>
-                    <b className="text-xs text-slate-900 block">{activeTopic?.title || "Chapter"} - Reference Slides.pdf</b>
-                    <span className="text-[11px] text-slate-500">Official instructor slides Â· 18 pages Â· Updated</span>
+                    <b className="text-xs text-slate-900 block">{currentPdfItem?.title || `${activeTopic?.title || "Chapter"} - Reference Slides.pdf`}</b>
+                    <span className="text-[11px] text-slate-500">{(currentPdfItem as any)?.media_id ? "Uploaded Chapter Document · PDF Format" : "Official instructor slides · 18 pages · Updated"}</span>
                   </div>
                 </div>
                 <button
@@ -1947,7 +1988,8 @@ export function StudentLearningPage() {
       <InAppPdfViewer
         isOpen={isPdfViewerOpen}
         onClose={() => setIsPdfViewerOpen(false)}
-        documentTitle={`${activeTopic?.title || "Chapter"} - Reference Slides.pdf`}
+        documentTitle={`${currentPdfItem?.title || activeTopic?.title || "Chapter"} - Reference Slides.pdf`}
+        mediaId={(currentPdfItem as any)?.media_id}
         pdfUrl={(activeTopic as any)?.pdf_url || (activeItem as any)?.media_url}
         totalSlides={18}
         chapterTitle={activeTopic?.title}

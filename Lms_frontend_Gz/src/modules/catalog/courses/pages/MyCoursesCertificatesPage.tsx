@@ -22,6 +22,7 @@ import {
   Terminal,
   Layers,
   GraduationCap,
+  Award,
 } from "lucide-react";
 
 type CourseStatusFilter = "all" | "not_started" | "in_progress" | "completed";
@@ -36,6 +37,7 @@ interface EnrichedCourse extends MyCourse {
   status: "Not Started" | "In Progress" | "Completed";
   isDone: boolean;
   thumbnailUrl?: string | null;
+  certificateId?: string | null;
 }
 
 // Deterministic modern gradient and icon themes for course placeholders
@@ -127,7 +129,8 @@ export function MyCoursesCertificatesPage() {
 
     return list.map((c) => {
       const courseIdStr = String(c.course_id);
-      const isDone = certificates.some((crt) => String(crt.course_id) === courseIdStr);
+      const matchingCert = certificates.find((crt) => String(crt.course_id) === courseIdStr);
+      const isDone = Boolean(matchingCert);
       const catalogEntry = catalogMap.get(courseIdStr);
 
       let progressPct = 0;
@@ -167,6 +170,7 @@ export function MyCoursesCertificatesPage() {
         status,
         isDone,
         thumbnailUrl: null,
+        certificateId: matchingCert?.certificate_id ? String(matchingCert.certificate_id) : null,
       };
     });
   }, [myCourses, certificates, catalogMap, user?.user_id]);
@@ -542,6 +546,22 @@ export function MyCoursesCertificatesPage() {
                       </>
                     )}
                   </button>
+                  {course.status === "Completed" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (course.certificateId) {
+                          navigate(`/certificates/issued/${course.certificateId}`);
+                        } else {
+                          navigate("/certificates/issued");
+                        }
+                      }}
+                      className="w-full mt-2 inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl text-xs font-bold bg-[#00663C] text-white hover:bg-[#00522F] transition-all cursor-pointer shadow-xs"
+                    >
+                      <Award size={14} />
+                      <span>View Certificate</span>
+                    </button>
+                  )}
                 </div>
               </div>
             );

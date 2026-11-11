@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { env } from "@/core/config/env";
 import {
   ArrowLeft,
   ChevronLeft,
@@ -24,6 +25,7 @@ export interface InAppPdfViewerProps {
   onClose: () => void;
   documentTitle: string;
   pdfUrl?: string;
+  mediaId?: string | number | null | undefined;
   totalSlides?: number;
   chapterTitle?: string;
   courseTitle?: string;
@@ -427,6 +429,7 @@ export function InAppPdfViewer({
   onClose,
   documentTitle,
   pdfUrl,
+  mediaId,
   totalSlides = 18,
   chapterTitle,
   courseTitle,
@@ -440,6 +443,7 @@ export function InAppPdfViewer({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -449,17 +453,49 @@ export function InAppPdfViewer({
     setPageInput(String(currentPage));
   }, [currentPage]);
 
-  // Loading animation simulation when opened
+  // Authenticated media stream fetch when mediaId is provided
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+        setBlobUrl(null);
+      }
+      return;
+    }
+
+    if (mediaId) {
       setIsLoading(true);
       setHasError(false);
-      const timer = setTimeout(() => {
-        setIsLoading(false);
-      }, 350);
-      return () => clearTimeout(timer);
+      const token =
+        localStorage.getItem("token") ||
+        localStorage.getItem("access_token") ||
+        sessionStorage.getItem("token");
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+      const streamUrl = `${env.apiBaseUrl}/media/stream/${mediaId}`;
+
+      fetch(streamUrl, { method: "GET", headers })
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const blob = await res.blob();
+          const pdfBlob =
+            blob.type === "application/pdf"
+              ? blob
+              : new Blob([blob], { type: "application/pdf" });
+          const url = URL.createObjectURL(pdfBlob);
+          setBlobUrl(url);
+          setIsLoading(false);
+        })
+        .catch((err) => {
+          console.warn("Failed to load PDF media stream, falling back to slides", err);
+          setIsLoading(false);
+        });
+    } else {
+      setBlobUrl(null);
+      setIsLoading(false);
     }
-  }, [isOpen, pdfUrl]);
+  }, [isOpen, mediaId]);
+
+  const effectivePdfUrl = blobUrl || pdfUrl;
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -738,8 +774,8 @@ export function InAppPdfViewer({
           </div>
         )}
 
-        {/* Embedded Native PDF Viewer if external valid URL provided */}
-        {!hasError && pdfUrl && pdfUrl.toLowerCase().endsWith(".pdf") ? (
+        {/* Embedded Native PDF Viewer if external valid URL or media stream provided */}
+        {!hasError && effectivePdfUrl ? (
           <div
             style={{
               transform: `scale(${zoom / 100})`,
@@ -747,14 +783,14 @@ export function InAppPdfViewer({
               transition: "transform 0.15s ease-out",
             }}
             className={cn(
-              "w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden border border-slate-700",
+              "w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden border border-slate-700 min-h-[640px]",
               orientation === "landscape" ? "aspect-16/10" : "aspect-1/1.414"
             )}
           >
             <iframe
-              src={`${pdfUrl}#toolbar=0&navpanes=0&page=${currentPage}&zoom=${zoom}`}
+              src={`${effectivePdfUrl}#toolbar=0&navpanes=0&page=${currentPage}&zoom=${zoom}`}
               title={documentTitle}
-              className="w-full h-full border-0"
+              className="w-full h-full border-0 min-h-[640px]"
               onError={() => setHasError(true)}
             />
           </div>

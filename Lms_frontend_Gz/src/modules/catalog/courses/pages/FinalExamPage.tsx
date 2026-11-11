@@ -1076,7 +1076,7 @@ export function FinalExamPage() {
             {testResult.passed && (
               <button
                 type="button"
-                onClick={() => navigate("/courses/my")}
+                onClick={() => navigate("/certificates/issued")}
                 className="px-5 py-2.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs"
               >
                 View Certificate

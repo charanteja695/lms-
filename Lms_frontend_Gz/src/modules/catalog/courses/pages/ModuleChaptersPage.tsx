@@ -12,6 +12,8 @@ import {
   useReorderTopicsMutation,
 } from "@/modules/catalog/courses/api/curriculumApi";
 import { AddChapterModal } from "@/modules/catalog/courses/components/modals/AddChapterModal";
+import { AdminVideoPreviewModal } from "@/modules/catalog/courses/components/modals/AdminVideoPreviewModal";
+import { AdminPdfPreviewModal } from "@/modules/catalog/courses/components/modals/AdminPdfPreviewModal";
 import { ConfirmModal } from "@/modules/catalog/courses/components/common/ConfirmModal";
 import { CoursePageHeader } from "@/modules/catalog/courses/components/common/CoursePageHeader";
 import { Icon, PageLoader } from "@/shared/ui";
@@ -37,6 +39,16 @@ export function ModuleChaptersPage() {
   const [isAddChapterOpen, setIsAddChapterOpen] = useState(false);
   const [editingChapter, setEditingChapter] = useState<TopicDetail | null>(null);
   const [deletingChapter, setDeletingChapter] = useState<TopicDetail | null>(null);
+  const [videoPreviewTarget, setVideoPreviewTarget] = useState<{
+    chapterTitle: string;
+    itemTitle?: string;
+    mediaId?: string | number | null;
+  } | null>(null);
+  const [pdfPreviewTarget, setPdfPreviewTarget] = useState<{
+    chapterTitle: string;
+    itemTitle?: string;
+    mediaId?: string | number | null;
+  } | null>(null);
 
   // Fetch Course
   const {
@@ -267,8 +279,10 @@ export function ModuleChaptersPage() {
           <div className="divide-y divide-slate-100">
             {chapters.map((ch, idx) => {
               const items = ch.items ?? [];
-              const hasVideo = items.some((i) => i.item_type === "video");
-              const hasPdf = items.some((i) => i.item_type === "pdf");
+              const videoItem = items.find((i) => i.item_type === "video");
+              const pdfItem = items.find((i) => i.item_type === "pdf");
+              const hasVideo = Boolean(videoItem);
+              const hasPdf = Boolean(pdfItem);
               const hasNotes = items.some((i) => i.item_type === "notes");
               const hasMaterials = items.length > 0;
               const hasTest = Boolean(ch.topic_test_id);
@@ -296,15 +310,51 @@ export function ModuleChaptersPage() {
 
                   <div className="min-w-0 flex-1">
                     <h4 className="text-sm font-bold text-[#0A1530] truncate">{ch.title}</h4>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-slate-400 font-medium">
+                    <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-slate-400 font-medium">
                       {hasVideo && (
-                        <span className="inline-flex items-center gap-1 text-slate-600">
-                          <Icon name="play" size={13} className="text-[#00663C]" /> Video
+                        <span className="inline-flex items-center gap-1.5 text-slate-600">
+                          <span className="inline-flex items-center gap-1">
+                            <Icon name="play" size={13} className="text-[#00663C]" /> Video
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setVideoPreviewTarget({
+                                chapterTitle: ch.title,
+                                itemTitle: videoItem?.title || "Chapter Video",
+                                mediaId: videoItem?.media_id,
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-[#00663C] hover:bg-[#00663C] hover:text-white border border-emerald-200/80 font-bold text-[11px] transition-all cursor-pointer shadow-2xs"
+                            title="Preview uploaded video"
+                          >
+                            <Icon name="play" size={10} className="fill-current" />
+                            <span>Preview</span>
+                          </button>
                         </span>
                       )}
                       {hasPdf && (
-                        <span className="inline-flex items-center gap-1 text-slate-600">
-                          <Icon name="fileText" size={13} className="text-[#00663C]" /> PDF
+                        <span className="inline-flex items-center gap-1.5 text-slate-600">
+                          <span className="inline-flex items-center gap-1">
+                            <Icon name="fileText" size={13} className="text-[#00663C]" /> PDF
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPdfPreviewTarget({
+                                chapterTitle: ch.title,
+                                itemTitle: pdfItem?.title || "Chapter PDF",
+                                mediaId: pdfItem?.media_id,
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-[#2563EB] hover:bg-[#2563EB] hover:text-white border border-blue-200/80 font-bold text-[11px] transition-all cursor-pointer shadow-2xs"
+                            title="View uploaded PDF"
+                          >
+                            <Icon name="fileText" size={10} />
+                            <span>View PDF</span>
+                          </button>
                         </span>
                       )}
                       {hasNotes && (
@@ -423,6 +473,28 @@ export function ModuleChaptersPage() {
           tone="danger"
           onConfirm={handleDeleteChapter}
           onClose={() => setDeletingChapter(null)}
+        />
+      )}
+
+      {/* Video Preview Modal */}
+      {videoPreviewTarget && (
+        <AdminVideoPreviewModal
+          isOpen={Boolean(videoPreviewTarget)}
+          onClose={() => setVideoPreviewTarget(null)}
+          chapterTitle={videoPreviewTarget.chapterTitle}
+          itemTitle={videoPreviewTarget.itemTitle}
+          mediaId={videoPreviewTarget.mediaId}
+        />
+      )}
+
+      {/* PDF Preview Modal */}
+      {pdfPreviewTarget && (
+        <AdminPdfPreviewModal
+          isOpen={Boolean(pdfPreviewTarget)}
+          onClose={() => setPdfPreviewTarget(null)}
+          chapterTitle={pdfPreviewTarget.chapterTitle}
+          itemTitle={pdfPreviewTarget.itemTitle}
+          mediaId={pdfPreviewTarget.mediaId}
         />
       )}
     </div>
