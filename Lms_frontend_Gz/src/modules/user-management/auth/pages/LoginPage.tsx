@@ -126,7 +126,6 @@ export function LoginPage() {
       finish(response);
     } catch (error) {
       setFormError(toApiError(error).message);
-      form.resetField("password");
     }
   });
 

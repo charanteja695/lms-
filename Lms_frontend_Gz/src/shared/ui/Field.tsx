@@ -20,7 +20,7 @@ export function Field({ label, hint: _hint, error, required, className, children
       {label && (
         // The asterisk sits outside the label so the field's accessible name is exactly the label text.
         <span className="flex items-center gap-0.5">
-          <label htmlFor={id} className="block text-sm font-semibold text-slate-800">
+          <label htmlFor={id} className="block text-[13px] font-medium text-[#111827]">
             {label}
           </label>
           {required && (

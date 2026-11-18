@@ -189,12 +189,12 @@ export function SideNav({
                           onClick={onItemClick}
                           aria-current={isActive ? "page" : undefined}
                           className={cn(
-                            "relative flex items-center rounded-xl text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400",
+                            "relative flex items-center rounded-xl text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400",
                             collapsed
-                              ? "h-11 w-11 justify-center mx-auto"
-                              : "gap-3 px-3 py-2.5",
+                              ? "h-10 w-10 justify-center mx-auto"
+                              : "gap-3 px-3 h-10",
                             isActive
-                              ? "bg-brand-600 font-semibold text-white shadow-sm"
+                              ? "bg-[#635BFF] font-semibold text-white shadow-sm"
                               : dark
                                 ? "text-slate-300 hover:bg-slate-800/70 hover:text-white"
                                 : "text-slate-600 hover:bg-slate-50 hover:text-navy-950",
@@ -214,7 +214,7 @@ export function SideNav({
                           />
 
                           {!collapsed && (
-                            <span className="truncate text-xs sm:text-sm font-medium">
+                            <span className="truncate text-[13px] font-medium leading-none">
                               {item.label}
                             </span>
                           )}

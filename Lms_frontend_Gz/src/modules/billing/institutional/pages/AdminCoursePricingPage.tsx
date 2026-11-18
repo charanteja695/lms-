@@ -517,17 +517,9 @@ export function AdminCoursePricingPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[#E2E8F0]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[#E5E7EB]">
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">
-              <span>Admin Workspace</span>
-              <span>/</span>
-              <span className="text-[#2563EB]">Course Pricing</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-[#0F172A]">Course Pricing Management</h1>
-            <p className="text-sm text-[#64748B] mt-0.5">
-              Manage individual and institutional course prices, discounts and taxes.
-            </p>
+            <h1 className="text-[28px] font-bold tracking-tight text-[#111827]">Course Pricing Management</h1>
           </div>
           <div className="flex items-center flex-wrap gap-2.5">
             <Button

@@ -146,12 +146,10 @@ export function BrowseCoursesPage() {
 
   return (
     <div className="space-y-6 max-w-[1500px] mx-auto pb-16">
-      {/* 1. Header with Eyebrow, Title & Catalog Count */}
+      {/* 1. Header with Title & Catalog Count */}
       <div className="page-title-row">
         <div>
-          <div className="eyebrow">LEARN AT YOUR PACE</div>
-          <h1>Explore courses</h1>
-          <p className="muted">Build in-demand skills with expert-led learning.</p>
+          <h1 className="text-[28px] font-bold text-[#111827]">Explore courses</h1>
         </div>
         <div className="catalog-count">
           <b>{courses.length > 0 ? `${courses.length}+` : "10+"}</b>
