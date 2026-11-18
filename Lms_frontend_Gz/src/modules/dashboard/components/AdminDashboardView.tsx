@@ -16,7 +16,6 @@ import {
   BarChart3,
   Layers,
 } from "lucide-react";
-import { useAuth } from "@/modules/user-management/auth/hooks/useAuth";
 import { useListCoursesQuery } from "@/modules/catalog/courses/api/coursesApi";
 import { useListInstitutionsQuery } from "@/modules/user-management/institutions/api/institutionsApi";
 import { useListUsersQuery } from "@/modules/user-management/users/api/usersApi";
@@ -25,7 +24,6 @@ import { useListEnrollmentsQuery } from "@/modules/learning/enrollments/api/enro
 
 
 export function AdminDashboardView() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState("Last 30 days");
 
@@ -57,11 +55,7 @@ export function AdminDashboardView() {
       {/* 1. Header with Eyebrow, Title & Actions */}
       <div className="page-head">
         <div>
-          <div className="eyebrow">
-            {user?.full_name ? `EXAMLMS ADMIN WORKSPACE · ${user.full_name.toUpperCase()}` : "EXAMLMS ADMIN WORKSPACE"}
-          </div>
           <h1>Admin Dashboard</h1>
-          <p>Enterprise LMS overview, real-time platform metrics, course operations and governance.</p>
         </div>
         <div className="head-actions">
           <div className="relative inline-flex items-center">
@@ -217,10 +211,7 @@ export function AdminDashboardView() {
         {/* Left: Enrollment Trends Chart (7 cols) */}
         <section className="lg:col-span-7 rounded-2xl border border-[#E5E7EB] bg-white p-6 shadow-2xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div>
-              <h3 className="text-base font-bold text-[#111827]">Student Enrollment Trends</h3>
-              <p className="text-xs text-slate-500">Daily enrollment volume across individual and institutional cohorts</p>
-            </div>
+            <h3 className="text-base font-bold text-[#111827]">Student Enrollment Trends</h3>
             <span className="text-xs font-bold text-[#635BFF] bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">
               {timeRange}
             </span>
@@ -254,10 +245,7 @@ export function AdminDashboardView() {
         <section className="lg:col-span-5 rounded-2xl border border-[#E5E7EB] bg-white p-6 shadow-2xs flex flex-col justify-between space-y-4">
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-base font-bold text-[#111827]">Revenue Overview</h3>
-                <p className="text-xs text-slate-500">Channel distribution</p>
-              </div>
+              <h3 className="text-base font-bold text-[#111827]">Revenue Overview</h3>
               <span className="text-xs font-semibold text-slate-400">Current Month</span>
             </div>
 

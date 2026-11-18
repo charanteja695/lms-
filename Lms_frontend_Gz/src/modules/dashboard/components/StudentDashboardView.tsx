@@ -170,9 +170,6 @@ export function StudentDashboardView() {
           <h1>
             Good {timeOfDay}, {firstName} <span>✦</span>
           </h1>
-          <p className="muted">
-            Keep building your skills. Track your courses, complete assessments, and advance your career.
-          </p>
         </div>
         <div className="welcome-pill">
           <Sparkles size={16} /> Active Learner
@@ -187,9 +184,6 @@ export function StudentDashboardView() {
             Learn something new.<br />
             <em>Become something more.</em>
           </h2>
-          <p>
-            Explore expert-led curriculum, pass proctored assessments, and earn industry-recognized certifications.
-          </p>
           <div className="hero-actions">
             <Link
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-white text-[#4f46dc] hover:bg-slate-50 transition shadow-xs cursor-pointer"
@@ -394,10 +388,7 @@ export function StudentDashboardView() {
       {/* 5. My Enrolled Courses Section (Part 2.A Priority) */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-[#111827]">My Enrolled Courses</h2>
-            <p className="text-xs text-slate-500">Courses you are currently learning and mastering</p>
-          </div>
+          <h2 className="text-xl font-bold text-[#111827]">My Enrolled Courses</h2>
           <Link
             to="/courses/my"
             className="text-xs font-bold text-[#635BFF] hover:text-[#5046E5] flex items-center gap-1 cursor-pointer transition-colors"
@@ -495,10 +486,7 @@ export function StudentDashboardView() {
       {/* 6. Upcoming Assessments & Milestones */}
       <section className="rounded-2xl border border-[#E5E7EB] bg-white p-6 shadow-2xs space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div>
-            <h3 className="text-base font-bold text-[#111827]">Assessments & Certifications</h3>
-            <p className="text-xs text-slate-500">Track your progress toward accredited certifications</p>
-          </div>
+          <h3 className="text-base font-bold text-[#111827]">Assessments & Certifications</h3>
           <Link to="/certificates" className="text-xs font-bold text-[#635BFF] hover:underline">
             View All Credentials →
           </Link>

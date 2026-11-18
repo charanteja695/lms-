@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   ExternalLink,
 } from "lucide-react";
-import { useAuth } from "@/modules/user-management/auth/hooks/useAuth";
 import {
   useGetInstitutionPurchasesQuery,
   useGetInstitutionRequestsQuery,
@@ -22,15 +21,12 @@ import {
 import { useListBatchesQuery } from "@/modules/learning/batches/api/batchesApi";
 
 export function InstitutionDashboardView() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [timeRange] = useState("Academic Year 2026-27");
 
   const { data: packages = [] } = useGetInstitutionPurchasesQuery();
   const { data: requests = [] } = useGetInstitutionRequestsQuery();
   const { data: batchesData } = useListBatchesQuery({});
-
-  const institutionName = user?.institution?.name || "Premier Institute of Technology";
 
   // Aggregate metrics from real packages
   const metrics = useMemo(() => {
@@ -57,12 +53,10 @@ export function InstitutionDashboardView() {
 
   return (
     <div className="space-y-5 max-w-[1600px] mx-auto pb-16 font-sans">
-      {/* 1. Workspace Header: 28px/700, 14px/400 subtitle */}
+      {/* 1. Workspace Header */}
       <div className="page-head">
         <div>
-          <div className="eyebrow">INSTITUTION WORKSPACE · {institutionName.toUpperCase()}</div>
           <h1>Institution Dashboard</h1>
-          <p>Monitor licensed courses, student allocations, batch performance and quotas.</p>
         </div>
         <div className="head-actions">
           <div className="relative inline-flex items-center">

@@ -62,6 +62,18 @@ export function MfaStep({ onDone, onCancel }: { onDone: (response: LoginResponse
       <FormProvider {...form}>
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           {formError && <Alert tone="error">{formError}</Alert>}
+
+          <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-950">
+            <span>Demo 2FA Code: <strong className="font-mono text-emerald-900">123456</strong></span>
+            <button
+              type="button"
+              onClick={() => form.setValue("code", "123456", { shouldValidate: true })}
+              className="font-bold text-emerald-700 underline decoration-emerald-500 hover:text-emerald-900"
+            >
+              Fill Code
+            </button>
+          </div>
+
           {useRecovery ? (
             <TextField<MfaValues> name="recovery_code" label="Recovery code" autoComplete="one-time-code" />
           ) : (
