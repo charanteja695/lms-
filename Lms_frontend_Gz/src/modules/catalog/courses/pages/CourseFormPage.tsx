@@ -687,9 +687,9 @@ export function CourseFormPage() {
             <div className="md:col-span-8 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-slate-700">Course Title *</label>
-                    <span className="text-[11px] text-slate-400">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[13px] font-medium text-[#111827]">Course Title *</label>
+                    <span className="text-[12px] text-[#64748B]">
                       {title.length}/200 {title.trim().length > 0 && title.trim().length < 3 ? "(min 3 chars required)" : ""}
                     </span>
                   </div>
@@ -706,34 +706,34 @@ export function CourseFormPage() {
                     }}
                     placeholder="e.g. Master Python Programming & Clean Architecture"
                     className={cn(
-                      "w-full rounded-xl border px-3.5 py-2 text-sm text-navy-950 focus:outline-none",
+                      "w-full h-11 rounded-xl border px-3.5 text-sm text-[#111827] focus:outline-none transition",
                       title.trim().length > 0 && title.trim().length < 3
                         ? "border-amber-400 bg-amber-50/20 focus:border-amber-500"
-                        : "border-slate-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                        : "border-[#E5E7EB] bg-white focus:border-[#635BFF] focus:ring-2 focus:ring-[#635BFF]/10"
                     )}
                   />
                   {title.trim().length > 0 && title.trim().length < 3 && (
-                    <p className="text-[11px] text-amber-600 mt-1 font-medium">
+                    <p className="text-[12px] text-amber-600 mt-1 font-medium">
                       Title must be at least 3 characters ({title.trim().length}/3).
                     </p>
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Course Code</label>
+                  <label className="block text-[13px] font-medium text-[#111827] mb-1.5">Course Code</label>
                   <input
                     type="text"
                     value={courseCode}
                     onChange={(e) => setCourseCode(e.target.value)}
                     placeholder="CS-101"
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-navy-950 font-mono focus:border-brand-500 focus:outline-none"
+                    className="w-full h-11 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm font-mono text-[#111827] focus:border-[#635BFF] focus:ring-2 focus:ring-[#635BFF]/10 focus:outline-none transition"
                   />
                 </div>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-700">Short Description</label>
-                  <span className="text-[11px] text-slate-400">{shortDesc.length}/350</span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[13px] font-medium text-[#111827]">Short Description</label>
+                  <span className="text-[12px] text-[#64748B]">{shortDesc.length}/350</span>
                 </div>
                 <input
                   type="text"
@@ -741,31 +741,31 @@ export function CourseFormPage() {
                   value={shortDesc}
                   onChange={(e) => setShortDesc(e.target.value)}
                   placeholder="A concise 1-sentence overview for course marketplace cards."
-                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-navy-950 focus:border-brand-500 focus:outline-none"
+                  className="w-full h-11 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm text-[#111827] focus:border-[#635BFF] focus:ring-2 focus:ring-[#635BFF]/10 focus:outline-none transition"
                 />
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-700">Full Description</label>
-                  <span className="text-[11px] text-slate-400">{fullDesc.length}/2000</span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[13px] font-medium text-[#111827]">Full Description</label>
+                  <span className="text-[12px] text-[#64748B]">{fullDesc.length}/2000</span>
                 </div>
                 <textarea
                   rows={3}
                   value={fullDesc}
                   onChange={(e) => setFullDesc(e.target.value)}
                   placeholder="Detailed course objectives, syllabus scope, and student takeaways."
-                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-navy-950 focus:border-brand-500 focus:outline-none resize-none"
+                  className="w-full rounded-xl border border-[#E5E7EB] bg-white p-3.5 text-sm text-[#111827] focus:border-[#635BFF] focus:ring-2 focus:ring-[#635BFF]/10 focus:outline-none transition resize-none"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Category</label>
+                  <label className="block text-[13px] font-medium text-[#111827] mb-1.5">Category</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-navy-950 bg-white focus:outline-none"
+                    className="w-full h-11 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm text-[#111827] focus:border-[#635BFF] focus:ring-2 focus:ring-[#635BFF]/10 focus:outline-none transition cursor-pointer"
                   >
                     <option value="Programming">Programming</option>
                     <option value="Data Science">Data Science</option>
@@ -776,68 +776,106 @@ export function CourseFormPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Subcategory</label>
+                  <label className="block text-[13px] font-medium text-[#111827] mb-1.5">Subcategory</label>
                   <input
                     type="text"
                     value={subcategory}
                     onChange={(e) => setSubcategory(e.target.value)}
                     placeholder="e.g. Python, Fullstack"
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-navy-950 focus:outline-none"
+                    className="w-full h-11 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm text-[#111827] focus:border-[#635BFF] focus:ring-2 focus:ring-[#635BFF]/10 focus:outline-none transition"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Instructor</label>
+                  <label className="block text-[13px] font-medium text-[#111827] mb-1.5">Instructor</label>
                   <input
                     type="text"
                     value={instructor}
                     onChange={(e) => setInstructor(e.target.value)}
                     placeholder="Dr. Sneha Reddy"
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-navy-950 focus:outline-none"
+                    className="w-full h-11 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm text-[#111827] focus:border-[#635BFF] focus:ring-2 focus:ring-[#635BFF]/10 focus:outline-none transition"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Difficulty Level</label>
-                  <div className="flex rounded-xl bg-slate-100 p-1">
-                    {(["Beginner", "Intermediate", "Advanced"] as const).map((lvl) => (
+              <div>
+                <label className="block text-[13px] font-medium text-[#111827] mb-2">Difficulty Level</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    {
+                      level: "Beginner" as const,
+                      title: "Beginner",
+                      desc: "No prior experience required",
+                      dot: "bg-emerald-500",
+                    },
+                    {
+                      level: "Intermediate" as const,
+                      title: "Intermediate",
+                      desc: "Foundational knowledge recommended",
+                      dot: "bg-blue-500",
+                    },
+                    {
+                      level: "Advanced" as const,
+                      title: "Advanced",
+                      desc: "In-depth concepts & mastery",
+                      dot: "bg-purple-500",
+                    },
+                  ].map((item) => {
+                    const isSelected = difficulty === item.level;
+                    return (
                       <button
-                        key={lvl}
+                        key={item.level}
                         type="button"
-                        onClick={() => setDifficulty(lvl)}
+                        onClick={() => setDifficulty(item.level)}
                         className={cn(
-                          "flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer",
-                          difficulty === lvl
-                            ? "bg-brand-600 text-white shadow-2xs"
-                            : "text-slate-600 hover:text-navy-950"
+                          "group relative flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all cursor-pointer",
+                          isSelected
+                            ? "border-[#635BFF] bg-[#635BFF]/5 ring-2 ring-[#635BFF]/20 shadow-xs"
+                            : "border-[#E5E7EB] bg-white hover:border-slate-300 hover:bg-slate-50/50"
                         )}
                       >
-                        {lvl}
+                        <div className="flex items-center justify-between w-full mb-1.5">
+                          <span className="flex items-center gap-2">
+                            <span className={cn("w-2 h-2 rounded-full", item.dot)} />
+                            <span className={cn("text-sm font-semibold", isSelected ? "text-[#635BFF]" : "text-[#111827]")}>
+                              {item.title}
+                            </span>
+                          </span>
+                          <span
+                            className={cn(
+                              "flex h-4 w-4 items-center justify-center rounded-full border transition-all",
+                              isSelected ? "border-[#635BFF] bg-[#635BFF]" : "border-slate-300 bg-white group-hover:border-slate-400"
+                            )}
+                          >
+                            {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                          </span>
+                        </div>
+                        <p className="text-[12px] text-[#64748B] font-normal leading-relaxed">{item.desc}</p>
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
+              </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Language</label>
+                  <label className="block text-[13px] font-medium text-[#111827] mb-1.5">Language</label>
                   <input
                     type="text"
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
                     placeholder="English"
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-navy-950 focus:outline-none"
+                    className="w-full h-11 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm text-[#111827] focus:border-[#635BFF] focus:ring-2 focus:ring-[#635BFF]/10 focus:outline-none transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Duration</label>
+                  <label className="block text-[13px] font-medium text-[#111827] mb-1.5">Duration</label>
                   <input
                     type="text"
                     value={duration}
                     onChange={(e) => setDuration(e.target.value)}
                     placeholder="42 Hours"
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-navy-950 focus:outline-none"
+                    className="w-full h-11 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm text-[#111827] focus:border-[#635BFF] focus:ring-2 focus:ring-[#635BFF]/10 focus:outline-none transition"
                   />
                 </div>
               </div>
