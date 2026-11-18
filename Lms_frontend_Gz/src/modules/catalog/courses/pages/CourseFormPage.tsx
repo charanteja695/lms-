@@ -84,7 +84,6 @@ export function CourseFormPage() {
   const [subcategory, setSubcategory] = useState("Python");
   const [instructor, setInstructor] = useState("Dr. Sneha Reddy");
   const [difficulty, setDifficulty] = useState<"Beginner" | "Intermediate" | "Advanced">("Beginner");
-  const [language, setLanguage] = useState("English");
   const [duration, setDuration] = useState("42 Hours");
 
   // STEP 2: Course Pricing Fields
@@ -856,28 +855,15 @@ export function CourseFormPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[13px] font-medium text-[#111827] mb-1.5">Language</label>
-                  <input
-                    type="text"
-                    value={language}
-                    onChange={(e) => setLanguage(e.target.value)}
-                    placeholder="English"
-                    className="w-full h-11 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm text-[#111827] focus:border-[#635BFF] focus:ring-2 focus:ring-[#635BFF]/10 focus:outline-none transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[13px] font-medium text-[#111827] mb-1.5">Duration</label>
-                  <input
-                    type="text"
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    placeholder="42 Hours"
-                    className="w-full h-11 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm text-[#111827] focus:border-[#635BFF] focus:ring-2 focus:ring-[#635BFF]/10 focus:outline-none transition"
-                  />
-                </div>
+              <div>
+                <label className="block text-[13px] font-medium text-[#111827] mb-1.5">Duration</label>
+                <input
+                  type="text"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                  placeholder="e.g. 42 Hours"
+                  className="w-full h-11 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm text-[#111827] focus:border-[#635BFF] focus:ring-2 focus:ring-[#635BFF]/10 focus:outline-none transition"
+                />
               </div>
             </div>
           </div>
