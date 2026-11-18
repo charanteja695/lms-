@@ -23,13 +23,14 @@ import type { IconName } from "@/shared/ui";
 /** Sidebar headings, in display order. A heading shows only when this person has something under it. */
 export const NAV_GROUPS = [
   { key: "home", label: null },
+  { key: "courses", label: "Course Management" },
+  { key: "academics", label: "Batches & Institutions" },
+  { key: "careers", label: "Career & Placements" },
+  { key: "admin", label: "System Administration" },
   { key: "users", label: "User Management" },
   { key: "learn", label: "Academic Learning" },
   { key: "exams", label: "Exams & Certifications" },
   { key: "curriculum", label: "Curriculum & Authoring" },
-  { key: "academics", label: "Batches & Institutions" },
-  { key: "careers", label: "Career & Placements" },
-  { key: "admin", label: "System Administration" },
   { key: "help", label: "Support & Help" },
 ] as const;
 
@@ -52,7 +53,7 @@ export type NavItem = {
 
 /** Every entry, in display order within its group; each module contributes its own. */
 export const NAVIGATION: NavItem[] = [
-  { section: "dashboard", label: "Home", icon: "dashboard", to: "/", group: "home", hint: "Your starting point" },
+  { section: "dashboard", label: "Dashboard", icon: "dashboard", to: "/", group: "home", hint: "Your starting point" },
   ...learningNavigation,
   ...catalogNavigation,
   ...mediaNavigation,

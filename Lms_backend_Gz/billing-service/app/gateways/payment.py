@@ -133,6 +133,9 @@ class PaymentGateway:
             return None
         event = json.loads(body)
         return GatewayEventIn(
-            event_id=str(event["event_id"]), kind=str(event["type"]), order_id=str(event["order_id"]),
-            payment_id=str(event["payment_id"]) if event.get("payment_id") else None, amount=int(event["amount"]) if event.get("amount") is not None else None,
+            event_id=str(event.get("event_id") or event.get("id") or "evt_default"),
+            kind=str(event.get("type") or event.get("event") or ""),
+            order_id=str(event["order_id"]),
+            payment_id=str(event.get("payment_id") or event.get("id") or ""),
+            amount=int(event["amount"]) if event.get("amount") is not None else None,
         )

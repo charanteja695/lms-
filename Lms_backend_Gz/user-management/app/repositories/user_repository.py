@@ -143,6 +143,11 @@ class UserRepository:
 
     @staticmethod
     def event_payload(user: User, *, institution_public_id: int | None) -> dict[str, Any]:
+        student = getattr(user, "_student_loaded", None)
+        try:
+            student = user.student
+        except Exception:
+            student = None
         return {
             "user_id": str(user.public_id),
             "email": user.email,
@@ -152,7 +157,7 @@ class UserRepository:
             "role": user.role,
             "status": user.status,
             "organization_id": str(institution_public_id) if institution_public_id else None,
-            "branch": user.student.branch if user.student else None,
-            "graduation_year": user.student.graduation_year if user.student else None,
-            "cgpa": float(user.student.cgpa) if (user.student and user.student.cgpa is not None) else None,
+            "branch": student.branch if student else None,
+            "graduation_year": student.graduation_year if student else None,
+            "cgpa": float(student.cgpa) if (student and student.cgpa is not None) else None,
         }

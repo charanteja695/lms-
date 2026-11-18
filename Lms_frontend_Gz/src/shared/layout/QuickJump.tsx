@@ -38,10 +38,10 @@ export function QuickJump() {
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} aria-label="Jump to a page (Ctrl+K)" className="flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-400 shadow-[0_1px_2px_rgb(16_24_40/0.04)] transition-colors hover:border-slate-300 hover:text-slate-600 sm:w-64">
-        <Icon name="search" size={16} />
-        <span className="hidden flex-1 text-left sm:inline">Jump to…</span>
-        <kbd className="hidden rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-sans text-[11px] font-semibold text-slate-500 sm:inline">Ctrl K</kbd>
+      <button type="button" onClick={() => setOpen(true)} aria-label="Search courses, students, or anything... (Ctrl + K)" className="flex h-10 cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200/90 bg-slate-50/70 px-4 text-xs sm:text-sm text-slate-400 shadow-2xs transition-all hover:border-slate-300 hover:bg-white hover:text-slate-600 sm:w-80 md:w-96">
+        <Icon name="search" size={16} className="text-slate-400" />
+        <span className="hidden flex-1 text-left sm:inline">Search courses, students, or anything...</span>
+        <kbd className="hidden rounded-md border border-slate-200 bg-white px-1.5 py-0.5 font-sans text-[10px] font-semibold text-slate-400 sm:inline">Ctrl + K</kbd>
       </button>
       {open && createPortal(
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]" role="dialog" aria-modal="true" aria-label="Jump to a page">
@@ -67,7 +67,7 @@ export function QuickJump() {
             <ul className="max-h-[50vh] overflow-y-auto p-2" role="listbox" aria-label="Pages">
               {results.length === 0 && <li className="px-3 py-8 text-center text-sm text-slate-500">No page matches “{query}”.</li>}
               {results.map((item, index) => (
-                <li key={item.to} role="option" aria-selected={index === active}>
+                <li key={`${item.to}-${item.label}`} role="option" aria-selected={index === active}>
                   <button type="button" onMouseEnter={() => setActive(index)} onClick={() => go(item.to)} className={cn("flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors", index === active ? "bg-brand-50" : "hover:bg-slate-50")}>
                     <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", index === active ? "bg-white text-brand-700 ring-1 ring-brand-100" : "bg-slate-100 text-slate-500")}><Icon name={item.icon} size={18} /></span>
                     <span className="min-w-0 flex-1">

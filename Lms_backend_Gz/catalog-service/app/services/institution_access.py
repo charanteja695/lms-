@@ -40,46 +40,107 @@ def get_user_management_db_url() -> str:
     return _get_database_url("lms_user_management", "USER_MANAGEMENT_DATABASE_URL")
 
 
-async def get_student_accessible_course_ids(organization_id: int | None) -> set[int]:
-    """Returns the set of course_ids for which the student's institution has an active subscription."""
-    if not organization_id:
-        return set()
+async def get_student_accessible_course_ids(organization_id: int | None, user_id: int | None = None) -> set[int]:
+    """Returns the set of course_ids for which the student has access:
+    1. Active subscriptions for the student's institution.
+    2. Active individual course purchases for the student.
+    """
+    course_ids: set[int] = set()
     db_url = get_subscription_db_url()
     try:
         conn = await asyncpg.connect(db_url)
         try:
-            rows = await conn.fetch("""
-                SELECT course_id FROM subscriptions
-                WHERE organization_id = $1
-                  AND status = 'active'
-                  AND starts_at <= NOW()
-                  AND (ends_at IS NULL OR ends_at > NOW())
-            """, int(organization_id))
-            return {int(r["course_id"]) for r in rows}
+            if organization_id:
+                rows = await conn.fetch("""
+                    SELECT course_id FROM subscriptions
+                    WHERE organization_id = $1
+                      AND status = 'active'
+                      AND starts_at <= NOW()
+                      AND (ends_at IS NULL OR ends_at > NOW())
+                """, int(organization_id))
+                course_ids.update(int(r["course_id"]) for r in rows)
+
+            if user_id:
+                u_rows = await conn.fetch("""
+                    SELECT course_id FROM course_access
+                    WHERE user_id = $1
+                      AND status = 'active'
+                      AND starts_at <= NOW()
+                      AND (ends_at IS NULL OR ends_at > NOW())
+                """, int(user_id))
+                course_ids.update(int(r["course_id"]) for r in u_rows)
         finally:
             await conn.close()
     except Exception as exc:
-        logger.error("Failed to query accessible courses for organization %s from %s: %s", organization_id, db_url, exc, exc_info=True)
-        return set()
+        logger.error("Failed to query accessible courses for organization %s, user %s from %s: %s", organization_id, user_id, db_url, exc, exc_info=True)
+    return course_ids
 
 
-async def check_student_course_access(organization_id: int | None, course_id: int) -> bool:
-    """Verifies that the student's institution has an active subscription for this specific course."""
-    if not organization_id:
-        return False
+async def check_student_course_access(organization_id: int | None, course_id: int, user_id: int | None = None) -> bool:
+    """Verifies that the student has access to this course:
+    1. Active individual purchase in course_access.
+    2. Active institutional subscription in subscriptions with seat capacity respected.
+    """
     db_url = get_subscription_db_url()
     try:
         conn = await asyncpg.connect(db_url)
         try:
-            row = await conn.fetchrow("""
-                SELECT id FROM subscriptions
-                WHERE organization_id = $1
-                  AND course_id = $2
-                  AND status = 'active'
-                  AND starts_at <= NOW()
-                  AND (ends_at IS NULL OR ends_at > NOW())
-            """, int(organization_id), int(course_id))
-            return row is not None
+            # 1. Check individual purchase first
+            if user_id:
+                u_row = await conn.fetchrow("""
+                    SELECT id FROM course_access
+                    WHERE user_id = $1
+                      AND course_id = $2
+                      AND status = 'active'
+                      AND starts_at <= NOW()
+                      AND (ends_at IS NULL OR ends_at > NOW())
+                """, int(user_id), int(course_id))
+                if u_row is not None:
+                    return True
+
+            # 2. Check institutional subscription
+            if organization_id:
+                sub_row = await conn.fetchrow("""
+                    SELECT id, seats_total, seats_used FROM subscriptions
+                    WHERE organization_id = $1
+                      AND course_id = $2
+                      AND status = 'active'
+                      AND starts_at <= NOW()
+                      AND (ends_at IS NULL OR ends_at > NOW())
+                """, int(organization_id), int(course_id))
+                if sub_row is not None:
+                    seats_total = int(sub_row["seats_total"])
+                    seats_used = int(sub_row["seats_used"])
+                    if user_id:
+                        res = await conn.fetchrow("""
+                            SELECT sr.id FROM seat_reservations sr
+                            JOIN subscriptions s ON s.id = sr.subscription_id
+                            WHERE s.id = $1 AND sr.released_at IS NULL AND sr.reservation_key = $2
+                        """, sub_row["id"], str(user_id))
+                        if res is not None:
+                            return True
+
+                        if seats_used >= seats_total:
+                            return False
+
+                        import uuid
+                        updated = await conn.fetchrow("""
+                            UPDATE subscriptions
+                            SET seats_used = seats_used + 1, updated_at = NOW()
+                            WHERE id = $1 AND seats_used < seats_total
+                            RETURNING seats_used
+                        """, sub_row["id"])
+                        if updated is None:
+                            return False
+                        await conn.execute("""
+                            INSERT INTO seat_reservations (id, subscription_id, reservation_key, created_at)
+                            VALUES ($1, $2, $3, NOW())
+                            ON CONFLICT (subscription_id, reservation_key) DO NOTHING
+                        """, uuid.uuid4(), sub_row["id"], str(user_id))
+                        return True
+                    return seats_used < seats_total
+
+            return False
         finally:
             await conn.close()
     except Exception as exc:

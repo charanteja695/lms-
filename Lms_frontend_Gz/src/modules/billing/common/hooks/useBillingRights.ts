@@ -1,4 +1,5 @@
 import { useCan } from "@/modules/user-management/common/permissions/useCan";
+import { usePermissions } from "@/modules/user-management/common/permissions/usePermissions";
 
 /**
  * Mirrors billing-service's policy.py: an institution head or employer admin handles their own organisation's billing
@@ -6,7 +7,9 @@ import { useCan } from "@/modules/user-management/common/permissions/useCan";
  */
 export function useBillingRights() {
   const { can, holds, acts, organizationType } = useCan();
-  const isManager = can("billing.manage");
+  const { permissions } = usePermissions();
+  const isManager =
+    can("billing.manage") || permissions.role === "super_admin" || permissions.role === "admin";
   /** Sees their organisation's invoices and quotes (the Billing page's View cell). */
   const isContact = acts("billing.view", "billing.contact");
   /** Edits the billing profile, asks for and accepts quotes, pays (the Update cell). */
@@ -14,4 +17,3 @@ export function useBillingRights() {
   const isHead = canUpdate && organizationType === "institution";
   return { isManager, isHead, isEmployerAdmin: holds("billing.plans.buy"), isContact, canUpdate, canQuote: (isContact && organizationType === "institution") || isManager };
 }
-

@@ -18,9 +18,9 @@ export const userManagementNavigation: NavItem[] = [
   { section: "users", viewRole: "student", label: "Students", icon: "graduation", to: "/students", group: "users", hint: "" },
   { section: "hierarchy", label: "Organisation hierarchy", icon: "layers", to: "/organisation", group: "admin", hint: "" },
   { section: "permissions", label: "Roles & permissions", icon: "key", to: "/permissions", group: "admin", hint: "" },
-  { section: "my_organization", label: "My organisation", icon: "building", to: "/my-organization", group: "academics", hint: "" },
-  { section: "academics", label: "Academic structure", icon: "layers", to: "/academics", group: "academics", hint: "" },
-  { section: "academics", label: "Marks & results", icon: "chart", to: "/results", group: "academics", hint: "" },
+  { section: "my_organization", label: "My organisation", icon: "building", to: "/my-organization", group: "users", hint: "Details and structure of your organisation" },
+  { section: "academics", label: "Academic Structure", icon: "book", to: "/academics", group: "academics", hint: "Departments, programs, and student sections" },
+  { section: "academics", label: "Marks & Results", icon: "chart", to: "/results", group: "academics", hint: "Student scores, test performance, and pass rates" },
   { section: "downloads", label: "Data exports", icon: "download", to: "/downloads", group: "admin", hint: "" },
   { section: "audit_logs", label: "System audit log", icon: "search", to: "/audit-logs", group: "admin", hint: "" },
 ];

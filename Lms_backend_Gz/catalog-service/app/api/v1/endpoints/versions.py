@@ -13,7 +13,10 @@ from app.api.deps import (
     sees_drafts,
 )
 from app.api.responses import errors
-from app.core.exceptions import NotFoundError
+from lms_common.subscription_guard import check_student_course_entitlement
+
+from app.core.config import get_settings
+from app.core.exceptions import NotFoundError, PermissionDeniedError
 from app.domain.enums import ContentStatus
 from app.schemas.course_rule import CourseRuleOut, CourseRuleUpdate
 from app.schemas.review import RejectRequest, ReviewListResponse, ReviewOut
@@ -61,6 +64,13 @@ async def get_version(course_id: CourseIdParam, version_id: VersionIdParam, auth
                 "Your institution has not been granted access to this course.",
                 code="COURSE_ACCESS_DENIED"
             )
+        entitled, err_code, err_msg = await check_student_course_entitlement(
+            user_id=auth.user_id,
+            course_id=course_id,
+            settings_db_url=get_settings().DATABASE_URL,
+        )
+        if not entitled:
+            raise PermissionDeniedError(err_msg or "Active subscription required.", code=err_code or "SUBSCRIPTION_REQUIRED")
     version = await VersionService(db).get_detail(course_id, version_id)
     if version.status not in (ContentStatus.PUBLISHED, ContentStatus.ARCHIVED) and not sees_drafts(auth):
         raise NotFoundError("Course version not found.", code="COURSE_VERSION_NOT_FOUND")  # a draft is its authors' business

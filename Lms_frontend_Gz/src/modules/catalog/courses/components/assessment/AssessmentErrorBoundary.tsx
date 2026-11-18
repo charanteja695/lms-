@@ -62,7 +62,7 @@ export class AssessmentErrorBoundary extends Component<Props, State> {
             </button>
             <Link
               to={returnUrl}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               Back to Course

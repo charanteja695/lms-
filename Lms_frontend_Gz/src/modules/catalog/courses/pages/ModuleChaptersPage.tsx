@@ -127,7 +127,7 @@ export function ModuleChaptersPage() {
         <button
           type="button"
           onClick={() => navigate(courseId ? `/courses/${courseId}` : "/courses")}
-          className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer"
+          className="px-5 py-2.5 rounded-xl bg-[#6366F1] hover:bg-[#4F46E5] text-xs font-bold text-white shadow-xs cursor-pointer transition"
         >
           Back to Course Hub
         </button>
@@ -235,9 +235,9 @@ export function ModuleChaptersPage() {
                   setEditingChapter(null);
                   setIsAddChapterOpen(true);
                 }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs transition"
               >
-                <Icon name="plus" size={15} /> Add chapter
+                <Icon name="plus" size={15} /> Add Chapter
               </button>
             )}
           </div>
@@ -245,15 +245,15 @@ export function ModuleChaptersPage() {
       />
 
       {/* Chapters Card */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-card overflow-hidden">
         <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
           <div>
-            <h3 className="text-sm font-bold text-[#0A1530]">Chapters</h3>
+            <h3 className="text-sm font-bold text-navy-950">Chapters</h3>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Each chapter can include video, PDF, notes, and an AI-generated exam test.
+              Each chapter can include video, PDF, notes, and an assessment test.
             </p>
           </div>
-          <span className="rounded-full bg-emerald-50 text-[#00663C] px-2.5 py-0.5 text-xs font-bold">
+          <span className="rounded-full bg-indigo-50 text-[#6366F1] border border-indigo-100 px-3 py-1 text-xs font-bold">
             {chapters.length} {chapters.length === 1 ? "chapter" : "chapters"} total
           </span>
         </div>
@@ -269,9 +269,9 @@ export function ModuleChaptersPage() {
               <button
                 type="button"
                 onClick={() => setIsAddChapterOpen(true)}
-                className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs"
+                className="px-5 py-2.5 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs transition"
               >
-                Add chapter
+                Add Chapter
               </button>
             )}
           </div>
@@ -314,7 +314,7 @@ export function ModuleChaptersPage() {
                       {hasVideo && (
                         <span className="inline-flex items-center gap-1.5 text-slate-600">
                           <span className="inline-flex items-center gap-1">
-                            <Icon name="play" size={13} className="text-[#00663C]" /> Video
+                            <Icon name="play" size={13} className="text-[#6366F1]" /> Video
                           </span>
                           <button
                             type="button"
@@ -326,7 +326,7 @@ export function ModuleChaptersPage() {
                                 mediaId: videoItem?.media_id,
                               });
                             }}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-[#00663C] hover:bg-[#00663C] hover:text-white border border-emerald-200/80 font-bold text-[11px] transition-all cursor-pointer shadow-2xs"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-[#6366F1] hover:bg-[#6366F1] hover:text-white border border-indigo-200 font-bold text-[11px] transition-all cursor-pointer shadow-2xs"
                             title="Preview uploaded video"
                           >
                             <Icon name="play" size={10} className="fill-current" />
@@ -337,7 +337,7 @@ export function ModuleChaptersPage() {
                       {hasPdf && (
                         <span className="inline-flex items-center gap-1.5 text-slate-600">
                           <span className="inline-flex items-center gap-1">
-                            <Icon name="fileText" size={13} className="text-[#00663C]" /> PDF
+                            <Icon name="fileText" size={13} className="text-[#6366F1]" /> PDF
                           </span>
                           <button
                             type="button"
@@ -349,7 +349,7 @@ export function ModuleChaptersPage() {
                                 mediaId: pdfItem?.media_id,
                               });
                             }}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-[#2563EB] hover:bg-[#2563EB] hover:text-white border border-blue-200/80 font-bold text-[11px] transition-all cursor-pointer shadow-2xs"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-[#2563EB] hover:bg-[#2563EB] hover:text-white border border-blue-200 font-bold text-[11px] transition-all cursor-pointer shadow-2xs"
                             title="View uploaded PDF"
                           >
                             <Icon name="fileText" size={10} />
@@ -359,7 +359,7 @@ export function ModuleChaptersPage() {
                       )}
                       {hasNotes && (
                         <span className="inline-flex items-center gap-1 text-slate-600">
-                          <Icon name="edit" size={13} className="text-[#00663C]" /> Notes
+                          <Icon name="edit" size={13} className="text-[#6366F1]" /> Notes
                         </span>
                       )}
                       {!hasMaterials && (
@@ -373,11 +373,11 @@ export function ModuleChaptersPage() {
                   {/* Real Status Chip based on actual data */}
                   <div className="shrink-0 hidden sm:block">
                     {hasTest ? (
-                      <span className="rounded-full bg-[#E7F3EC] text-[#00663C] px-3 py-1 text-xs font-bold">
+                      <span className="rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 text-xs font-bold">
                         Test linked
                       </span>
                     ) : hasMaterials ? (
-                      <span className="rounded-full bg-indigo-50 text-indigo-700 px-3 py-1 text-xs font-bold">
+                      <span className="rounded-full bg-indigo-50 text-indigo-700 px-3 py-1 text-xs font-bold border border-indigo-100">
                         Ready for AI generator
                       </span>
                     ) : (

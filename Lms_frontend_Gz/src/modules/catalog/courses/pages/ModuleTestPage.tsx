@@ -176,7 +176,7 @@ export function ModuleTestPage() {
         </p>
         <Link
           to="/courses/my"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#00663C] text-white rounded-xl text-sm font-semibold hover:bg-[#00522F]"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#6366F1] text-white rounded-xl text-sm font-semibold hover:bg-[#4F46E5]"
         >
           <Icon name="arrow-left" size={16} /> Back to My Courses
         </Link>
@@ -197,7 +197,7 @@ export function ModuleTestPage() {
         </p>
         <Link
           to="/courses/my"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#00663C] text-white rounded-xl text-sm font-semibold hover:bg-[#00522F]"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#6366F1] text-white rounded-xl text-sm font-semibold hover:bg-[#4F46E5]"
         >
           <Icon name="arrow-left" size={16} /> Back to My Courses
         </Link>
@@ -222,7 +222,7 @@ export function ModuleTestPage() {
         </p>
         <Link
           to="/courses/my"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#00663C] text-white rounded-xl text-sm font-semibold hover:bg-[#00522F]"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#6366F1] text-white rounded-xl text-sm font-semibold hover:bg-[#4F46E5]"
         >
           <Icon name="arrow-left" size={16} /> Back to My Courses
         </Link>
@@ -243,7 +243,7 @@ export function ModuleTestPage() {
         </p>
         <Link
           to={`/courses/${courseId}/learn`}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#00663C] text-white rounded-xl text-sm font-semibold hover:bg-[#00522F]"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#6366F1] text-white rounded-xl text-sm font-semibold hover:bg-[#4F46E5]"
         >
           <Icon name="arrow-left" size={16} /> Return to Course Room
         </Link>
@@ -263,7 +263,7 @@ export function ModuleTestPage() {
         </p>
         <Link
           to={`/courses/${courseId}/learn`}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#00663C] text-white rounded-xl text-sm font-semibold hover:bg-[#00522F]"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#6366F1] text-white rounded-xl text-sm font-semibold hover:bg-[#4F46E5]"
         >
           <Icon name="arrow-left" size={16} /> Return to Course Room
         </Link>
@@ -296,11 +296,11 @@ export function ModuleTestPage() {
       {/* 1. Header with Breadcrumb: Courses / Course Name / Module Name */}
       <div className="pb-3 border-b border-slate-200 space-y-1">
         <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-          <Link to="/courses/my" className="hover:text-[#00663C] transition-colors">
+          <Link to="/courses/my" className="hover:text-[#6366F1] transition-colors">
             Courses
           </Link>
           <span>/</span>
-          <Link to={`/courses/${courseId}/learn`} className="hover:text-[#00663C] transition-colors truncate max-w-xs">
+          <Link to={`/courses/${courseId}/learn`} className="hover:text-[#6366F1] transition-colors truncate max-w-xs">
             {courseTitle}
           </Link>
           <span>/</span>
@@ -312,7 +312,7 @@ export function ModuleTestPage() {
       {/* 2. Screen 9 Design: Centered Test Overview Card */}
       <div className="max-w-xl mx-auto rounded-3xl border border-[#E4EAE7] bg-white p-8 md:p-10 text-center shadow-sm space-y-6">
         {/* Trophy Badge Icon */}
-        <div className="w-16 h-16 rounded-full bg-[#E7F3EC] text-[#00663C] flex items-center justify-center mx-auto shadow-2xs">
+        <div className="w-16 h-16 rounded-full bg-[#EEF2FF] text-[#6366F1] flex items-center justify-center mx-auto shadow-2xs">
           <Icon name="award" size={32} />
         </div>
 
@@ -362,7 +362,7 @@ export function ModuleTestPage() {
                   className={cn(
                     "w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs transition-colors",
                     ch.isPassed
-                      ? "bg-[#00663C] text-white"
+                      ? "bg-[#6366F1] text-white"
                       : "border-2 border-slate-300 bg-white"
                   )}
                 >
@@ -374,7 +374,7 @@ export function ModuleTestPage() {
                 {!ch.isPassed && (
                   <Link
                     to={ch.hasTest ? `/courses/${courseId}/chapters/${ch.topic_id}/test` : `/courses/${courseId}/learn`}
-                    className="text-[11px] font-bold text-[#00663C] hover:underline shrink-0"
+                    className="text-[11px] font-bold text-[#6366F1] hover:underline shrink-0"
                   >
                     {ch.hasTest ? "Take test" : "Go to lesson"}
                   </Link>
@@ -393,7 +393,7 @@ export function ModuleTestPage() {
             className={cn(
               "w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold transition-all shadow-xs",
               allChapterTestsPassed && moduleTestId
-                ? "bg-[#00663C] text-white hover:bg-[#00522F] cursor-pointer shadow-md"
+                ? "bg-[#6366F1] text-white hover:bg-[#4F46E5] cursor-pointer shadow-md"
                 : "bg-slate-200 text-slate-400 cursor-not-allowed"
             )}
           >

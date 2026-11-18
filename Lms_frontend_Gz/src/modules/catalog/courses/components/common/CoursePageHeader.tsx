@@ -48,7 +48,7 @@ export function CoursePageHeader({
             <button
               type="button"
               onClick={handleBack}
-              className="inline-flex items-center gap-1 text-slate-600 hover:text-[#00663C] mr-2 font-bold cursor-pointer transition-colors"
+              className="inline-flex items-center gap-1 text-slate-600 hover:text-[#6366F1] mr-2 font-bold cursor-pointer transition-colors"
               title="Go back"
             >
               <Icon name="arrowLeft" size={15} />
@@ -64,7 +64,7 @@ export function CoursePageHeader({
                 {item.href && !isLast && !item.current ? (
                   <Link
                     to={item.href}
-                    className="hover:text-[#00663C] transition-colors truncate max-w-[200px]"
+                    className="hover:text-[#6366F1] transition-colors truncate max-w-[200px]"
                     title={item.label}
                   >
                     {item.label}

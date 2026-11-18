@@ -48,6 +48,13 @@ export function AccessDeniedPage({
           ← Go Back
         </Button>
         <Button
+          variant="secondary"
+          onClick={() => navigate("/", { replace: true })}
+          className="px-4 py-2 text-sm font-medium"
+        >
+          Go to Dashboard
+        </Button>
+        <Button
           variant="primary"
           onClick={() => navigate(homePath, { replace: true })}
           className="px-5 py-2 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white"

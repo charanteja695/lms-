@@ -416,7 +416,12 @@ PLATFORM_KEYS: frozenset[str] = frozenset(p.key for p in PERMISSIONS if p.audien
 # Menu entries (feature level) → the permissions that open them (any one is enough). Display order.
 MENU: dict[str, tuple[str, ...]] = {
     "my_learning": ("learning.study",),
+    "browse_courses": ("store.buy", "learning.study"),
+    "my_subscription": ("store.buy",),
+    "my_payment_requests": ("store.buy",),
+    "payment_history": ("store.buy",),
     "store": ("store.buy",),
+    "institution_payments": ("institution.payments.manage",),
     "batches": ("learning.batches.view", "learning.batches.manage", AdminScope.ACCOUNTS_MANAGE),
     "courses": ("catalog.browse", AdminScope.CONTENT_AUTHOR, AdminScope.CONTENT_REVIEW),
     "learning_paths": ("catalog.browse", AdminScope.CONTENT_AUTHOR, AdminScope.CONTENT_REVIEW),

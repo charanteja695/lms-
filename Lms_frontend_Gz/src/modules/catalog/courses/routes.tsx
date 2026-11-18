@@ -72,6 +72,33 @@ export const courseRoutes: RouteObject[] = [
     element: page(<FinalExamPage />),
   },
 
+  // Authoring Only: Create & Edit Course, AI Generation (Strictly super_admin and admin; 403 Access Denied for student/staff)
+  {
+    element: <RequireRole roles={["super_admin", "admin"]} />,
+    children: [
+      {
+        path: "/courses/create",
+        element: page(<CourseFormPage />),
+      },
+      {
+        path: "/courses/new",
+        element: page(<CourseFormPage />),
+      },
+      {
+        path: "/courses/:courseId/edit",
+        element: page(<CourseFormPage />),
+      },
+      {
+        path: "/courses/:courseId/modules/:moduleId/chapters/:chapterId/ai-generate",
+        element: page(<AIGeneratorPage />),
+      },
+      {
+        path: "/courses/:courseId/ai-generator",
+        element: page(<AIGeneratorPage />),
+      },
+    ],
+  },
+
   // Admin & Staff: Course Catalog and Hub (Students redirected to /courses/my)
   {
     element: (
@@ -100,29 +127,6 @@ export const courseRoutes: RouteObject[] = [
       {
         path: "/courses/:courseId/modules/:moduleId/chapters",
         element: page(<ModuleChaptersPage />),
-      },
-    ],
-  },
-
-  // Authoring Only: Create & Edit Course, AI Generation (Strictly super_admin and admin; 403 Access Denied for student/staff)
-  {
-    element: <RequireRole roles={["super_admin", "admin"]} />,
-    children: [
-      {
-        path: "/courses/new",
-        element: page(<CourseFormPage />),
-      },
-      {
-        path: "/courses/:courseId/edit",
-        element: page(<CourseFormPage />),
-      },
-      {
-        path: "/courses/:courseId/modules/:moduleId/chapters/:chapterId/ai-generate",
-        element: page(<AIGeneratorPage />),
-      },
-      {
-        path: "/courses/:courseId/ai-generator",
-        element: page(<AIGeneratorPage />),
       },
     ],
   },

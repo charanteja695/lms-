@@ -21,7 +21,7 @@ class Permission(StrEnum):
 
 
 def can_manage_billing(auth: AccessTokenClaims) -> bool:
-    return auth.can(Permission.BILLING_MANAGE)
+    return auth.can(Permission.BILLING_MANAGE) or auth.role == "super_admin"
 
 
 def is_billing_contact(auth: AccessTokenClaims, action: str = "view") -> bool:
@@ -35,7 +35,20 @@ def can_buy_plans(auth: AccessTokenClaims) -> bool:
 
 
 def can_buy_courses(auth: AccessTokenClaims) -> bool:
-    return auth.organization_id is not None and auth.has_scope(Permission.STORE_BUY)
+    if auth.role in ("super_admin", "admin", "staff", "institution_head"):
+        return False
+    return auth.has_scope(Permission.STORE_BUY) or (auth.role == "student" and not auth.organization_id)
+
+
+def is_independent_student(auth: AccessTokenClaims) -> bool:
+    return auth.role == "student" and not auth.organization_id
+
+def is_student_user(auth: AccessTokenClaims) -> bool:
+    return auth.role == "student" or can_buy_courses(auth)
+
+
+def is_institution_head(auth: AccessTokenClaims) -> bool:
+    return auth.organization_id is not None and auth.role == "institution_head"
 
 
 def owns(auth: AccessTokenClaims, org_id: int, action: str = "view") -> bool:

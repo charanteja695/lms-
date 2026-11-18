@@ -259,7 +259,7 @@ export function CertificatesListPage() {
                           type="button"
                           disabled={downloadingCertId === cert.certificate_id}
                           onClick={() => handleDownloadPdf(cert.certificate_id, cert.verification_code)}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] disabled:opacity-50 cursor-pointer shadow-xs transition-colors"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] disabled:opacity-50 cursor-pointer shadow-xs transition-colors"
                         >
                           <Download size={13} />
                           <span>{downloadingCertId === cert.certificate_id ? "Exporting..." : "Download PDF"}</span>

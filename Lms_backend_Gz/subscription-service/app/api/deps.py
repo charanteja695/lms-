@@ -167,7 +167,7 @@ REQUEST = "subscriptions.request"  # the coarse key; heads are set per action on
 
 def require_institution_head(auth: CurrentAuth) -> AccessTokenClaims:
     """Submit a course request for their own institution: the ``course_requests.create`` cell (by default the head)."""
-    if auth.organization_id is None or not (auth.can_act("course_requests.create", REQUEST) or auth.role == "institution_head"):
+    if auth.organization_id is None or not auth.can_act("course_requests.create", REQUEST):
         raise PermissionDeniedError()
     return auth
 

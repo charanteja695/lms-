@@ -20,7 +20,7 @@ from app.core.exceptions import AuthenticationError, NotFoundError, PermissionDe
 from app.core.ids import parse_public_id
 from app.core.security import AccessTokenClaims, TokenError, get_verifier
 from app.gateways.payment import PaymentGateway
-from app.permissions.policy import can_buy_courses, can_buy_plans, can_manage_billing, is_billing_contact
+from app.permissions.policy import can_buy_courses, can_buy_plans, can_manage_billing, is_billing_contact, is_institution_head, is_student_user
 from app.services.rate_limiter import RateLimiter
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -94,6 +94,19 @@ RequireBillingContact = Annotated[
     AccessTokenClaims, Depends(_require(lambda a: is_billing_contact(a) or can_manage_billing(a), "Only an institution head, an employer admin or a billing manager can do this.", "PERMISSION_DENIED"))
 ]
 RequireLearner = Annotated[AccessTokenClaims, Depends(_require(can_buy_courses, "Only self-registered learners buy courses here.", "LEARNERS_ONLY"))]
+from app.permissions.policy import is_independent_student
+RequireIndependentStudent = Annotated[
+    AccessTokenClaims,
+    Depends(
+        _require(
+            is_independent_student,
+            "Institution students receive course access directly through their institution. Individual payment and subscription management is unavailable.",
+            "INSTITUTION_STUDENTS_FORBIDDEN",
+        )
+    ),
+]
+RequireStudentUser = Annotated[AccessTokenClaims, Depends(_require(is_student_user, "Only students may access student subscriptions and payments.", "STUDENTS_ONLY"))]
+RequireInstitutionHead = Annotated[AccessTokenClaims, Depends(_require(is_institution_head, "Only an Institution Head may manage institution student payments.", "INSTITUTION_HEAD_ONLY"))]
 RequireEmployerAdmin = Annotated[AccessTokenClaims, Depends(_require(can_buy_plans, "Only someone allowed to buy plans for their company can do this.", "EMPLOYER_ADMINS_ONLY"))]
 
 
@@ -130,10 +143,25 @@ async def org_id_path(org_id: Annotated[str, Path()]) -> int:
     return await _id_path("Organisation", "ORGANIZATION_NOT_FOUND")(org_id)
 
 
+async def plan_id_path(plan_id: Annotated[str, Path()]) -> int:
+    return await _id_path("Subscription plan", "PLAN_NOT_FOUND")(plan_id)
+
+
+async def tx_id_path(tx_id: Annotated[str, Path()]) -> int:
+    return await _id_path("Transaction", "TRANSACTION_NOT_FOUND")(tx_id)
+
+
+async def request_id_path(request_id: Annotated[str, Path()]) -> int:
+    return await _id_path("Payment request", "PAYMENT_REQUEST_NOT_FOUND")(request_id)
+
+
 InvoiceIdParam = Annotated[int, Depends(invoice_id_path)]
 QuoteIdParam = Annotated[int, Depends(quote_id_path)]
 PriceIdParam = Annotated[int, Depends(price_id_path)]
 OrgIdParam = Annotated[int, Depends(org_id_path)]
+PlanIdParam = Annotated[int, Depends(plan_id_path)]
+TxIdParam = Annotated[int, Depends(tx_id_path)]
+RequestIdParam = Annotated[int, Depends(request_id_path)]
 
 
 def rate_limit_user(scope: str, limit_setting: str, window_seconds: int) -> Callable[..., Awaitable[None]]:

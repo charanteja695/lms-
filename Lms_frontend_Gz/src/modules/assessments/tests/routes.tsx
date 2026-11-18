@@ -1,4 +1,4 @@
-import type { RouteObject } from "react-router-dom";
+import { Navigate, type RouteObject } from "react-router-dom";
 
 import { drawerPage, WithOverlay } from "@/shared/routing/drawerRoute";
 import { lazyNamed, page } from "@/shared/routing/page";
@@ -13,6 +13,10 @@ export const testRoutes: RouteObject[] = [
   {
     element: <RequireRole roles={["super_admin", "admin", "institution_head", "staff"]} />,
     children: [
+      {
+        path: "/assessments",
+        element: <Navigate to="/tests" replace />,
+      },
       {
         path: "/tests",
         element: page(<WithOverlay><TestsListPage /></WithOverlay>),

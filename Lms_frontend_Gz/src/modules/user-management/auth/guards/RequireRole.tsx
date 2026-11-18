@@ -38,8 +38,8 @@ export function RequireRole({
     return children ? <>{children}</> : <Outlet />;
   }
 
-  if (userRole === "student" && studentRedirect) {
-    return <Navigate to={studentRedirect} replace />;
+  if (userRole === "student") {
+    return <Navigate to={studentRedirect || "/"} replace />;
   }
 
   if (redirectTo) {

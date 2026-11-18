@@ -1,4 +1,3 @@
-import { env } from "@/core/config/env";
 import { cn } from "@/core/lib/cn";
 import { Icon } from "@/shared/ui";
 import { LogoMark } from "./LogoMark";
@@ -6,27 +5,30 @@ import { LogoMark } from "./LogoMark";
 export function Brand({
   collapsed = false,
   onCloseMobile,
+  dark = false,
 }: {
   collapsed?: boolean;
   onCloseMobile?: () => void;
+  dark?: boolean;
 }) {
   return (
     <div
       className={cn(
-        "flex h-16 items-center border-b border-slate-100 transition-all duration-200",
+        "flex h-[68px] items-center transition-all duration-200",
+        dark ? "border-b border-slate-800/80" : "border-b border-slate-100",
         collapsed ? "justify-center px-2" : "justify-between px-4 sm:px-5",
       )}
     >
       <div className="flex items-center gap-3 min-w-0">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white">
-          <LogoMark className="h-8 w-8" />
-        </span>
+        <LogoMark className="h-9 w-9" />
         {!collapsed && (
           <div className="min-w-0 leading-tight">
-            <p className="truncate text-[15px] font-bold text-navy-950 tracking-tight">{env.appName}</p>
-            {env.organizationName && (
-              <p className="truncate text-[11px] font-medium text-slate-500">{env.organizationName}</p>
-            )}
+            <p className={cn("truncate text-[16px] font-bold tracking-tight", dark ? "text-white" : "text-navy-950")}>
+              ExamLMS
+            </p>
+            <p className={cn("truncate text-[11px] font-medium tracking-tight", dark ? "text-slate-400" : "text-slate-500")}>
+              Learn • Practice • Excel
+            </p>
           </div>
         )}
       </div>
@@ -35,7 +37,10 @@ export function Brand({
         <button
           type="button"
           onClick={onCloseMobile}
-          className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-navy-950 cursor-pointer lg:hidden"
+          className={cn(
+            "flex h-9 w-9 items-center justify-center rounded-xl transition-colors cursor-pointer lg:hidden",
+            dark ? "text-slate-400 hover:bg-slate-800 hover:text-white" : "text-slate-500 hover:bg-slate-100 hover:text-navy-950",
+          )}
           aria-label="Close navigation"
         >
           <Icon name="x" size={18} />

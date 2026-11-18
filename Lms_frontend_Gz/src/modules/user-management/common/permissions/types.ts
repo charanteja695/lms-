@@ -16,6 +16,9 @@ export type Section =
   | "profile"
   | "security"
   // One per other backend service (docs/PRODUCT.md §6); see user-management's capabilities.py for who gets which.
+  | "browse_courses"
+  | "my_subscription"
+  | "payment_history"
   | "store"
   | "catalog"
   | "subscriptions"
@@ -37,6 +40,11 @@ export type Section =
 /** Entries inside those modules (feature level), from user-management's `_MENU_ACCESS`: which screens a role or scope gets. */
 export type MenuKey =
   | "my_learning"
+  | "browse_courses"
+  | "my_subscription"
+  | "my_payment_requests"
+  | "payment_history"
+  | "institution_payments"
   | "batches"
   | "courses"
   | "learning_paths"

@@ -8,8 +8,9 @@ import { PageLoader } from "@/shared/ui";
  * Shows a screen only if the server lists its section for this person. It is a navigation aid:
  * the API authorises every request regardless.
  */
-export function RequireSection({ section }: { section: Section }) {
+export function RequireSection({ section }: { section: Section | Section[] }) {
   const { isLoading, can } = usePermissions();
   if (isLoading) return <PageLoader />;
-  return can(section) ? <Outlet /> : <Navigate to="/" replace />;
+  const allowed = Array.isArray(section) ? section.some((s) => can(s)) : can(section);
+  return allowed ? <Outlet /> : <Navigate to="/" replace />;
 }

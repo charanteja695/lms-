@@ -5,8 +5,28 @@
       "service": "user-management"
     },
     {
+      "path": "/api/v1/admin/allocations",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/admin/course-pricing",
+      "service": "billing-service"
+    },
+    {
       "path": "/api/v1/admin/employers",
       "service": "job-portal-service"
+    },
+    {
+      "path": "/api/v1/admin/institutional-packages",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/admin/institutional-requests",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/admin/institutional-revenue-reports",
+      "service": "billing-service"
     },
     {
       "path": "/api/v1/admin/invoices",
@@ -21,6 +41,18 @@
       "service": "billing-service"
     },
     {
+      "path": "/api/v1/admin/payment-reports",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/admin/payment-requests",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/admin/payment-settings",
+      "service": "billing-service"
+    },
+    {
       "path": "/api/v1/admin/prices",
       "service": "billing-service"
     },
@@ -31,6 +63,14 @@
     {
       "path": "/api/v1/admin/sla-policies",
       "service": "support-service"
+    },
+    {
+      "path": "/api/v1/admin/subscription-plans",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/admin/transactions",
+      "service": "billing-service"
     },
     {
       "path": "/api/v1/admins",
@@ -197,6 +237,22 @@
       "service": "job-portal-service"
     },
     {
+      "path": "/api/v1/institution/course-pricing",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/institution/course-requests",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/institution/payments",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/institution/purchases",
+      "service": "billing-service"
+    },
+    {
       "path": "/api/v1/institutions",
       "service": "user-management"
     },
@@ -359,6 +415,34 @@
     {
       "path": "/api/v1/student",
       "service": "ai-interview-service"
+    },
+    {
+      "path": "/api/v1/student/account-context",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/student/checkout",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/student/payment-requests",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/student/payment-settings",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/student/payments",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/student/plans",
+      "service": "billing-service"
+    },
+    {
+      "path": "/api/v1/student/subscription",
+      "service": "billing-service"
     },
     {
       "path": "/api/v1/students",

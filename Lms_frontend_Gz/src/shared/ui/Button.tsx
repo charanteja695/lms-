@@ -5,8 +5,8 @@ import { Icon, type IconName } from "./Icon";
 import { Spinner } from "./Spinner";
 
 const variants = {
-  primary: "bg-brand-700 text-white shadow-brand hover:bg-brand-800 disabled:opacity-50 disabled:shadow-none",
-  secondary: "border border-slate-200/90 bg-white text-navy-950 shadow-card hover:border-brand-300 hover:bg-slate-50 hover:text-brand-800 disabled:text-slate-400 disabled:shadow-none",
+  primary: "bg-brand-600 text-white shadow-sm hover:bg-brand-700 disabled:opacity-50 disabled:shadow-none focus-visible:ring-brand-500",
+  secondary: "border border-slate-200/90 bg-white text-navy-950 shadow-card hover:border-brand-300 hover:bg-slate-50 hover:text-brand-700 disabled:text-slate-400 disabled:shadow-none",
   danger: "bg-red-600 text-white shadow-sm hover:bg-red-700 disabled:opacity-50",
   ghost: "text-slate-600 hover:bg-slate-100/90 hover:text-slate-900 disabled:text-slate-300",
   link: "text-brand-600 hover:text-brand-700 hover:underline underline-offset-4 px-0 py-0 h-auto",

@@ -202,19 +202,24 @@ export function AddChapterModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs overflow-y-auto">
-      <div className="w-full max-w-xl rounded-2xl bg-white shadow-xl border border-slate-200 overflow-hidden my-8">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-bold text-[#0A1530]">
-              {initialData ? "Edit chapter" : "Add chapter"}
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">{moduleTitle}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
+      <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in zoom-in-95 duration-200">
+        <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 via-white to-indigo-50/30">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100/80 text-[#6366F1] flex items-center justify-center shrink-0">
+              <Icon name="book" size={18} className="text-[#6366F1]" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-navy-950">
+                {initialData ? "Edit Chapter" : "Add Chapter"}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">{moduleTitle}</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
           >
             <Icon name="x" size={18} />
           </button>
@@ -229,8 +234,8 @@ export function AddChapterModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
             <div className="sm:col-span-9">
-              <label className="block text-xs font-bold text-slate-800 mb-1">
-                Chapter name *
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Chapter Name *
               </label>
               <input
                 type="text"
@@ -238,23 +243,23 @@ export function AddChapterModal({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. JSX and Component Lifecycle"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:border-[#00663C] focus:outline-none"
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-navy-950 placeholder:text-slate-400 focus:border-[#6366F1] focus:ring-2 focus:ring-indigo-100 focus:outline-none transition"
               />
             </div>
             <div className="sm:col-span-3">
-              <label className="block text-xs font-bold text-slate-800 mb-1">Order #</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Order #</label>
               <input
                 type="number"
                 min={1}
                 value={position}
                 onChange={(e) => setPosition(Number(e.target.value))}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:border-[#00663C] focus:outline-none"
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-navy-950 font-semibold focus:border-[#6366F1] focus:ring-2 focus:ring-indigo-100 focus:outline-none transition"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-800 mb-1">
+            <label className="block text-xs font-bold text-slate-700 mb-1">
               Description / Summary
             </label>
             <textarea
@@ -262,19 +267,19 @@ export function AddChapterModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What will students learn in this chapter?"
-              className="w-full rounded-xl border border-slate-300 p-3 text-xs text-slate-900 focus:border-[#00663C] focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 p-3 text-xs text-navy-950 placeholder:text-slate-400 focus:border-[#6366F1] focus:ring-2 focus:ring-indigo-100 focus:outline-none resize-none transition"
             />
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-slate-800">Learning objectives</label>
+              <label className="text-xs font-bold text-slate-700">Learning Objectives</label>
               <button
                 type="button"
                 onClick={handleAddObjective}
-                className="text-[11px] font-bold text-[#00663C] hover:underline"
+                className="text-[11px] font-bold text-[#6366F1] hover:text-[#4F46E5] transition cursor-pointer"
               >
-                + Add objective
+                + Add Objective
               </button>
             </div>
             <div className="space-y-2">
@@ -285,13 +290,13 @@ export function AddChapterModal({
                     value={obj}
                     onChange={(e) => handleObjectiveChange(i, e.target.value)}
                     placeholder={`Objective ${i + 1}`}
-                    className="flex-1 rounded-xl border border-slate-300 px-3 py-1.5 text-xs text-slate-900 focus:border-[#00663C] focus:outline-none"
+                    className="flex-1 rounded-xl border border-slate-200 px-3.5 py-1.5 text-xs text-navy-950 placeholder:text-slate-400 focus:border-[#6366F1] focus:ring-2 focus:ring-indigo-100 focus:outline-none transition"
                   />
                   {objectives.length > 1 && (
                     <button
                       type="button"
                       onClick={() => handleRemoveObjective(i)}
-                      className="p-1 text-slate-400 hover:text-rose-600"
+                      className="p-1 text-slate-400 hover:text-rose-600 transition cursor-pointer"
                     >
                       <Icon name="x" size={14} />
                     </button>
@@ -302,37 +307,43 @@ export function AddChapterModal({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-800 mb-2">
-              Upload study materials (Video, PDF or Notes)
+            <label className="block text-xs font-bold text-slate-700 mb-2">
+              Upload Study Materials (Video, PDF or Notes)
             </label>
-            <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="grid grid-cols-3 gap-2.5 mb-3">
               <button
                 type="button"
                 onClick={() => handleTriggerUpload("video")}
-                className="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-slate-300 hover:border-[#00663C] hover:bg-emerald-50/50 transition-colors"
+                className="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-slate-200 hover:border-[#6366F1] hover:bg-indigo-50/30 transition-all cursor-pointer group"
               >
-                <Icon name="play" size={18} className="text-[#00663C] mb-1" />
-                <span className="text-[11px] font-bold text-slate-700">Add Video</span>
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-[#6366F1] flex items-center justify-center mb-1 group-hover:scale-105 transition-transform">
+                  <Icon name="play" size={16} />
+                </div>
+                <span className="text-[11px] font-bold text-navy-950">Add Video</span>
                 <span className="text-[10px] text-slate-400">MP4, WebM</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleTriggerUpload("pdf")}
-                className="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-slate-300 hover:border-[#00663C] hover:bg-emerald-50/50 transition-colors"
+                className="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-slate-200 hover:border-[#6366F1] hover:bg-indigo-50/30 transition-all cursor-pointer group"
               >
-                <Icon name="fileText" size={18} className="text-[#00663C] mb-1" />
-                <span className="text-[11px] font-bold text-slate-700">Add PDF</span>
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-[#6366F1] flex items-center justify-center mb-1 group-hover:scale-105 transition-transform">
+                  <Icon name="fileText" size={16} />
+                </div>
+                <span className="text-[11px] font-bold text-navy-950">Add PDF</span>
                 <span className="text-[10px] text-slate-400">Slides, Notes</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleTriggerUpload("note")}
-                className="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-slate-300 hover:border-[#00663C] hover:bg-emerald-50/50 transition-colors"
+                className="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-slate-200 hover:border-[#6366F1] hover:bg-indigo-50/30 transition-all cursor-pointer group"
               >
-                <Icon name="book" size={18} className="text-[#00663C] mb-1" />
-                <span className="text-[11px] font-bold text-slate-700">Add Notes</span>
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-[#6366F1] flex items-center justify-center mb-1 group-hover:scale-105 transition-transform">
+                  <Icon name="book" size={16} />
+                </div>
+                <span className="text-[11px] font-bold text-navy-950">Add Notes</span>
                 <span className="text-[10px] text-slate-400">Text, Markdown</span>
               </button>
             </div>
@@ -345,40 +356,41 @@ export function AddChapterModal({
             />
 
             {materials.length > 0 && (
-              <div className="space-y-2 border border-slate-200 rounded-xl p-3 bg-slate-50">
+              <div className="space-y-2 border border-slate-200 rounded-xl p-3 bg-slate-50/80">
                 <span className="text-[11px] font-bold text-slate-700 block mb-1">
-                  Attached files ({materials.length})
+                  Attached Files ({materials.length})
                 </span>
                 {materials.map((mat, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200 text-xs"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200 text-xs shadow-2xs"
                   >
-                    <div className="flex items-center gap-2 truncate">
-                      <Icon
-                        name={mat.type === "video" ? "play" : mat.type === "pdf" ? "fileText" : "book"}
-                        size={14}
-                        className="text-[#00663C] shrink-0"
-                      />
-                      <span className="truncate font-medium text-slate-800">{mat.name}</span>
+                    <div className="flex items-center gap-2.5 truncate">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-50 text-[#6366F1] flex items-center justify-center shrink-0">
+                        <Icon
+                          name={mat.type === "video" ? "play" : mat.type === "pdf" ? "fileText" : "book"}
+                          size={14}
+                        />
+                      </div>
+                      <span className="truncate font-semibold text-navy-950">{mat.name}</span>
                       {mat.size && <span className="text-[10px] text-slate-400">({mat.size})</span>}
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
                       {mat.status === "uploading" ? (
-                        <div className="flex items-center gap-1.5 text-[11px] text-[#00663C] font-semibold">
-                          <Spinner size={12} className="text-[#00663C]" />
+                        <div className="flex items-center gap-1.5 text-[11px] text-[#6366F1] font-semibold">
+                          <Spinner size={12} className="text-[#6366F1]" />
                           <span>{mat.progress || 0}%</span>
                         </div>
                       ) : (
-                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                           Ready
                         </span>
                       )}
                       <button
                         type="button"
                         onClick={() => handleRemoveMaterial(idx)}
-                        className="text-slate-400 hover:text-rose-600"
+                        className="text-slate-400 hover:text-rose-600 p-1 transition cursor-pointer"
                       >
                         <Icon name="x" size={14} />
                       </button>
@@ -394,16 +406,16 @@ export function AddChapterModal({
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] disabled:opacity-50"
+              className="px-5 py-2.5 rounded-xl bg-[#6366F1] hover:bg-[#4F46E5] text-xs font-bold text-white shadow-xs transition disabled:opacity-50 cursor-pointer"
             >
-              {isSaving ? "Saving..." : initialData ? "Save changes" : "Create chapter"}
+              {isSaving ? "Saving..." : initialData ? "Save Changes" : "Create Chapter"}
             </button>
           </div>
         </form>

@@ -13,10 +13,13 @@ then the test's attempt limit and cooldown, and — for a scheduled exam — its
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+import logging
 from typing import Any
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.core.config import Settings
 from app.core.security import AccessTokenClaims
@@ -121,7 +124,7 @@ class EligibilityService:
                     logger.warning(f"Error checking module prerequisites: {e}")
 
             if test.kind == TestKind.FINAL:
-                # Backend validation: Final test unlocks ONLY after all module tests in the course are passed
+                # Backend validation: Final test unlocks ONLY after all course chapters are completed and all chapter/module tests are passed
                 try:
                     import asyncpg
                     conn_cat = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_catalog')
@@ -131,34 +134,66 @@ class EligibilityService:
                            FROM courses c
                            JOIN course_versions cv ON cv.course_id = c.id
                            JOIN modules m ON m.course_version_id = cv.id
-                           WHERE c.public_id = $1''',
+                           WHERE c.public_id = $1 AND cv.status = 'published' ''',
+                        course_id
+                    )
+                    topic_rows = await conn_cat.fetch(
+                        '''SELECT t.public_id as topic_id, t.topic_test_id, ti.public_id as item_id, ti.required
+                           FROM courses c
+                           JOIN course_versions cv ON cv.course_id = c.id
+                           JOIN modules m ON m.course_version_id = cv.id
+                           JOIN topics t ON t.module_id = m.id
+                           LEFT JOIN topic_items ti ON ti.topic_id = t.id
+                           WHERE c.public_id = $1 AND cv.status = 'published' ''',
                         course_id
                     )
                     await conn_cat.close()
 
                     required_module_tests = [r['module_test_id'] for r in mod_rows if r['module_test_id']]
-                    if required_module_tests:
-                        conn_learn = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_learning')
-                        enr = await conn_learn.fetchrow('SELECT id FROM enrollments WHERE public_id = $1', result.enrollment.enrollment_id)
-                        passed_test_ids = set()
-                        if enr:
-                            pt = await conn_learn.fetch(
-                                'SELECT test_id FROM assessment_results WHERE enrollment_id = $1 AND passed = true', enr['id']
-                            )
-                            passed_test_ids = {r['test_id'] for r in pt}
-                        await conn_learn.close()
+                    conn_learn = await asyncpg.connect('postgresql://lms:lms@127.0.0.1:5432/lms_learning')
+                    enr = await conn_learn.fetchrow('SELECT id FROM enrollments WHERE public_id = $1', result.enrollment.enrollment_id)
+                    passed_test_ids = set()
+                    completed_item_ids = set()
+                    if enr:
+                        enr_uuid = enr['id']
+                        ci = await conn_learn.fetch(
+                            'SELECT topic_item_id FROM item_progress WHERE enrollment_id = $1', enr_uuid
+                        )
+                        completed_item_ids = {r['topic_item_id'] for r in ci}
+                        pt = await conn_learn.fetch(
+                            'SELECT test_id FROM assessment_results WHERE enrollment_id = $1 AND passed = true', enr_uuid
+                        )
+                        passed_test_ids = {r['test_id'] for r in pt}
+                    await conn_learn.close()
 
-                        assessment_passed = (await self.db.execute(
-                            select(Attempt.test_public_id).where(
-                                Attempt.user_id == auth.user_id,
-                                Attempt.result == AttemptResult.PASSED
-                            )
-                        )).scalars().all()
-                        passed_test_ids.update(t for t in assessment_passed if t)
+                    assessment_passed = (await self.db.execute(
+                        select(Attempt.test_public_id).where(
+                            Attempt.user_id == auth.user_id,
+                            Attempt.result == AttemptResult.PASSED
+                        )
+                    )).scalars().all()
+                    passed_test_ids.update(t for t in assessment_passed if t)
 
-                        for mod_test_id in required_module_tests:
-                            if mod_test_id not in passed_test_ids:
-                                return self._deny(result, "NOT_ELIGIBLE_FOR_FINAL", "You must pass all module tests before taking the final course test.")
+                    # 1. Check all chapters & chapter tests
+                    if topic_rows:
+                        topics_dict = {}
+                        for r in topic_rows:
+                            tid = r['topic_id']
+                            if tid not in topics_dict:
+                                topics_dict[tid] = {'test_id': r['topic_test_id'], 'req_items': set()}
+                            if r['item_id'] and r['required']:
+                                topics_dict[tid]['req_items'].add(r['item_id'])
+
+                        for tid, info in topics_dict.items():
+                            if not info['req_items'].issubset(completed_item_ids):
+                                return self._deny(result, "NOT_ELIGIBLE_FOR_FINAL", "You must complete all chapters before taking the final course certification exam.")
+                            if info['test_id'] and info['test_id'] not in passed_test_ids:
+                                return self._deny(result, "NOT_ELIGIBLE_FOR_FINAL", "You must pass all chapter tests before taking the final course certification exam.")
+
+                    # 2. Check all configured module tests
+                    for mod_test_id in required_module_tests:
+                        if mod_test_id not in passed_test_ids:
+                            return self._deny(result, "NOT_ELIGIBLE_FOR_FINAL", "You must pass all module tests before taking the final course certification exam.")
                 except Exception as e:
                     logger.warning(f"Error checking final test prerequisites: {e}")
         elif test.kind == TestKind.HIRING:

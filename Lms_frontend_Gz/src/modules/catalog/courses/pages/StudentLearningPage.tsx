@@ -6,7 +6,7 @@ import {
   useListEnrollmentsQuery,
   useGetUnlockStateQuery,
   useCompleteItemMutation,
-  useEnrollStudentMutation,
+  useSelfEnrollCourseMutation,
 } from "@/modules/learning/enrollments/api/enrollmentsApi";
 import { useListMyCoursesQuery } from "@/modules/learning/common/api/myCoursesApi";
 import { useGetMyTestQuery, useListAttemptsQuery } from "@/modules/assessments/attempts/api/attemptsApi";
@@ -31,6 +31,7 @@ import {
   Clock,
   ChevronRight,
   ChevronDown,
+  ChevronLeft,
   Menu,
   X,
   FileText,
@@ -45,8 +46,9 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { InAppPdfViewer } from "../components/InAppPdfViewer";
+import { InlineAssessmentView, ActiveAssessmentView } from "../components/assessment/InlineAssessmentView";
 
-type MaterialTab = "video" | "pdf" | "notes" | "materials";
+type MaterialTab = "description" | "resources" | "discussion" | "video" | "pdf" | "notes" | "materials";
 
 export type VideoQuality = "Auto" | "420p" | "720p" | "1080p" | "2040p";
 
@@ -107,6 +109,7 @@ interface SavedVideoProgress {
   duration: number;
   percent: number;
   completed: boolean;
+  watchedIntervals?: [number, number][];
   updatedAt: string;
 }
 
@@ -156,7 +159,7 @@ export function StudentLearningPage() {
   };
 
   // Active Tab & Selection State
-  const [activeTab, setActiveTab] = useState<MaterialTab>("video");
+  const [activeTab, setActiveTab] = useState<MaterialTab>("description");
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
 
@@ -204,11 +207,39 @@ export function StudentLearningPage() {
   // Map of topicId -> SavedVideoProgress
   const [videoProgressMap, setVideoProgressMap] = useState<Record<string, SavedVideoProgress>>(() => {
     try {
-      const stored = localStorage.getItem(progressStorageKey);
+      const studentId = user?.user_id || "guest";
+      const key = `examlms_video_progress_${studentId}_${courseId || "default"}`;
+      const stored = localStorage.getItem(key);
       if (stored) return JSON.parse(stored);
     } catch {}
     return {};
   });
+
+  // Re-sync videoProgressMap with monotonic preservation whenever progressStorageKey changes or on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(progressStorageKey);
+      if (stored) {
+        const parsed: Record<string, SavedVideoProgress> = JSON.parse(stored);
+        setVideoProgressMap((current) => {
+          const merged: Record<string, SavedVideoProgress> = { ...parsed, ...current };
+          for (const [k, v] of Object.entries(parsed)) {
+            const cur = current[k];
+            if (cur) {
+              const isDone = Boolean(cur.completed || v.completed || (cur.percent ?? 0) >= 100 || (v.percent ?? 0) >= 100);
+              merged[k] = {
+                ...v,
+                ...cur,
+                percent: isDone ? 100 : Math.max(cur.percent || 0, v.percent || 0),
+                completed: isDone,
+              };
+            }
+          }
+          return merged;
+        });
+      }
+    } catch {}
+  }, [progressStorageKey]);
 
   // Queries
   const { data: course, isLoading: isCourseLoading, isError: isCourseError } = useGetCourseQuery(courseId ?? "", {
@@ -222,7 +253,7 @@ export function StudentLearningPage() {
     { skip: !courseId || !versionId }
   );
 
-  const { data: enrollmentsData, isLoading: isEnrollmentsLoading } = useListEnrollmentsQuery({
+  const { data: enrollmentsData, isLoading: isEnrollmentsLoading, refetch: refetchEnrollments } = useListEnrollmentsQuery({
     status: "active",
     per_page: 50,
   });
@@ -237,20 +268,53 @@ export function StudentLearningPage() {
       const found = list.find((e) => String(e.enrollment_id) === String(courseMatch.enrollment_id));
       if (found) return found;
     }
-    const directMatch = list.find((e: any) => String(e.course_id) === String(courseId));
+    const directMatch = list.find(
+      (e: any) =>
+        String(e.batch?.course_id || e.course_id) === String(courseId) &&
+        e.status === "active"
+    );
     return directMatch || null;
   }, [enrollmentsData, myCourses, courseId]);
 
-  const { data: unlockState } = useGetUnlockStateQuery(enrollment?.enrollment_id ?? "", {
+  const { data: unlockState, refetch: refetchUnlockState } = useGetUnlockStateQuery(enrollment?.enrollment_id ?? "", {
     skip: !enrollment?.enrollment_id,
   });
 
   const [completeItemMutation, { isLoading: isCompleting }] = useCompleteItemMutation();
-  const [enrollMutation, { isLoading: isEnrolling }] = useEnrollStudentMutation();
+  const [selfEnrollMutation, { isLoading: isEnrolling }] = useSelfEnrollCourseMutation();
+
+  // Active Assessment State (for rendering inline assessment in left main content area)
+  const [activeAssessment, setActiveAssessment] = useState<ActiveAssessmentView | null>(null);
+
+  const handleOpenAssessment = useCallback(
+    (
+      type: "chapter" | "module" | "final",
+      testId?: string | null,
+      moduleId?: string,
+      chapterId?: string,
+      title?: string
+    ) => {
+      setActiveAssessment({
+        type,
+        testId: testId || undefined,
+        moduleId,
+        chapterId,
+        title:
+          title ||
+          (type === "chapter"
+            ? "Chapter Test"
+            : type === "module"
+            ? "Module Test"
+            : "Final Certification Exam"),
+      });
+      handleSelectCourseTab("modules");
+    },
+    []
+  );
 
   // Final Exam Query
   const finalTestId = versionDetail?.rule?.final_test_id;
-  const { data: finalTestDetail } = useGetMyTestQuery(String(finalTestId ?? ""), {
+  const { data: finalTestDetail, refetch: refetchFinalTest } = useGetMyTestQuery(String(finalTestId ?? ""), {
     skip: !finalTestId,
   });
   const { data: finalAttemptsData } = useListAttemptsQuery(
@@ -271,9 +335,10 @@ export function StudentLearningPage() {
       const unlockMod = unlockMods.find((um) => String(um.module_id) === String(m.module_id));
       return {
         module_id: m.module_id,
+        module_test_id: m.module_test_id || (unlockMod as any)?.module_test_id,
         title: m.title,
         position: m.position || mIdx + 1,
-        unlocked: unlockMod ? unlockMod.unlocked : true,
+        unlocked: unlockMod ? unlockMod.unlocked : (mIdx === 0),
         completed: unlockMod ? unlockMod.completed : false,
         test_passed: unlockMod ? Boolean((unlockMod as any).test_passed) : false,
         topics: (m.topics ?? []).map((t, tIdx) => {
@@ -283,7 +348,8 @@ export function StudentLearningPage() {
             title: t.title,
             position: t.position || tIdx + 1,
             topic_test_id: t.topic_test_id,
-            unlocked: unlockTopic ? unlockTopic.unlocked : true,
+            test_required: Boolean(t.topic_test_id),
+            unlocked: unlockTopic ? unlockTopic.unlocked : (mIdx === 0 && tIdx === 0),
             completed: unlockTopic ? unlockTopic.completed : false,
             test_passed: unlockTopic ? Boolean(unlockTopic.test_passed) : false,
             completed_items: unlockTopic ? unlockTopic.completed_items : 0,
@@ -363,12 +429,13 @@ export function StudentLearningPage() {
       const key = String(topic.topic_id);
       const saved = videoProgressMap[key];
       if (saved) {
-        if (saved.completed) return 100;
+        if (saved.completed || (saved.percent ?? 0) >= 100) return 100;
         if (saved.percent > 0) return Math.min(100, saved.percent);
       }
 
       // 3. Check topic items completion ratio
       if (topic.required_items > 0 && topic.completed_items > 0) {
+        if (topic.completed_items >= topic.required_items) return 100;
         return Math.min(100, Math.round((topic.completed_items / topic.required_items) * 100));
       }
 
@@ -384,6 +451,30 @@ export function StudentLearningPage() {
       if (mod.completed || mod.test_passed) return 100;
       const sum = mod.topics.reduce((acc: number, t: any) => acc + getChapterProgress(t), 0);
       return Math.round(sum / mod.topics.length);
+    },
+    [getChapterProgress]
+  );
+
+  // Helper: Strict Sequential Module Completion Validation
+  const isModuleFullyCompleted = useCallback(
+    (m: any): boolean => {
+      if (!m) return false;
+      // 1. Backend confirmed completion
+      if (m.completed) return true;
+
+      // 2. If module has a configured test, that test MUST be passed
+      if (m.module_test_id && !(m as any).test_passed) {
+        return false;
+      }
+
+      // 3. All chapters in this module must be completed and their tests passed
+      if (!m.topics || m.topics.length === 0) return false;
+      return m.topics.every((t: any) => {
+        if (t.topic_test_id && !(t as any).test_passed) {
+          return false;
+        }
+        return Boolean(t.completed) || getChapterProgress(t) === 100;
+      });
     },
     [getChapterProgress]
   );
@@ -416,16 +507,27 @@ export function StudentLearningPage() {
       return "in_progress";
     }
 
-    // Available?
+    // Available? Strict sequential assessment gating:
+    // 1. ALL modules must be fully completed AND all configured module tests passed
     const allModulesFinished =
-      modulesList.length > 0 && modulesList.every((m) => m.completed || (m as any).test_passed || getModuleProgress(m) === 100);
-    const isEligible = Boolean(unlockState?.eligible_for_final || finalTestDetail?.can_start || allModulesFinished);
-    if (isEligible) {
+      modulesList.length > 0 && modulesList.every((m) => isModuleFullyCompleted(m));
+
+    // 2. Backend assessment-service can_start constraint
+    if (finalTestDetail?.can_start === false) {
+      return "locked";
+    }
+
+    // 3. Backend learning-service unlockState constraint
+    if (unlockState && unlockState.eligible_for_final === false) {
+      return "locked";
+    }
+
+    if (allModulesFinished && unlockState?.eligible_for_final !== false) {
       return "available";
     }
 
     return "locked";
-  }, [finalTestId, finalAttemptsData, finalTestDetail, unlockState, modulesList, getModuleProgress]);
+  }, [finalTestId, finalAttemptsData, finalTestDetail, unlockState, modulesList, isModuleFullyCompleted]);
 
   // Certificate Data & Course Completion Evaluation
   const { data: certsData } = useListCertificatesQuery({ per_page: 50 });
@@ -437,7 +539,7 @@ export function StudentLearningPage() {
   const isCourseCompleted =
     Boolean(courseCertificate) ||
     finalStatus === "completed" ||
-    (modulesList.length > 0 && modulesList.every((m) => m.completed || (m as any).test_passed));
+    (modulesList.length > 0 && modulesList.every((m) => isModuleFullyCompleted(m)));
 
   // Restore video progress when switching chapters
   useEffect(() => {
@@ -459,40 +561,131 @@ export function StudentLearningPage() {
     setIsPlaying(false);
   }, [activeTopic?.topic_id]);
 
-  // Save Progress Debounced
+  // Helper to merge time intervals [start, end]
+  const mergeWatchedIntervals = useCallback((intervals: [number, number][]): [number, number][] => {
+    if (!intervals || intervals.length === 0) return [];
+    const sorted = [...intervals].sort((a, b) => a[0] - b[0]);
+    const first = sorted[0];
+    if (!first) return [];
+    const merged: [number, number][] = [[first[0], first[1]]];
+    for (let i = 1; i < sorted.length; i++) {
+      const item = sorted[i];
+      if (!item) continue;
+      const [currStart, currEnd] = item;
+      const prev = merged[merged.length - 1];
+      if (!prev) continue;
+      if (currStart <= prev[1] + 1) {
+        prev[1] = Math.max(prev[1], currEnd);
+      } else {
+        merged.push([currStart, currEnd]);
+      }
+    }
+    return merged;
+  }, []);
+
+  const calculateUniqueWatched = useCallback((intervals: [number, number][]): number => {
+    return intervals.reduce((acc, [start, end]) => acc + Math.max(0, end - start), 0);
+  }, []);
+
+  // Tracking refs for real playback vs seeking
+  const lastTimeRef = useRef<number | null>(null);
+  const isSeekingRef = useRef<boolean>(false);
   const saveProgressDebounced = useRef<NodeJS.Timeout | null>(null);
+
+  // Monotonic Progress Persistence
   const persistProgress = useCallback(
     (timeSec: number, durSec: number, forceComplete = false) => {
       if (!activeTopic) return;
       const key = String(activeTopic.topic_id);
-      const computedPct = durSec > 0 ? Math.min(100, Math.round((timeSec / durSec) * 100)) : 0;
-      const isDone = forceComplete || computedPct >= 90;
 
-      const record: SavedVideoProgress = {
-        currentTime: Math.floor(timeSec),
-        duration: Math.floor(durSec),
-        percent: isDone ? 100 : computedPct,
-        completed: isDone,
-        updatedAt: new Date().toISOString(),
-      };
+      // Cancel any pending debounced autosave so it cannot fire later with stale data
+      if (saveProgressDebounced.current) {
+        clearTimeout(saveProgressDebounced.current);
+        saveProgressDebounced.current = null;
+      }
 
-      setVideoProgressMap((prev) => {
-        const next = { ...prev, [key]: record };
+      setVideoProgressMap((currentMap) => {
+        // Read directly from currentMap, fallback to localStorage
+        let prev = currentMap[key];
+        if (!prev) {
+          try {
+            const raw = localStorage.getItem(progressStorageKey);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              prev = parsed[key];
+            }
+          } catch {}
+        }
+
+        const prevIntervals: [number, number][] = prev?.watchedIntervals ? [...prev.watchedIntervals] : [];
+        const merged = mergeWatchedIntervals(prevIntervals);
+        const totalWatchedSec = calculateUniqueWatched(merged);
+
+        // Percentage based on unique watched intervals
+        const effectiveDur = durSec > 0 ? durSec : (prev?.duration || duration || 600);
+        const calculatedPct = effectiveDur > 0 ? Math.min(100, Math.round((totalWatchedSec / effectiveDur) * 100)) : 0;
+
+        // MONOTONIC COMPLETION RULE:
+        // Once marked complete (or >= 90% watched, or forceComplete, or backend topic.completed), completion status NEVER drops back to false.
+        const isAlreadyCompleted = Boolean(
+          prev?.completed ||
+          (prev?.percent ?? 0) >= 100 ||
+          activeTopic.completed ||
+          (activeTopic as any).test_passed
+        );
+        const isDone = isAlreadyCompleted || forceComplete || calculatedPct >= 90;
+
+        // MONOTONIC PROGRESS PERCENTAGE:
+        // Never drop below previously achieved progress percentage.
+        const newPercent = isDone ? 100 : Math.max(prev?.percent || 0, calculatedPct);
+
+        const record: SavedVideoProgress = {
+          currentTime: Math.floor(timeSec), // Playback position for resume/rewind
+          duration: Math.floor(effectiveDur),
+          percent: newPercent,              // Monotonic progress percentage
+          completed: isDone,                // Monotonic completion flag
+          watchedIntervals: isDone && merged.length === 0 ? [[0, Math.floor(effectiveDur)]] : merged,
+          updatedAt: new Date().toISOString(),
+        };
+
+        const next = { ...currentMap, [key]: record };
         try {
           localStorage.setItem(progressStorageKey, JSON.stringify(next));
         } catch {}
         return next;
       });
 
-      // Auto sync with backend if completed and enrolled
-      if (isDone && enrollment?.enrollment_id && activeItem?.topic_item_id) {
-        completeItemMutation({
-          enrollmentId: enrollment.enrollment_id,
-          topicItemId: activeItem.topic_item_id,
-        }).catch(() => {});
+      // Synchronize with backend database whenever completed and enrolled
+      if (enrollment?.enrollment_id && activeTopic) {
+        const requiredItems = activeTopic.items?.filter((it: any) => it.required) || [];
+        if (forceComplete) {
+          requiredItems.forEach((it: any) => {
+            completeItemMutation({
+              enrollmentId: enrollment.enrollment_id,
+              topicItemId: it.topic_item_id,
+            }).catch(() => {});
+          });
+        } else if (currentVideoItem?.topic_item_id) {
+          const effectiveDur = durSec > 0 ? durSec : duration;
+          if (timeSec >= effectiveDur * 0.9) {
+            completeItemMutation({
+              enrollmentId: enrollment.enrollment_id,
+              topicItemId: currentVideoItem.topic_item_id,
+            }).catch(() => {});
+          }
+        }
       }
     },
-    [activeTopic, progressStorageKey, enrollment?.enrollment_id, activeItem?.topic_item_id, completeItemMutation]
+    [
+      activeTopic,
+      progressStorageKey,
+      mergeWatchedIntervals,
+      calculateUniqueWatched,
+      duration,
+      enrollment?.enrollment_id,
+      currentVideoItem?.topic_item_id,
+      completeItemMutation,
+    ]
   );
 
   // Time update listener
@@ -501,6 +694,55 @@ export function StudentLearningPage() {
     const cur = videoRef.current.currentTime;
     const dur = videoRef.current.duration || duration || 600;
     setCurrentTime(cur);
+
+    if (activeTopic) {
+      const key = String(activeTopic.topic_id);
+      // Track real playback interval (only when playing and not seeking, delta between 0 and 3s)
+      if (!isSeekingRef.current && isPlaying && lastTimeRef.current !== null) {
+        const delta = cur - lastTimeRef.current;
+        if (delta > 0 && delta <= 3) {
+          setVideoProgressMap((currentMap) => {
+            let prev = currentMap[key];
+            if (!prev) {
+              try {
+                const raw = localStorage.getItem(progressStorageKey);
+                if (raw) {
+                  prev = JSON.parse(raw)[key];
+                }
+              } catch {}
+            }
+            const isDone = Boolean(
+              prev?.completed ||
+              (prev?.percent ?? 0) >= 100 ||
+              activeTopic.completed ||
+              (activeTopic as any).test_passed
+            );
+            const intervals: [number, number][] = [
+              ...(prev?.watchedIntervals || []),
+              [lastTimeRef.current!, cur],
+            ];
+            const merged = mergeWatchedIntervals(intervals);
+            const watchedSec = calculateUniqueWatched(merged);
+            const calculatedPct = dur > 0 ? Math.min(100, Math.round((watchedSec / dur) * 100)) : 0;
+            const nextDone = isDone || calculatedPct >= 90;
+            const nextRecord: SavedVideoProgress = {
+              currentTime: Math.floor(cur),
+              duration: Math.floor(dur),
+              percent: nextDone ? 100 : Math.max(prev?.percent || 0, calculatedPct),
+              completed: nextDone,
+              watchedIntervals: merged,
+              updatedAt: new Date().toISOString(),
+            };
+            const nextMap = { ...currentMap, [key]: nextRecord };
+            try {
+              localStorage.setItem(progressStorageKey, JSON.stringify(nextMap));
+            } catch {}
+            return nextMap;
+          });
+        }
+      }
+    }
+    lastTimeRef.current = cur;
 
     if (saveProgressDebounced.current) clearTimeout(saveProgressDebounced.current);
     saveProgressDebounced.current = setTimeout(() => {
@@ -518,8 +760,21 @@ export function StudentLearningPage() {
 
   const handleVideoEnded = () => {
     setIsPlaying(false);
-    if (videoRef.current) {
-      persistProgress(videoRef.current.duration || duration, videoRef.current.duration || duration, true);
+    lastTimeRef.current = null;
+    if (saveProgressDebounced.current) {
+      clearTimeout(saveProgressDebounced.current);
+      saveProgressDebounced.current = null;
+    }
+    const dur = videoRef.current?.duration || duration || 600;
+    persistProgress(dur, dur, true);
+    if (enrollment?.enrollment_id && activeTopic) {
+      const itemsToComplete = activeTopic.items?.filter((it: any) => it.required) || [];
+      itemsToComplete.forEach((it: any) => {
+        completeItemMutation({
+          enrollmentId: enrollment.enrollment_id,
+          topicItemId: it.topic_item_id,
+        }).catch(() => {});
+      });
     }
   };
 
@@ -528,19 +783,26 @@ export function StudentLearningPage() {
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
+      lastTimeRef.current = null;
       persistProgress(videoRef.current.currentTime, videoRef.current.duration || duration);
     } else {
+      lastTimeRef.current = videoRef.current.currentTime;
       videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const seekTo = Number(e.target.value);
+    isSeekingRef.current = true;
+    lastTimeRef.current = seekTo;
     setCurrentTime(seekTo);
     if (videoRef.current) {
       videoRef.current.currentTime = seekTo;
     }
     persistProgress(seekTo, duration);
+    setTimeout(() => {
+      isSeekingRef.current = false;
+    }, 200);
   };
 
   const handleToggleMute = () => {
@@ -685,51 +947,76 @@ export function StudentLearningPage() {
   const isLessonCompleted = activeChapterProgress === 100;
 
   const handleMarkCompleted = async () => {
-    if (!enrollment?.enrollment_id || !activeItem?.topic_item_id) {
+    if (!enrollment?.enrollment_id) {
       notify.error("Course enrollment required. You must be actively enrolled in this course to save progress.");
       return;
     }
-    persistProgress(duration, duration, true);
-    try {
-      await completeItemMutation({
-        enrollmentId: enrollment.enrollment_id,
-        topicItemId: activeItem.topic_item_id,
-      }).unwrap();
-      notify.success("Progress saved! Chapter test unlocked.");
-    } catch {
-      notify.success("Progress updated.");
+    if (saveProgressDebounced.current) {
+      clearTimeout(saveProgressDebounced.current);
+      saveProgressDebounced.current = null;
+    }
+    const dur = duration > 0 ? duration : 600;
+    persistProgress(dur, dur, true);
+
+    const itemsToComplete = activeTopic?.items?.filter((it: any) => it.required) || [];
+    if (itemsToComplete.length > 0) {
+      try {
+        await Promise.all(
+          itemsToComplete.map((it: any) =>
+            completeItemMutation({
+              enrollmentId: enrollment.enrollment_id,
+              topicItemId: it.topic_item_id,
+            }).unwrap().catch(() => {})
+          )
+        );
+        notify.success("Lesson completed! Progress saved and chapter test unlocked.");
+      } catch {
+        notify.success("Progress saved.");
+      }
+    } else {
+      notify.success("Lesson completed! Progress saved.");
     }
   };
 
   const handleEnrollNow = async () => {
-    const targetCourse = myCourses?.find((c) => String(c.course_id) === String(courseId));
-    if (!targetCourse?.batch_id) {
-      notify.info("Enrollment for this course is managed through your institution batch.");
-      return;
-    }
+    if (!courseId) return;
     try {
-      await enrollMutation({
-        batchId: targetCourse.batch_id,
-        body: { student_user_id: "me" } as any,
-      }).unwrap();
+      await selfEnrollMutation({ courseId }).unwrap();
       notify.success("Enrolled successfully! Ready to start learning.");
+      refetchEnrollments?.();
     } catch (err: any) {
-      notify.error(err?.data?.message || "Enrollment request submitted.");
+      const msg = err?.data?.message || err?.message || "Enrollment request submitted.";
+      notify.error(msg);
     }
   };
 
   const handleStartChapterTest = () => {
     if (!activeTopic) return;
-    navigate(`/courses/${courseId}/chapters/${activeTopic.topic_id}/test`);
+    handleOpenAssessment(
+      "chapter",
+      (activeTopic as any).topic_test_id,
+      currentActiveModule?.module_id,
+      activeTopic.topic_id,
+      `${activeTopic.title} Test`
+    );
   };
 
   const handleFinalTestClick = () => {
-    if (!finalTestId) return;
-    if (finalStatus === "locked") {
-      notify.info("Prerequisites not completed. Finish all course modules and tests to take the final certification exam.");
+    if (!finalTestId) {
+      notify.info("No final examination has been configured for this course.");
       return;
     }
-    navigate(`/courses/${courseId}/final-exam`);
+    if (finalStatus === "locked") {
+      notify.info("Prerequisites not completed. Finish all course modules and pass all module tests to unlock the final certification exam.");
+      return;
+    }
+    handleOpenAssessment(
+      "final",
+      String(finalTestId),
+      undefined,
+      undefined,
+      finalTestDetail?.title || "Final Certification Exam"
+    );
   };
 
   const formatTime = (secs: number) => {
@@ -737,6 +1024,7 @@ export function StudentLearningPage() {
     const s = Math.floor(secs % 60);
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
+
 
   if (isCourseLoading || (versionId && isVersionLoading)) {
     return <PageLoader label="Loading your learning room..." />;
@@ -794,21 +1082,31 @@ export function StudentLearningPage() {
   return (
     <div className="max-w-[1560px] mx-auto space-y-5 pb-12 px-2 sm:px-4">
       {/* Top Header & Breadcrumb */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
-        <div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mb-1">
-            <Link to="/courses/my" className="hover:text-blue-600 transition-colors">
-              Courses
-            </Link>
-            <span>/</span>
-            <span className="text-slate-800 font-bold">{courseTitle}</span>
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#E5E7EB]">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate("/courses/my")}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs"
+            title="Back to My Courses"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <div>
+            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mb-0.5">
+              <Link to="/courses/my" className="hover:text-[#635BFF] transition-colors">
+                Courses
+              </Link>
+              <span>/</span>
+              <span className="text-slate-800 font-bold">{courseTitle}</span>
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2.5">
+              <span>{activeTopic?.title || "Course Lesson"}</span>
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F5F4FF] text-[#635BFF] border border-[#E5E7EB]">
+                Module {currentActiveModule?.position || 1}
+              </span>
+            </h2>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2.5">
-            <span>{activeTopic?.title || "Course Lesson"}</span>
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-              Module {currentActiveModule?.position || 1}
-            </span>
-          </h2>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -836,7 +1134,7 @@ export function StudentLearningPage() {
       </div>
 
       {/* 4 Course Navigation Tabs: Course Overview | Modules | Assessments | Certificate */}
-      <div className="flex items-center gap-2 border-b border-slate-200">
+      <div className="flex items-center gap-2 border-b border-[#E5E7EB]">
         {[
           { id: "overview", label: "Course Overview", icon: BookOpen },
           { id: "modules", label: "Modules", icon: Play },
@@ -870,7 +1168,7 @@ export function StudentLearningPage() {
                   className={cn(
                     "text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1",
                     tab.locked
-                      ? "bg-slate-100 text-slate-500 border border-slate-200"
+                      ? "bg-slate-100 text-slate-500 border border-[#E5E7EB]"
                       : "bg-emerald-50 text-emerald-700 border border-emerald-200"
                   )}
                 >
@@ -912,7 +1210,7 @@ export function StudentLearningPage() {
       {activeCourseTab === "overview" && (
         <div className="space-y-6">
           {/* Hero Overview Card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs space-y-4">
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-6 shadow-2xs space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
@@ -972,8 +1270,34 @@ export function StudentLearningPage() {
             </div>
           </div>
 
+          {/* Learning Objectives (Part 2.C) */}
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-6 shadow-2xs space-y-3">
+            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-[#635BFF]" />
+              <span>What You Will Learn</span>
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-600">
+              <div className="flex items-start gap-2.5">
+                <Check size={14} className="text-emerald-600 mt-0.5 shrink-0" />
+                <span>Master core architectural paradigms and clean code fundamentals.</span>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <Check size={14} className="text-emerald-600 mt-0.5 shrink-0" />
+                <span>Implement real-world programming patterns with structured error handling.</span>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <Check size={14} className="text-emerald-600 mt-0.5 shrink-0" />
+                <span>Complete hands-on module tests and graded knowledge checks.</span>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <Check size={14} className="text-emerald-600 mt-0.5 shrink-0" />
+                <span>Qualify for an accredited industry certification upon proctored examination.</span>
+              </div>
+            </div>
+          </div>
+
           {/* Syllabus Modules Outline */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs space-y-4">
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-6 shadow-2xs space-y-4">
             <h4 className="text-sm font-bold text-slate-900">Curriculum Structure & Modules</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {modulesList.map((m, idx) => {
@@ -981,7 +1305,7 @@ export function StudentLearningPage() {
                 return (
                   <div
                     key={m.module_id}
-                    className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors flex items-start gap-3 bg-slate-50/50"
+                    className="p-4 rounded-xl border border-[#E5E7EB] hover:border-slate-300 transition-colors flex items-start gap-3 bg-slate-50/50"
                   >
                     <div
                       className={cn(
@@ -1008,7 +1332,7 @@ export function StudentLearningPage() {
       {/* TAB 2: ASSESSMENTS OVERVIEW */}
       {activeCourseTab === "assessments" && (
         <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs space-y-6">
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-6 shadow-2xs space-y-6">
             <div>
               <h3 className="text-lg font-bold text-slate-900">Course Assessments & Examinations</h3>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -1088,7 +1412,7 @@ export function StudentLearningPage() {
                 {modulesList.map((m) => (
                   <div
                     key={m.module_id}
-                    className="p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-colors flex items-center justify-between gap-3"
+                    className="p-4 rounded-xl border border-[#E5E7EB] bg-white hover:border-slate-300 transition-colors flex items-center justify-between gap-3"
                   >
                     <div>
                       <b className="text-xs font-bold text-slate-900 block truncate">{m.title} Test</b>
@@ -1097,7 +1421,15 @@ export function StudentLearningPage() {
 
                     <button
                       type="button"
-                      onClick={() => navigate(`/courses/${courseId}/modules/${m.module_id}/test`)}
+                      onClick={() =>
+                        handleOpenAssessment(
+                          "module",
+                          (m as any).module_test_id,
+                          m.module_id,
+                          undefined,
+                          `${m.title} Test`
+                        )
+                      }
                       className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer shadow-2xs"
                     >
                       {(m as any).test_passed ? "Review" : "Take Test"}
@@ -1127,8 +1459,8 @@ export function StudentLearningPage() {
               </div>
 
               {/* Official Certificate Box */}
-              <div className="relative rounded-2xl border-4 border-[#00663C] bg-white p-8 sm:p-10 text-center shadow-lg space-y-4">
-                <div className="text-[11px] uppercase font-bold tracking-widest text-[#00663C]">
+              <div className="relative rounded-2xl border-4 border-[#6366F1] bg-white p-8 sm:p-10 text-center shadow-lg space-y-4">
+                <div className="text-[11px] uppercase font-bold tracking-widest text-[#6366F1]">
                   GenZ Technologies & Examination LMS
                 </div>
 
@@ -1144,7 +1476,7 @@ export function StudentLearningPage() {
                   has successfully satisfied all learning modules, hands-on tasks, and proctored examinations for
                 </p>
 
-                <h5 className="text-xl font-bold text-[#00663C]">{courseCertificate?.course_title || courseTitle}</h5>
+                <h5 className="text-xl font-bold text-[#6366F1]">{courseCertificate?.course_title || courseTitle}</h5>
 
                 <p className="text-xs text-slate-600 font-medium">
                   Score: <b>{courseCertificate?.score_percent != null ? courseCertificate.score_percent : 100}%</b> (
@@ -1154,7 +1486,7 @@ export function StudentLearningPage() {
                     : new Date().toLocaleDateString()}
                 </p>
 
-                <div className="inline-block text-[11px] font-mono text-slate-500 bg-slate-50 py-1 px-3 rounded-md border border-slate-200">
+                <div className="inline-block text-[11px] font-mono text-slate-500 bg-slate-50 py-1 px-3 rounded-md border border-[#E5E7EB]">
                   ID: {courseCertificate?.verification_code || courseCertificate?.certificate_id || "EXAM-CERT-VERIFIED"}
                 </div>
 
@@ -1181,7 +1513,7 @@ export function StudentLearningPage() {
                       courseCertificate?.verification_code || "CERT"
                     )
                   }
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] disabled:opacity-50 cursor-pointer shadow-xs transition-colors"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] disabled:opacity-50 cursor-pointer shadow-xs transition-colors"
                 >
                   <Download size={15} />
                   <span>{downloadingCertId ? "Preparing PDF..." : "Download Certificate PDF"}</span>
@@ -1214,7 +1546,7 @@ export function StudentLearningPage() {
             </div>
           ) : (
             /* INCOMPLETE: CERTIFICATE LOCKED STATE */
-            <div className="max-w-xl mx-auto rounded-2xl border border-slate-200 bg-white p-10 text-center space-y-4 shadow-2xs">
+            <div className="max-w-xl mx-auto rounded-2xl border border-[#E5E7EB] bg-white p-10 text-center space-y-4 shadow-2xs">
               <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-600 mx-auto flex items-center justify-center">
                 <Lock size={26} />
               </div>
@@ -1224,7 +1556,7 @@ export function StudentLearningPage() {
               </p>
 
               {/* Requirements Checklist */}
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-left space-y-2 text-xs">
+              <div className="p-4 rounded-xl bg-slate-50 border border-[#E5E7EB] text-left space-y-2 text-xs">
                 <b className="text-slate-800 font-bold block mb-1">Completion Checklist:</b>
                 <div className="flex items-center justify-between text-slate-600">
                   <span className="flex items-center gap-2">
@@ -1264,11 +1596,11 @@ export function StudentLearningPage() {
       {/* TAB 4: MODULES (INTERACTIVE LEARNING ROOM) */}
       {activeCourseTab === "modules" && (
         <div ref={containerRef} className="flex flex-col lg:flex-row gap-0 relative items-stretch">
-        {/* Left Column: Video Player & Learning Content */}
+        {/* Left Column: Video Player & Learning Content OR Assessment View */}
         <div
           style={{ width: undefined }}
           className={cn(
-            "w-full transition-all duration-75 flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden",
+            "w-full transition-all duration-75 flex flex-col rounded-2xl border border-[#E5E7EB] bg-white shadow-2xs overflow-hidden",
             "lg:min-w-[420px]"
           )}
           // Desktop custom dynamic width
@@ -1280,19 +1612,48 @@ export function StudentLearningPage() {
             }
           }}
         >
-          {/* Main Video Player Container (Consistent 16:9 Aspect Ratio) */}
-          <div
-            ref={playerContainerRef}
-            className="aspect-video bg-slate-950 relative overflow-hidden flex flex-col justify-between group select-none"
-          >
-            {/* HTML5 Video Element */}
-            <video
-              ref={videoRef}
-              src={realVideoUrl || (QUALITY_OPTIONS.find((q) => q.id === videoQuality) || QUALITY_OPTIONS[0]!).src}
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={handleLoadedMetadata}
-              onEnded={handleVideoEnded}
-              className="w-full h-full object-contain cursor-pointer"
+          {activeAssessment ? (
+            <InlineAssessmentView
+              courseId={courseId ?? ""}
+              courseTitle={course?.title || courseTitle}
+              assessment={activeAssessment}
+              modulesList={modulesList}
+              currentModule={
+                activeAssessment.moduleId
+                  ? modulesList.find((m) => String(m.module_id) === String(activeAssessment.moduleId))
+                  : currentActiveModule
+              }
+              currentChapter={
+                activeAssessment.chapterId
+                  ? (modulesList as any[]).flatMap((m: any) => m.topics || []).find((t: any) => String(t.topic_id) === String(activeAssessment.chapterId))
+                  : activeTopic
+              }
+              finalTestDetail={finalTestDetail}
+              unlockState={unlockState}
+              onClose={() => setActiveAssessment(null)}
+              onTestPassed={() => {
+                refetchUnlockState();
+                refetchFinalTest();
+              }}
+              onOpenFinalProctoredPage={() => {
+                navigate(`/courses/${courseId}/final-exam`);
+              }}
+            />
+          ) : (
+            <>
+              {/* Main Video Player Container (Consistent 16:9 Aspect Ratio) */}
+              <div
+                ref={playerContainerRef}
+                className="aspect-video bg-slate-950 relative overflow-hidden flex flex-col justify-between group select-none"
+              >
+                {/* HTML5 Video Element */}
+                <video
+                  ref={videoRef}
+                  src={realVideoUrl || (QUALITY_OPTIONS.find((q) => q.id === videoQuality) || QUALITY_OPTIONS[0]!).src}
+                  onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onEnded={handleVideoEnded}
+                  className="w-full h-full object-contain cursor-pointer"
               onClick={handlePlayPause}
               playsInline
             />
@@ -1488,9 +1849,9 @@ export function StudentLearningPage() {
             </div>
           </div>
 
-          {/* Material Tabs */}
-          <div className="flex border-b border-slate-200 px-5 gap-6 bg-slate-50/70">
-            {(["video", "pdf", "notes", "materials"] as const).map((tab) => (
+          {/* Material Tabs matching reference mockup */}
+          <div className="flex border-b border-[#E5E7EB] px-5 gap-6 bg-slate-50/70">
+            {(["description", "resources", "discussion"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -1498,73 +1859,69 @@ export function StudentLearningPage() {
                 className={cn(
                   "py-3 text-xs font-bold transition-all relative capitalize cursor-pointer",
                   activeTab === tab
-                    ? "text-blue-600 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-600"
+                    ? "text-[#635BFF] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#635BFF]"
                     : "text-slate-500 hover:text-slate-900"
                 )}
               >
-                {tab === "video" ? "Video Lesson" : tab === "pdf" ? "PDF Slides" : tab === "notes" ? "Chapter Notes" : "Materials"}
+                {tab === "description" ? "Description" : tab === "resources" ? "Resources" : "Discussion"}
               </button>
             ))}
           </div>
 
           {/* Tab Content */}
           <div className="p-5 text-xs text-slate-600 min-h-[140px] leading-relaxed flex-1">
-            {activeTab === "video" && (
+            {activeTab === "description" && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-slate-900 text-sm">{activeTopic?.title || "Video Lesson"}</h4>
+                  <h4 className="font-bold text-slate-900 text-sm">About this lesson</h4>
                   <span className="text-[11px] font-semibold text-slate-500">
-                    Watch progress: <b className="text-blue-600">{activeChapterProgress}%</b>
+                    Watch progress: <b className="text-[#635BFF]">{activeChapterProgress}%</b>
                   </span>
                 </div>
                 <p className="text-slate-600 leading-normal">
-                  Master the key programming syntax, foundational patterns, and real-world techniques presented in this chapter. Follow along with interactive examples and review every required item before proceeding to the chapter assessment.
+                  In this lesson, you will learn the core concepts and techniques of {activeTopic?.title || "this chapter"}. Follow along with interactive examples and review every required item before proceeding to the chapter assessment.
                 </p>
               </div>
             )}
 
-            {activeTab === "pdf" && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                    <FileText size={20} />
+            {activeTab === "resources" && (
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-[#E5E7EB] bg-slate-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[#F5F4FF] text-[#635BFF] flex items-center justify-center shrink-0">
+                      <FileText size={20} />
+                    </div>
+                    <div>
+                      <b className="text-xs text-slate-900 block">{currentPdfItem?.title || `${activeTopic?.title || "Chapter"} - Reference Slides.pdf`}</b>
+                      <span className="text-[11px] text-slate-500">{(currentPdfItem as any)?.media_id ? "Uploaded Chapter Document · PDF Format" : "Official instructor slides · 18 pages · Updated"}</span>
+                    </div>
                   </div>
-                  <div>
-                    <b className="text-xs text-slate-900 block">{currentPdfItem?.title || `${activeTopic?.title || "Chapter"} - Reference Slides.pdf`}</b>
-                    <span className="text-[11px] text-slate-500">{(currentPdfItem as any)?.media_id ? "Uploaded Chapter Document · PDF Format" : "Official instructor slides · 18 pages · Updated"}</span>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPdfViewerOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#635BFF] text-xs font-bold text-white hover:bg-[#5046E5] cursor-pointer shadow-xs transition-colors shrink-0"
+                  >
+                    <Eye size={15} /> View PDF
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsPdfViewerOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer shadow-xs transition-colors shrink-0"
-                >
-                  <Eye size={15} /> View PDF
-                </button>
               </div>
             )}
 
-            {activeTab === "notes" && (
+            {activeTab === "discussion" && (
               <div className="space-y-2.5">
-                <h4 className="font-bold text-slate-900 text-sm">Key Chapter Learning Objectives:</h4>
-                <ul className="list-disc pl-4 space-y-1.5 text-slate-600 text-xs leading-normal">
-                  <li>Review core variable scoping, naming conventions, and runtime evaluation order.</li>
-                  <li>Complete every lesson item before starting the chapter test.</li>
-                  <li>A minimum score of 70% is required to pass the chapter test and advance sequentially.</li>
-                </ul>
-              </div>
-            )}
-
-            {activeTab === "materials" && (
-              <div className="space-y-2">
-                <h4 className="font-bold text-slate-900 text-sm">Downloadable Starter Code & Solution Notebooks:</h4>
-                <p className="text-slate-600">Access starter code repositories, exercise solution notebooks, and quick reference cheat sheets.</p>
+                <h4 className="font-bold text-slate-900 text-sm">Lesson Q&amp;A &amp; Discussion</h4>
+                <p className="text-slate-500 text-xs">
+                  Ask questions, share code snippets, or discuss concepts with peers and mentors.
+                </p>
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-[#E5E7EB] text-slate-600 text-xs">
+                  No questions asked yet. Post the first question for this lesson!
+                </div>
               </div>
             )}
           </div>
 
           {/* Action Footer */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-50 border-t border-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-50 border-t border-[#E5E7EB]">
             <span className="text-xs text-slate-500 font-medium">
               Complete this chapter's lessons to unlock the chapter test.
             </span>
@@ -1598,7 +1955,15 @@ export function StudentLearningPage() {
               {currentActiveModule && (
                 <button
                   type="button"
-                  onClick={() => navigate(`/courses/${courseId}/modules/${currentActiveModule.module_id}/test`)}
+                  onClick={() =>
+                    handleOpenAssessment(
+                      "module",
+                      (currentActiveModule as any)?.module_test_id,
+                      currentActiveModule.module_id,
+                      undefined,
+                      `${currentActiveModule.title} Test`
+                    )
+                  }
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer shadow-2xs transition-colors"
                 >
                   <Award size={14} className="text-blue-600" /> Module test
@@ -1606,7 +1971,9 @@ export function StudentLearningPage() {
               )}
             </div>
           </div>
-        </div>
+        </>
+      )}
+    </div>
 
         {/* Draggable Vertical Divider (Desktop Only) */}
         <div
@@ -1645,7 +2012,7 @@ export function StudentLearningPage() {
         <div
           style={{ width: undefined }}
           className={cn(
-            "rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden flex flex-col",
+            "rounded-2xl border border-[#E5E7EB] bg-white shadow-2xs overflow-hidden flex flex-col",
             "lg:min-w-[280px] lg:flex-1",
             // Mobile toggle visibility
             !isMobileSidebarOpen && "hidden lg:flex",
@@ -1659,6 +2026,22 @@ export function StudentLearningPage() {
             }
           }}
         >
+          {/* Top Tabs in Sidebar: Course Content | Notes matching reference mockup */}
+          <div className="flex border-b border-[#E5E7EB] bg-slate-50/80 px-4">
+            <button
+              type="button"
+              className="py-3 px-3 text-xs font-bold text-[#635BFF] border-b-2 border-[#635BFF] -mb-px cursor-pointer"
+            >
+              Course Content
+            </button>
+            <button
+              type="button"
+              className="py-3 px-3 text-xs font-medium text-slate-500 hover:text-slate-800 cursor-pointer"
+            >
+              Notes
+            </button>
+          </div>
+
           {/* Progress Header */}
           <div className="flex items-center gap-4 p-4 border-b border-slate-100 bg-slate-50/50">
             <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center shrink-0 border-4 border-blue-100">
@@ -1814,12 +2197,27 @@ export function StudentLearningPage() {
                                   <Check size={10} /> Passed
                                 </span>
                               ) : (t as any).topic_test_id ? (
-                                <Link
-                                  to={`/courses/${courseId}/chapters/${t.topic_id}/test`}
-                                  className="text-blue-600 font-bold text-[11px] hover:underline"
-                                >
-                                  Take test
-                                </Link>
+                                isTopicDone ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleOpenAssessment(
+                                        "chapter",
+                                        (t as any).topic_test_id,
+                                        m.module_id,
+                                        t.topic_id,
+                                        `${t.title} Test`
+                                      )
+                                    }
+                                    className="text-blue-600 font-bold text-[11px] hover:underline cursor-pointer"
+                                  >
+                                    Take test
+                                  </button>
+                                ) : (
+                                  <span className="text-slate-400 text-[10px] flex items-center gap-1" title="Complete chapter lesson first">
+                                    <Lock size={10} /> Locked
+                                  </span>
+                                )
                               ) : (
                                 <span className="text-slate-400 text-[10px] italic">
                                   No test
@@ -1832,28 +2230,49 @@ export function StudentLearningPage() {
 
                       {/* Module Test Row Link */}
                       <div className="pt-1.5">
-                        <Link
-                          to={`/courses/${courseId}/modules/${m.module_id}/test`}
-                          className="flex items-center justify-between p-2 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200 transition-colors group"
-                        >
-                          <div className="flex items-center gap-2 truncate">
-                            <div className="w-5 h-5 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
-                              <Award size={13} />
-                            </div>
-                            <span className="text-xs font-bold text-slate-900 group-hover:text-blue-600 truncate">
-                              Module test
-                            </span>
-                          </div>
-                          {(m as any).test_passed ? (
-                            <span className="text-emerald-700 font-bold text-[10px] bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
-                              <Check size={10} /> Passed
-                            </span>
-                          ) : (
-                            <span className="text-[11px] font-bold text-blue-600 flex items-center gap-0.5">
-                              Open <ChevronRight size={13} />
-                            </span>
-                          )}
-                        </Link>
+                        {(() => {
+                          const allChaptersDone = (m.topics || []).every((top: any) => Boolean(top.completed) || getChapterProgress(top) === 100);
+                          const allChapterTestsDone = (m.topics || []).every((top: any) => !top.topic_test_id || Boolean(top.test_passed));
+                          const isModuleTestUnlocked = allChaptersDone && allChapterTestsDone;
+
+                          return (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleOpenAssessment(
+                                  "module",
+                                  (m as any).module_test_id,
+                                  m.module_id,
+                                  undefined,
+                                  `${m.title} Test`
+                                )
+                              }
+                              className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-[#E5E7EB] transition-colors group cursor-pointer text-left"
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <div className="w-5 h-5 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+                                  <Award size={13} />
+                                </div>
+                                <span className="text-xs font-bold text-slate-900 group-hover:text-blue-600 truncate">
+                                  Module test
+                                </span>
+                              </div>
+                              {(m as any).test_passed ? (
+                                <span className="text-emerald-700 font-bold text-[10px] bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                                  <Check size={10} /> Passed
+                                </span>
+                              ) : isModuleTestUnlocked ? (
+                                <span className="text-[11px] font-bold text-blue-600 flex items-center gap-0.5">
+                                  Open <ChevronRight size={13} />
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-[10px] flex items-center gap-1" title="Pass all chapter tests to unlock">
+                                  <Lock size={11} /> Locked
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
@@ -1884,7 +2303,7 @@ export function StudentLearningPage() {
                     </span>
                   )}
                   {finalStatus === "locked" && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-500 px-2 py-0.5 text-[10px] font-bold border border-slate-200">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-500 px-2 py-0.5 text-[10px] font-bold border border-[#E5E7EB]">
                       <Lock size={11} /> Locked
                     </span>
                   )}
@@ -1901,7 +2320,7 @@ export function StudentLearningPage() {
                       ? "bg-white border-amber-300 hover:border-amber-500 hover:shadow-sm cursor-pointer"
                       : finalStatus === "completed"
                       ? "bg-white border-emerald-300 hover:border-emerald-500 hover:shadow-sm cursor-pointer"
-                      : "bg-slate-100/90 border-slate-200 opacity-80 cursor-not-allowed"
+                      : "bg-slate-100/90 border-[#E5E7EB] opacity-80 cursor-not-allowed"
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -1919,7 +2338,7 @@ export function StudentLearningPage() {
                       {finalStatus === "locked" && (
                         <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
                           <Lock size={11} className="text-slate-400 shrink-0" />
-                          Complete all modules to unlock
+                          Complete all modules and pass all module tests to unlock
                         </p>
                       )}
                       {finalStatus === "completed" && finalTestDetail?.best_percent != null && (
@@ -1980,6 +2399,18 @@ export function StudentLearningPage() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Sticky Bottom Mark as Complete Button matching reference mockup */}
+          <div className="p-4 border-t border-[#E5E7EB] bg-white">
+            <button
+              type="button"
+              disabled={isCompleting}
+              onClick={handleMarkCompleted}
+              className="w-full py-2.5 px-4 rounded-xl bg-[#635BFF] hover:bg-[#5046E5] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+            >
+              <span>{isLessonCompleted ? "Completed ✓" : "Mark as Complete ✓"}</span>
+            </button>
           </div>
         </div>
       </div>

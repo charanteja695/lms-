@@ -79,9 +79,9 @@ export function ThumbnailUploader({ value, onChange, className, error }: Thumbna
       </label>
 
       {isUploading ? (
-        <div className="relative border-2 border-dashed border-emerald-400 bg-emerald-50/40 rounded-2xl p-6 text-center flex flex-col items-center justify-center min-h-[190px]">
-          <Spinner size={32} className="text-[#00663C] mb-2" />
-          <b className="text-sm font-bold text-[#0A1530] mb-1">Uploading thumbnail...</b>
+        <div className="relative border-2 border-dashed border-indigo-300 bg-indigo-50/40 rounded-2xl p-6 text-center flex flex-col items-center justify-center min-h-[190px]">
+          <Spinner size={32} className="text-[#6366F1] mb-2" />
+          <b className="text-sm font-bold text-navy-950 mb-1">Uploading thumbnail...</b>
           <span className="text-xs text-slate-500 font-medium">{uploadProgress}% complete</span>
         </div>
       ) : value ? (
@@ -115,14 +115,14 @@ export function ThumbnailUploader({ value, onChange, className, error }: Thumbna
           onDrop={handleDrop}
           onClick={() => inputRef.current?.click()}
           className={cn(
-            "relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-colors bg-[#F8FAF9] flex flex-col items-center justify-center min-h-[190px]",
+            "relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-colors bg-slate-50/50 flex flex-col items-center justify-center min-h-[190px]",
             isDragging
-              ? "border-emerald-600 bg-emerald-50/50"
-              : "border-slate-300 hover:border-emerald-500 hover:bg-[#F2F7F4]"
+              ? "border-indigo-500 bg-indigo-50/40"
+              : "border-slate-300 hover:border-[#6366F1] hover:bg-indigo-50/20"
           )}
         >
-          {/* Upload circle icon matching Screenshot 2 */}
-          <div className="w-12 h-12 rounded-full bg-[#E7F3EC] text-[#00663C] flex items-center justify-center mb-2.5 transition-transform group-hover:scale-105">
+          {/* Upload circle icon matching ExamLMS */}
+          <div className="w-12 h-12 rounded-full bg-indigo-50 text-[#6366F1] border border-indigo-100 flex items-center justify-center mb-2.5 transition-transform group-hover:scale-105">
             <svg
               className="w-5 h-5"
               viewBox="0 0 24 24"
@@ -136,7 +136,7 @@ export function ThumbnailUploader({ value, onChange, className, error }: Thumbna
             </svg>
           </div>
 
-          <b className="text-[14px] font-bold text-[#0A1530] mb-0.5">
+          <b className="text-[14px] font-bold text-navy-950 mb-0.5">
             Upload thumbnail
           </b>
           <p className="text-[12px] text-slate-500 mb-0.5">

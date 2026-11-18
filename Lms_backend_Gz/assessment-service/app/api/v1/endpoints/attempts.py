@@ -24,6 +24,8 @@ from app.api.deps import (
 )
 from app.api.responses import AUTHENTICATED, errors
 from app.api.views import paper_view, result_view, state_of
+from lms_common.subscription_guard import check_student_course_entitlement, resolve_course_id_for_assessment_target
+
 from app.core.exceptions import NotFoundError, PermissionDeniedError
 from app.core.time import utcnow
 from app.domain.enums import SubmitReason
@@ -130,6 +132,30 @@ async def create_attempt(
             raise
         except Exception:
             pass
+    if auth.role == "student" and test.target_type in ("course", "module", "topic") and test.target_id:
+        course_id, assessment_kind = await resolve_course_id_for_assessment_target(
+            test.target_type,
+            int(test.target_id),
+            settings_db_url=settings.DATABASE_URL,
+        )
+        if course_id is not None:
+            entitled, err_code, err_msg = await check_student_course_entitlement(
+                user_id=auth.user_id,
+                course_id=course_id,
+                assessment_kind=assessment_kind,
+                settings_db_url=settings.DATABASE_URL,
+            )
+            if not entitled:
+                raise PermissionDeniedError(err_msg or "Plan restriction.", code=err_code or "PLAN_FEATURE_RESTRICTED")
+            if getattr(test, "proctoring_level", "none") != "none":
+                p_ok, p_code, p_msg = await check_student_course_entitlement(
+                    user_id=auth.user_id,
+                    course_id=course_id,
+                    assessment_kind="proctoring",
+                    settings_db_url=settings.DATABASE_URL,
+                )
+                if not p_ok:
+                    raise PermissionDeniedError(p_msg or "Proctoring not included in plan.", code=p_code or "PLAN_FEATURE_RESTRICTED")
     service = AttemptService(db, settings, redis)
     attempt = await service.prepare(test, auth, ctx, key=key)
     if data.start_now:

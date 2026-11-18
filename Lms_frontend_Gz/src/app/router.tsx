@@ -1,6 +1,8 @@
+import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
 
 import { RouteError } from "@/shared/routing/RouteError";
+import { PageLoader } from "@/shared/ui/Spinner";
 
 import { billingModuleRoutes } from "@/modules/billing/routes";
 import { analyticsModuleRoutes } from "@/modules/analytics/routes";
@@ -23,10 +25,12 @@ import { supportModuleRoutes } from "@/modules/support/routes";
 import { subscriptionsModuleRoutes } from "@/modules/subscriptions/routes";
 import { RequireAuth } from "@/modules/user-management/auth/guards/RequireAuth";
 import { userManagementRoutes } from "@/modules/user-management/routes";
-import { AppLayout } from "@/shared/layout/AppLayout";
 import { AuthLayout } from "@/shared/layout/AuthLayout";
-import { PublicLayout } from "@/shared/layout/PublicLayout";
-import { NotFoundPage } from "@/shared/pages/NotFoundPage";
+
+const LandingPage = lazy(() => import("@/shared/pages/LandingPage").then((m) => ({ default: m.LandingPage })));
+const NotFoundPage = lazy(() => import("@/shared/pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })));
+const AppLayout = lazy(() => import("@/shared/layout/AppLayout").then((m) => ({ default: m.AppLayout })));
+const PublicLayout = lazy(() => import("@/shared/layout/PublicLayout").then((m) => ({ default: m.PublicLayout })));
 
 /**
  * The app router only composes module routes. To add a module (catalog, learning, ...),
@@ -37,16 +41,18 @@ export const router = createBrowserRouter([
   {
     errorElement: <RouteError />,
     children: [
+    { path: "/landing", element: <Suspense fallback={<PageLoader />}><LandingPage /></Suspense> },
+    { path: "/welcome", element: <Suspense fallback={<PageLoader />}><LandingPage /></Suspense> },
     { element: <AuthLayout />, children: [...userManagementRoutes.public] },
     // Public pages that also work while signed in (no PublicOnly redirect).
     { element: <AuthLayout />, children: [...certificatesModuleRoutes.public] },
-    { element: <PublicLayout />, children: [...careerModuleRoutes.public] },
+    { element: <Suspense fallback={<PageLoader />}><PublicLayout /></Suspense>, children: [...careerModuleRoutes.public] },
     {
       element: <RequireAuth />,
       children: [
         ...userManagementRoutes.setup,
         {
-          element: <AppLayout />,
+          element: <Suspense fallback={<PageLoader />}><AppLayout /></Suspense>,
           children: [
             ...dashboardRoutes,
             ...userManagementRoutes.app,
@@ -68,7 +74,7 @@ export const router = createBrowserRouter([
             ...notificationsModuleRoutes,
             ...analyticsModuleRoutes,
             ...billingModuleRoutes,
-            { path: "*", element: <NotFoundPage /> },
+            { path: "*", element: <Suspense fallback={<PageLoader />}><NotFoundPage /></Suspense> },
           ],
         },
       ],

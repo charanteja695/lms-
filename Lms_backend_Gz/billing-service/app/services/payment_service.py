@@ -16,6 +16,7 @@ from app.gateways.errors import Rejected, Unavailable
 from app.gateways.payment import PaymentGateway, PaymentGatewayNotConfigured
 from app.models.billing import GatewayEvent, Invoice, Payment
 from app.services.invoice_service import InvoiceService
+from app.services.student_subscription_service import StudentSubscriptionService
 
 _PAYABLE = {InvoiceStatus.ISSUED, InvoiceStatus.OVERDUE}
 
@@ -110,8 +111,9 @@ class PaymentService:
         """Money for this order arrived (from the webhook or a verified checkout). Idempotent: a second report changes nothing."""
         found = await self._pending_payment(order_id)
         if found is None:
-            await self.db.commit()
-            return "ignored"
+            return await StudentSubscriptionService(self.db, self.settings, self.gateway).capture_by_order(
+                order_id, payment_id=payment_id, amount=amount
+            )
         payment, invoice = found
         if payment.status != PaymentStatus.PENDING:
             await self.db.commit()
@@ -126,12 +128,78 @@ class PaymentService:
         payment.status, payment.paid_at = PaymentStatus.SUCCEEDED, utcnow()
         payment.gateway_payment_id = payment_id
         await self._apply(invoice, payment.amount)
+
+        # If this invoice settled an individual course purchase, activate entitlement
+        if invoice.source_type == "purchase":
+            from app.domain.enums import PurchaseStatus
+            from app.models.billing import CoursePurchase
+            from app.services.store_service import StoreService
+
+            purchase = (
+                await self.db.execute(select(CoursePurchase).where(CoursePurchase.invoice_id == invoice.id))
+            ).scalar_one_or_none()
+            if purchase is not None and purchase.status != PurchaseStatus.PAID:
+                purchase.status = PurchaseStatus.PAID
+                purchase.paid_at = utcnow()
+                from app.services.outbox import write_event
+                write_event(
+                    self.db,
+                    event_type="course.purchased",
+                    aggregate_type="course_purchase",
+                    aggregate_id=purchase.id,
+                    payload={
+                        "user_id": str(purchase.user_id),
+                        "course_id": str(purchase.course_id),
+                        "valid_days": purchase.valid_days,
+                        "purchase_id": str(purchase.public_id),
+                    },
+                )
+                await self.db.flush()
+                await StoreService(self.db, self.settings, self.gateway)._activate_individual_entitlement(
+                    user_id=purchase.user_id,
+                    course_id=purchase.course_id,
+                    valid_days=purchase.valid_days,
+                    organization_id=purchase.org_id,
+                )
+
+        # If this invoice settled an institutional bulk purchase request, update request status to paid
+        if invoice.source_type in ("inst_request", "institutional"):
+            from datetime import UTC
+            from app.models.institutional_request import InstitutionalPurchaseRequest
+
+            try:
+                req_pub_id = int(invoice.source_id)
+                inst_req = (
+                    await self.db.execute(
+                        select(InstitutionalPurchaseRequest).where(InstitutionalPurchaseRequest.public_id == req_pub_id)
+                    )
+                ).scalar_one_or_none()
+                if inst_req is not None and inst_req.status in ("quoted", "accepted"):
+                    inst_req.status = "paid"
+                    inst_req.payment_info = {
+                        "transaction_id": f"tx_inst_{new_public_id()}",
+                        "gateway_order_id": order_id,
+                        "gateway_payment_id": payment_id,
+                        "amount_paid_paise": payment.amount,
+                        "method": "gateway",
+                        "paid_at": utcnow().astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "verified": True,
+                    }
+                    inst_req.updated_at = utcnow()
+                    await self.db.flush()
+            except Exception:
+                pass
+
         await self.db.commit()
         return "paid"
 
     async def fail(self, order_id: str) -> str:
         found = await self._pending_payment(order_id)
-        if found is None or found[0].status != PaymentStatus.PENDING:
+        if found is None:
+            return await StudentSubscriptionService(self.db, self.settings, self.gateway).fail_by_order(
+                order_id, reason="Payment failed at gateway."
+            )
+        if found[0].status != PaymentStatus.PENDING:
             await self.db.commit()
             return "ignored"
         found[0].status = PaymentStatus.FAILED

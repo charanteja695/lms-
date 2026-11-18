@@ -17,7 +17,41 @@ from app.models.billing import (
 from app.models.outbox_event import OutboxEvent
 from app.models.processed_event import ProcessedEvent
 from app.models.refs import OrgRef
+from app.models.institutional_request import InstitutionalPurchaseRequest
+from app.models.institutional_pricing import CourseInstitutionalPricing, CoursePricingChangeAudit
+from app.models.student_subscription import (
+    PaymentSettings,
+    StudentPaymentAllocation,
+    StudentPaymentRequest,
+    StudentPaymentTransaction,
+    StudentSubscription,
+    StudentSubscriptionCourse,
+    SubscriptionPlan,
+)
 
 __all__ = [
-    "Base", "BillingProfile", "CoursePurchase", "CreditNote", "GatewayEvent", "Invoice", "InvoiceLine", "NumberCounter", "OrgPlan", "OrgRef", "OutboxEvent", "Payment", "PriceItem", "ProcessedEvent", "Quote",
+    "Base",
+    "BillingProfile",
+    "CourseInstitutionalPricing",
+    "CoursePurchase",
+    "CreditNote",
+    "GatewayEvent",
+    "InstitutionalPurchaseRequest",
+    "Invoice",
+    "InvoiceLine",
+    "NumberCounter",
+    "OrgPlan",
+    "OrgRef",
+    "OutboxEvent",
+    "Payment",
+    "PaymentSettings",
+    "PriceItem",
+    "ProcessedEvent",
+    "Quote",
+    "StudentPaymentAllocation",
+    "StudentPaymentRequest",
+    "StudentPaymentTransaction",
+    "StudentSubscription",
+    "StudentSubscriptionCourse",
+    "SubscriptionPlan",
 ]

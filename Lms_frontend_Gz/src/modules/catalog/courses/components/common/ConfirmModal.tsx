@@ -1,4 +1,4 @@
-import { Icon } from "@/shared/ui";
+import { Trash2, AlertCircle } from "lucide-react";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -22,35 +22,39 @@ export function ConfirmModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 p-6 space-y-4">
-        <div className="flex items-start gap-3.5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200 p-6 space-y-5">
+        <div className="flex items-start gap-4">
           <div
-            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-              tone === "danger" ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-[#00663C]"
+            className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+              tone === "danger"
+                ? "bg-rose-50 border border-rose-100 text-rose-600"
+                : "bg-indigo-50 border border-indigo-100 text-[#6366F1]"
             }`}
           >
-            <Icon name={tone === "danger" ? "trash" : "check"} size={20} />
+            {tone === "danger" ? <Trash2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
           </div>
           <div>
-            <h3 className="text-base font-bold text-[#0A1530]">{title}</h3>
+            <h3 className="text-base font-bold text-navy-950">{title}</h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">{description}</p>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+            className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer transition"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className={`px-4 py-2 rounded-xl text-xs font-bold text-white cursor-pointer shadow-xs ${
-              tone === "danger" ? "bg-rose-600 hover:bg-rose-700" : "bg-[#00663C] hover:bg-[#00522F]"
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white cursor-pointer shadow-xs transition ${
+              tone === "danger"
+                ? "bg-rose-600 hover:bg-rose-700"
+                : "bg-[#6366F1] hover:bg-[#4F46E5]"
             }`}
           >
             {confirmLabel}

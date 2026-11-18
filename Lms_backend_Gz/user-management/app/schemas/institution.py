@@ -171,12 +171,16 @@ class InstitutionOut(ResponseSchema):
     def from_model(cls, institution: Institution, counts: dict[str, int], actor: User | None = None) -> Self:
         admin = UserRef.of(institution.admin)
         assert admin is not None
-        assert institution.institution_type is not None  # null only for the Employer org_type, never here
+        raw_type = institution.institution_type or InstitutionType.COLLEGE.value
+        try:
+            itype = InstitutionType(raw_type)
+        except ValueError:
+            itype = InstitutionType.COLLEGE
         return cls(
             organization_id=institution.public_id,
             name=institution.name,
             code=institution.code,
-            type=InstitutionType(institution.institution_type),
+            type=itype,
             status=InstitutionStatus(institution.status),
             status_reason=institution.status_reason,
             contact=ContactOut(
@@ -228,12 +232,16 @@ class InstitutionListItem(ResponseSchema):
     def from_model(cls, institution: Institution, counts: dict[str, int], actor: User | None = None) -> Self:
         admin = UserRef.of(institution.admin)
         assert admin is not None
-        assert institution.institution_type is not None  # null only for the Employer org_type, never here
+        raw_type = institution.institution_type or InstitutionType.COLLEGE.value
+        try:
+            itype = InstitutionType(raw_type)
+        except ValueError:
+            itype = InstitutionType.COLLEGE
         return cls(
             organization_id=institution.public_id,
             name=institution.name,
             code=institution.code,
-            type=InstitutionType(institution.institution_type),
+            type=itype,
             status=InstitutionStatus(institution.status),
             city=institution.city,
             state=institution.state,

@@ -15,6 +15,8 @@ async def ensure_institution_access(user: User, institutions: InstitutionReposit
     """Organisation members (institutions and employers) may only act while their organisation is active."""
     if not policies.is_organization_scoped(user.role):
         return None
+    if user.role == "student" and user.institution_id is None:
+        return None
     institution = await institutions.get(user.institution_id) if user.institution_id else None
     return check_institution_active(user, institution)
 
@@ -22,6 +24,8 @@ async def ensure_institution_access(user: User, institutions: InstitutionReposit
 def check_institution_active(user: User, institution: Institution | None) -> Institution | None:
     """Same rule as ensure_institution_access, for an institution that is already loaded."""
     if not policies.is_organization_scoped(user.role):
+        return None
+    if user.role == "student" and user.institution_id is None:
         return None
     if institution is None or institution.deleted_at is not None or institution.status != InstitutionStatus.ACTIVE:
         raise PermissionDeniedError(

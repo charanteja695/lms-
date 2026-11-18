@@ -100,10 +100,9 @@ class PermissionService:
 
     async def effective_for(self, user: User) -> list[str]:
         role = Role(user.role)
-        individual = (
-            role == Role.STUDENT
-            and user.institution_id is not None
-            and (
+        individual = role == Role.STUDENT and (
+            user.institution_id is None
+            or (
                 await self.db.scalar(select(Institution.institution_type).where(Institution.id == user.institution_id))
             )
             == InstitutionType.INDIVIDUAL

@@ -1,7 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from lms_common.envelopes import PageContext, SortOrder
+from sqlalchemy import select
 
 from app.api.deps import (
     CurrentAuth,
@@ -12,13 +13,58 @@ from app.api.deps import (
     SubscriptionIdParam,
     ensure_organization_visible,
     institutions_listed,
+    require_seat_caller,
 )
 from app.api.responses import errors
+from app.core.exceptions import NotFoundError
+from app.core.time import utcnow
+from app.domain.enums import SubscriptionStatus
+from app.entitlements.cache import sync_entitlement
+from app.models.subscription import Subscription
 from app.schemas.common import ListQuery
 from app.schemas.subscription import CancelRequest, SubscriptionListResponse, SubscriptionOut, SubscriptionResponse
 from app.services.subscription_service import SubscriptionService
 
 router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
+
+
+@router.get(
+    "/internal/organizations/{organization_id}/courses/{course_id}/active",
+    summary="Get active subscription for an organization and course (internal)",
+    dependencies=[Depends(require_seat_caller)],
+)
+async def get_active_subscription_internal(
+    organization_id: int,
+    course_id: int,
+    db: DbSession,
+    settings: SettingsDep,
+    redis: RedisDep,
+) -> dict:
+    now = utcnow()
+    stmt = (
+        select(Subscription)
+        .where(
+            Subscription.organization_id == organization_id,
+            Subscription.course_id == course_id,
+            Subscription.status == SubscriptionStatus.ACTIVE,
+            Subscription.starts_at <= now,
+            Subscription.ends_at >= now,
+        )
+    )
+    sub = (await db.execute(stmt)).scalars().first()
+    if sub is None:
+        raise NotFoundError("No active subscription for this course and institution.", code="NO_ACTIVE_SUBSCRIPTION")
+
+    await sync_entitlement(redis, key_prefix=settings.ENTITLEMENT_KEY_PREFIX, subscription=sub)
+    return {
+        "subscription_id": sub.public_id,
+        "organization_id": sub.organization_id,
+        "course_id": sub.course_id,
+        "seats_total": sub.seats_total,
+        "seats_used": sub.seats_used,
+        "starts_at": sub.starts_at.isoformat(),
+        "ends_at": sub.ends_at.isoformat(),
+    }
 
 
 @router.get(

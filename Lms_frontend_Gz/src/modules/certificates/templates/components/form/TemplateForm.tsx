@@ -35,7 +35,7 @@ export function TemplateForm({ defaultValues, isEdit, submitting, formError, onS
             <TextField<TemplateFormValues> name="title_text" label="Title" required maxLength={120} className="sm:col-span-2" />
             <TextareaField<TemplateFormValues> name="body_text" label="Body" hint={PLACEHOLDER_HINT} rows={4} maxLength={1000} className="sm:col-span-2" />
             <TextareaField<TemplateFormValues> name="footer_text" label="Footer" hint={PLACEHOLDER_HINT} rows={2} maxLength={300} className="sm:col-span-2" />
-            <TextField<TemplateFormValues> name="accent_color" label="Accent colour" hint="A hex colour such as #00663C. Leave empty for the platform's brand colour." maxLength={7} />
+            <TextField<TemplateFormValues> name="accent_color" label="Accent colour" hint="A hex colour such as #6366F1. Leave empty for the platform's brand colour." maxLength={7} />
           </FormSection>
           <FormSection title="Signatories" description="Up to three people who sign the certificate.">
             <SignatoriesEditor />

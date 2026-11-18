@@ -105,7 +105,7 @@ export function ChapterTestPage() {
         <div className="pt-2">
           <Link
             to="/courses/my"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] transition-colors"
           >
             Back to My Courses
           </Link>
@@ -128,7 +128,7 @@ export function ChapterTestPage() {
         <div className="pt-2">
           <Link
             to="/courses/my"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] transition-colors"
           >
             Back to My Courses
           </Link>
@@ -155,7 +155,7 @@ export function ChapterTestPage() {
         <div className="pt-2">
           <Link
             to="/courses/my"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] transition-colors"
           >
             Back to My Courses
           </Link>
@@ -178,7 +178,7 @@ export function ChapterTestPage() {
         <div className="pt-2">
           <Link
             to={`/courses/${courseId}/learn`}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] transition-colors"
           >
             Back to Course Room
           </Link>
@@ -201,7 +201,7 @@ export function ChapterTestPage() {
         <div className="pt-2">
           <Link
             to={`/courses/${courseId}/learn`}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] transition-colors"
           >
             Back to Course Room
           </Link>
@@ -224,7 +224,7 @@ export function ChapterTestPage() {
         <div className="pt-2">
           <Link
             to={`/courses/${courseId}/learn`}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] transition-colors"
           >
             Continue Lessons
           </Link>

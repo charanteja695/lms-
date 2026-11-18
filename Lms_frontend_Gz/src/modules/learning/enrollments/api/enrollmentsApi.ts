@@ -30,6 +30,14 @@ export const enrollmentsApi = baseApi.injectEndpoints({
       transformResponse: (response: { enrollment: Enrollment }) => response.enrollment,
       invalidatesTags: ["EnrollmentList"],
     }),
+    selfEnrollCourse: build.mutation<Enrollment, { courseId: string }>({
+      query: ({ courseId }) => ({
+        url: `/enrollments/courses/${courseId}/self-enroll`,
+        method: "POST",
+      }),
+      transformResponse: (response: { enrollment: Enrollment }) => response.enrollment,
+      invalidatesTags: ["EnrollmentList"],
+    }),
     withdrawEnrollment: build.mutation<Enrollment, string>({
       query: (id) => ({ url: `/enrollments/${id}/withdraw`, method: "POST" }),
       transformResponse: (response: { enrollment: Enrollment }) => response.enrollment,
@@ -51,6 +59,7 @@ export const {
   useListEnrollmentsQuery,
   useGetEnrollmentQuery,
   useEnrollStudentMutation,
+  useSelfEnrollCourseMutation,
   useWithdrawEnrollmentMutation,
   useGetUnlockStateQuery,
   useCompleteItemMutation,

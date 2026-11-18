@@ -143,7 +143,7 @@ export function AIGeneratorPage() {
 
           <div className="space-y-3">
             <div className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50/50">
-              <span className="w-6 h-6 rounded-full bg-[#00663C] text-white flex items-center justify-center shrink-0">
+              <span className="w-6 h-6 rounded-full bg-[#6366F1] text-white flex items-center justify-center shrink-0">
                 <Icon name="check" size={13} />
               </span>
               <div className="min-w-0 flex-1">
@@ -155,7 +155,7 @@ export function AIGeneratorPage() {
             </div>
 
             <div className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50/50">
-              <span className="w-6 h-6 rounded-full bg-[#00663C] text-white flex items-center justify-center shrink-0">
+              <span className="w-6 h-6 rounded-full bg-[#6366F1] text-white flex items-center justify-center shrink-0">
                 <Icon name="check" size={13} />
               </span>
               <div className="min-w-0 flex-1">
@@ -187,7 +187,7 @@ export function AIGeneratorPage() {
             <select
               value={numQuestions}
               onChange={(e) => setNumQuestions(Number(e.target.value))}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 focus:border-[#00663C] focus:outline-none"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 focus:border-[#6366F1] focus:outline-none"
             >
               <option value={4}>4 questions</option>
               <option value={8}>8 questions</option>
@@ -207,7 +207,7 @@ export function AIGeneratorPage() {
                   className={cn(
                     "flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer",
                     difficulty === lvl
-                      ? "bg-white text-[#00663C] shadow-2xs font-bold"
+                      ? "bg-white text-[#6366F1] shadow-2xs font-bold"
                       : "text-slate-600 hover:text-slate-900"
                   )}
                 >
@@ -230,7 +230,7 @@ export function AIGeneratorPage() {
                     className={cn(
                       "flex items-center gap-2 p-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-left",
                       isSelected
-                        ? "border-[#00663C] bg-emerald-50/50 text-[#00663C]"
+                        ? "border-[#6366F1] bg-emerald-50/50 text-[#6366F1]"
                         : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
                     )}
                   >
@@ -238,7 +238,7 @@ export function AIGeneratorPage() {
                       className={cn(
                         "w-4 h-4 rounded flex items-center justify-center shrink-0 border",
                         isSelected
-                          ? "bg-[#00663C] border-[#00663C] text-white"
+                          ? "bg-[#6366F1] border-[#6366F1] text-white"
                           : "border-slate-300 bg-white"
                       )}
                     >
@@ -264,7 +264,7 @@ export function AIGeneratorPage() {
               type="button"
               disabled={isGenerating}
               onClick={handleGenerate}
-              className="px-5 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] disabled:opacity-50 cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+              className="px-5 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] disabled:opacity-50 cursor-pointer shadow-xs inline-flex items-center gap-1.5"
             >
               {isGenerating ? (
                 <>

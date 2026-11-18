@@ -628,7 +628,7 @@ export function QuestionReviewPage() {
                   "inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-colors",
                   hasPublishedSuccess
                     ? "bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-default"
-                    : "bg-[#00663C] text-white hover:bg-[#00522F] disabled:opacity-50 cursor-pointer"
+                    : "bg-[#6366F1] text-white hover:bg-[#4F46E5] disabled:opacity-50 cursor-pointer"
                 )}
               >
                 <Icon
@@ -705,11 +705,11 @@ export function QuestionReviewPage() {
       {hasPublishedSuccess && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#00663C] text-white flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-full bg-[#6366F1] text-white flex items-center justify-center shrink-0">
               <Icon name="check" size={16} />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-[#00663C]">Questions Published to Assessment Bank!</h4>
+              <h4 className="text-xs font-bold text-[#6366F1]">Questions Published to Assessment Bank!</h4>
               <p className="text-[11px] text-emerald-800">
                 Step 4 is complete. You can now configure the Final Exam in Step 5 using these questions.
               </p>
@@ -718,7 +718,7 @@ export function QuestionReviewPage() {
           <button
             type="button"
             onClick={() => navigate(`/courses/${courseId}?tab=final_exam&step=5`)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs"
           >
             <span>Continue to Step 5 (Final exam)</span>
             <Icon name="arrow-right" size={14} />
@@ -789,7 +789,7 @@ export function QuestionReviewPage() {
               <button
                 type="button"
                 onClick={handleApproveAll}
-                className="px-3.5 py-1.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs"
+                className="px-3.5 py-1.5 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs"
               >
                 Approve all
               </button>
@@ -827,7 +827,7 @@ export function QuestionReviewPage() {
                       <span
                         className={cn(
                           "px-2.5 py-0.5 rounded-full text-[11px] font-bold",
-                          isApproved ? "bg-[#E7F3EC] text-[#00663C]" : "bg-amber-100 text-amber-800"
+                          isApproved ? "bg-[#EEF2FF] text-[#6366F1]" : "bg-amber-100 text-amber-800"
                         )}
                       >
                         {isApproved ? "Approved" : "Pending review"}
@@ -850,14 +850,14 @@ export function QuestionReviewPage() {
                               className={cn(
                                 "flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-medium",
                                 isCorrect
-                                  ? "border-emerald-300 bg-emerald-50/50 text-[#00663C] font-semibold"
+                                  ? "border-emerald-300 bg-emerald-50/50 text-[#6366F1] font-semibold"
                                   : "border-slate-200 text-slate-700 bg-slate-50/30"
                               )}
                             >
                               <span
                                 className={cn(
                                   "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
-                                  isCorrect ? "bg-[#00663C] text-white" : "border border-slate-300 text-slate-500"
+                                  isCorrect ? "bg-[#6366F1] text-white" : "border border-slate-300 text-slate-500"
                                 )}
                               >
                                 {String.fromCharCode(65 + oIdx)}
@@ -917,7 +917,7 @@ export function QuestionReviewPage() {
                       <button
                         type="button"
                         onClick={() => handleApprove(q.id)}
-                        className="px-3.5 py-1.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+                        className="px-3.5 py-1.5 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs inline-flex items-center gap-1.5"
                       >
                         <Icon name="check" size={13} />
                         <span>Approve question</span>

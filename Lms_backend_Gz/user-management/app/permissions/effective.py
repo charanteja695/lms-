@@ -11,7 +11,9 @@ from app.permissions.features import BY_KEY, MENU, MODULES, PERMISSIONS, PLATFOR
 from app.permissions.pages import CELL_KEYS, MATRIX_ROLES, cell_defaults, implied, may_hold, without_orphans
 from app.permissions.roles import ADMIN_SCOPES, Role
 
-STORE_BUY = "store.buy"  # given by being a self-registered learner, never by a tick
+STORE_BUY = "store.buy"
+STUDENT_PAYMENT_REQUEST = "student.payment_request"
+INSTITUTION_PAYMENTS_MANAGE = "institution.payments.manage"
 
 
 def _apply(held: set[str], overrides: Mapping[str, bool], keep: Iterable[str] | None = None) -> set[str]:
@@ -44,8 +46,9 @@ def effective(
     """Role defaults + this person's grants − their removals, limited to what the role may hold.
 
     Matrix roles: the cells held (a page's other actions only while its View is held) plus the feature keys they
-    imply; an admin adds their platform scopes. A self-registered learner (``individual``) may also buy courses. A super admin gets every platform permission listed (and every
-    service treats them as holding everything).
+    imply; an admin adds their platform scopes. Students also hold store/subscription capabilities so they can
+    browse approved courses and manage their subscriptions. A super admin gets every platform permission listed
+    (and every service treats them as holding everything).
     """
     if role == Role.SUPER_ADMIN:
         return sorted(PLATFORM_KEYS)
@@ -54,8 +57,11 @@ def effective(
             {c for c in _apply(role_defaults(role, role_overrides), user_overrides, CELL_KEYS) if may_hold(c, role)}
         )
         extra = {s for s in admin_scopes if s in ADMIN_SCOPES} if role == Role.ADMIN else implied(cells)
-        if individual and role == Role.STUDENT:
-            extra.add(STORE_BUY)
+        if role == Role.STUDENT:
+            if individual:
+                extra.add(STORE_BUY)
+        elif role == Role.INSTITUTION_HEAD:
+            extra.add(INSTITUTION_PAYMENTS_MANAGE)
         return sorted(cells | extra)
     held = _apply(role_defaults(role, role_overrides), user_overrides)
     return sorted(k for k in held if k in BY_KEY and eligible(BY_KEY[k], role, organization_type))

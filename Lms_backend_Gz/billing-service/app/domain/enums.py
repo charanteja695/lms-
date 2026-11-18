@@ -19,6 +19,7 @@ class InvoiceKind(StrEnum):
     SUBSCRIPTION = "subscription"
     PLAN = "plan"
     COURSE = "course"  # an individual learner's course purchase
+    STUDENT_SUBSCRIPTION = "student_subscription"
 
 
 class PurchaseStatus(StrEnum):
@@ -51,3 +52,42 @@ class PlanStatus(StrEnum):
     ACTIVE = "active"
     EXPIRED = "expired"
     CANCELLED = "cancelled"
+
+
+class StudentSubStatus(StrEnum):
+    PENDING = "pending"
+    ACTIVE = "active"
+    EXPIRED = "expired"
+    SUPERSEDED = "superseded"
+    CANCELLED = "cancelled"
+    FAILED = "failed"
+
+
+class TxStatus(StrEnum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class TxActionType(StrEnum):
+    NEW = "new"
+    UPGRADE = "upgrade"
+    RENEW = "renew"
+    ADD_COURSE = "add_course"
+
+
+class PaymentRequestStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    PAYMENT_INITIATED = "payment_initiated"
+    PAID = "paid"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class PaymentScope(StrEnum):
+    INDEPENDENT_STUDENT = "independent_student"
+    INSTITUTION_SINGLE = "institution_single"
+    INSTITUTION_BULK = "institution_bulk"

@@ -19,6 +19,8 @@ from app.api.deps import (
     SettingsDep,
 )
 from app.api.responses import AUTHENTICATED, errors
+from lms_common.subscription_guard import check_student_course_entitlement
+
 from app.core.exceptions import ConflictError, PermissionDeniedError
 from app.domain.enums import CertificateStatus, PdfStatus
 from app.models.certificate import Certificate
@@ -101,6 +103,14 @@ async def issue_from_pass(
     payload = data.model_dump()
     if payload.get("score_percent") is not None and payload.get("percent") is None:
         payload["percent"] = payload["score_percent"]
+    entitled, err_code, err_msg = await check_student_course_entitlement(
+        user_id=data.student_user_id,
+        course_id=data.course_id,
+        require_certificate=True,
+        settings_db_url=settings.DATABASE_URL,
+    )
+    if not entitled:
+        raise PermissionDeniedError(err_msg or "Certificates not enabled on plan.", code=err_code or "PLAN_FEATURE_RESTRICTED")
     cert = await IssueService(db, settings).issue_from_pass(payload)
     if cert is None:
         existing = (

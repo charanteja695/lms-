@@ -7,7 +7,11 @@ import { useSubscriptionColumns } from "@/modules/subscriptions/subscriptions/co
 import type { SubscriptionFilters as Filters } from "@/modules/subscriptions/subscriptions/types";
 import { Button, Card, DataTable, EmptyState, PageHeader, Pagination } from "@/shared/ui";
 
-export function SubscriptionsListPage() {
+export interface SubscriptionsListPageProps {
+  embedded?: boolean;
+}
+
+export function SubscriptionsListPage({ embedded = false }: SubscriptionsListPageProps = {}) {
   const navigate = useNavigate();
   const { params, update, reset } = useListParams<Record<keyof Filters, string | undefined>>({ page: 1, per_page: 20 });
   const apiParams = params as Filters & { page: number; per_page: number };
@@ -17,7 +21,9 @@ export function SubscriptionsListPage() {
 
   return (
     <>
-      <PageHeader title="Subscriptions" description="Active, expired and cancelled course subscriptions." />
+      {!embedded && (
+        <PageHeader title="Subscriptions" description="Active, expired and cancelled course subscriptions." />
+      )}
       <Card bodyClassName="p-0">
         <SubscriptionFilters filters={apiParams} activeCount={activeCount} update={update} reset={reset} />
         {isError ? (

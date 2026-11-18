@@ -10,7 +10,7 @@ from app.core.exceptions import BadRequestError, NotFoundError
 from app.core.ids import new_public_id
 from app.db.session import commit_or_conflict
 from app.models.batch import Batch
-from app.schemas.batch import BatchCreate
+from app.schemas.batch import BatchCreate, BatchUpdate
 from app.schemas.common import ListQuery
 from app.services.course_structure_service import CourseStructureService
 from app.services.institution_ref_service import InstitutionRefService
@@ -64,3 +64,21 @@ class BatchService:
             stmt = stmt.where(Batch.status == query.status)
         stmt = stmt.order_by(Batch.created_at.desc() if query.sort_order == "desc" else Batch.created_at.asc())
         return await paginate(self.db, stmt, query.page, query.per_page)
+
+    async def update(self, batch_id: int, data: BatchUpdate) -> Batch:
+        batch = await self.get(batch_id)
+        if data.name is not None and data.name.strip():
+            batch.name = data.name.strip()
+        if data.status is not None and data.status.strip():
+            batch.status = data.status.strip().lower()
+        self.db.add(batch)
+        await commit_or_conflict(self.db)
+        return batch
+
+    async def delete(self, batch_id: int) -> Batch:
+        batch = await self.get(batch_id)
+        batch.status = "archived"
+        self.db.add(batch)
+        await commit_or_conflict(self.db)
+        return batch
+

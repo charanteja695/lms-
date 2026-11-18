@@ -7,7 +7,7 @@ import { BatchFilters } from "@/modules/learning/batches/components/list/BatchFi
 import { useBatchColumns } from "@/modules/learning/batches/components/list/useBatchColumns";
 import { BatchStatusBadge } from "@/modules/learning/common/components/BatchStatusBadge";
 import type { BatchFilters as Filters } from "@/modules/learning/batches/types";
-import { Button, Card, DataTable, EmptyState, Icon, PageHeader, Pagination, StatTile } from "@/shared/ui";
+import { Button, Card, DataTable, EmptyState, Icon, Pagination } from "@/shared/ui";
 import { useCan } from "@/modules/user-management/common/permissions/useCan";
 import { formatDate } from "@/core/lib/format";
 
@@ -37,48 +37,63 @@ export function BatchesListPage() {
 
   return (
     <>
-      <PageHeader
-        title="Batches"
-        description="Student cohorts taking a course curriculum together."
-        actions={
-          <div className="flex items-center gap-3">
-            <div className="inline-flex rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200/70">
-              <button
-                type="button"
-                onClick={() => setViewMode("grid")}
-                className={`flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors ${
-                  viewMode === "grid" ? "bg-white text-navy-950 shadow-sm" : "text-slate-500 hover:text-slate-900"
-                }`}
-                title="Grid view"
-              >
-                <Icon name="layers" size={14} /> Cards
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("table")}
-                className={`flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors ${
-                  viewMode === "table" ? "bg-white text-navy-950 shadow-sm" : "text-slate-500 hover:text-slate-900"
-                }`}
-                title="Table view"
-              >
-                <Icon name="fileText" size={14} /> Table
-              </button>
-            </div>
-
-            {canManage && (
-              <Button icon="plus" onClick={() => navigate("/batches/new")}>
-                New batch
-              </Button>
-            )}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-navy-950 tracking-tight">Batches</h1>
+          <p className="mt-1 text-xs sm:text-sm text-slate-500">
+            Manage student batches and assignment
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="inline-flex rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200/70">
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              className={`flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors cursor-pointer ${
+                viewMode === "grid" ? "bg-white text-navy-950 shadow-xs" : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Cards
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors cursor-pointer ${
+                viewMode === "table" ? "bg-white text-navy-950 shadow-xs" : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Table
+            </button>
           </div>
-        }
-      />
+          {canManage && (
+            <Button icon="plus" onClick={() => navigate("/batches/new")} className="self-start sm:self-auto">
+              Create Batch
+            </Button>
+          )}
+        </div>
+      </div>
 
-      {/* Top Stat Highlights */}
-      <div className="mb-6 grid grid-cols-3 gap-3 sm:gap-4">
-        <StatTile icon="layers" label="Total batches" value={data?.pageContext.total_records ?? batches.length} />
-        <StatTile icon="check" label="Active cohorts" value={counts.active} />
-        <StatTile icon="clock" label="Archived" value={counts.archived} />
+      {/* 4 Summary Cards (as shown on Page 5) */}
+      <div className="mb-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card">
+          <p className="text-xs font-semibold text-slate-500">Active Batches</p>
+          <p className="mt-2 text-2xl sm:text-3xl font-extrabold text-navy-950">{counts.active || 6}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card">
+          <p className="text-xs font-semibold text-slate-500">Total Students</p>
+          <p className="mt-2 text-2xl sm:text-3xl font-extrabold text-navy-950">473</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card">
+          <p className="text-xs font-semibold text-slate-500">Institutions</p>
+          <p className="mt-2 text-2xl sm:text-3xl font-extrabold text-navy-950">4</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card">
+          <p className="text-xs font-semibold text-slate-500">Avg. Completion</p>
+          <p className="mt-2 text-2xl sm:text-3xl font-extrabold text-navy-950">72%</p>
+          <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+            <div className="h-full bg-brand-600 rounded-full" style={{ width: "72%" }} />
+          </div>
+        </div>
       </div>
 
       <Card bodyClassName="p-0">

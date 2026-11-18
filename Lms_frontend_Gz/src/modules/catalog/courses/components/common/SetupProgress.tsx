@@ -32,7 +32,7 @@ export function SetupProgress({ steps, onStepClick, className }: SetupProgressPr
           className={cn(
             "text-xs font-bold px-2.5 py-1 rounded-full",
             doneCount === steps.length
-              ? "bg-[#E7F3EC] text-[#00663C]"
+              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
               : "bg-slate-100 text-slate-600"
           )}
         >
@@ -57,7 +57,7 @@ export function SetupProgress({ steps, onStepClick, className }: SetupProgressPr
               className={cn(
                 "relative flex flex-col gap-1.5 p-3 rounded-xl transition-all text-left border cursor-pointer",
                 isCurrent
-                  ? "bg-emerald-50/50 border-[#00663C]/40 ring-2 ring-[#00663C]/10"
+                  ? "bg-indigo-50/50 border-[#6366F1]/50 ring-2 ring-indigo-100"
                   : isDone
                   ? "bg-slate-50/70 border-slate-200 hover:bg-slate-100/70"
                   : "bg-white border-dashed border-slate-200 hover:border-slate-300",
@@ -69,9 +69,9 @@ export function SetupProgress({ steps, onStepClick, className }: SetupProgressPr
                   className={cn(
                     "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all shrink-0",
                     isDone
-                      ? "bg-[#00663C] text-white"
+                      ? "bg-emerald-600 text-white"
                       : isCurrent
-                      ? "border-2 border-[#00663C] text-[#00663C] bg-white ring-4 ring-[#E7F3EC]"
+                      ? "border-2 border-[#6366F1] text-[#6366F1] bg-white ring-4 ring-indigo-50"
                       : "border-2 border-slate-300 text-slate-400 bg-white"
                   )}
                 >
@@ -81,7 +81,7 @@ export function SetupProgress({ steps, onStepClick, className }: SetupProgressPr
                     step.id
                   )}
                 </div>
-                <b className="text-xs font-bold text-[#0A1530] truncate">{step.label}</b>
+                <b className="text-xs font-bold text-navy-950 truncate">{step.label}</b>
               </div>
               <p className="text-[11px] text-slate-500 pl-9 font-medium truncate">{step.sublabel}</p>
             </button>

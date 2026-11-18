@@ -45,3 +45,15 @@ async def reserve_seat(settings: Settings, subscription_id: int, reservation_key
 
 async def release_seat(settings: Settings, subscription_id: int, reservation_key: str) -> dict[str, Any]:
     return await _seat_call(settings, subscription_id, "release", reservation_key)
+
+
+async def get_active_subscription(settings: Settings, organization_id: int, course_id: int) -> dict[str, Any] | None:
+    url = f"{settings.SUBSCRIPTION_SERVICE_URL}/api/v1/subscriptions/internal/organizations/{organization_id}/courses/{course_id}/active"
+    try:
+        async with httpx.AsyncClient(timeout=settings.SUBSCRIPTION_SERVICE_TIMEOUT_SECONDS) as client:
+            response = await client.get(url, headers=_headers(settings))
+            if response.status_code == 200:
+                return response.json()
+            return None
+    except Exception:
+        return None

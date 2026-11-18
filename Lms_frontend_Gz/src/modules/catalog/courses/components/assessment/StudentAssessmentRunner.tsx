@@ -36,10 +36,11 @@ interface StudentAssessmentRunnerProps {
   courseId: string;
   courseTitle: string;
   contextTitle: string;
-  contextType: "chapter" | "module";
+  contextType: "chapter" | "module" | "final";
   parentModuleId?: string;
   passMarkPercent?: number;
   onTestPassed?: () => void;
+  onClose?: () => void;
   returnUrl?: string;
 }
 
@@ -53,11 +54,20 @@ export function StudentAssessmentRunner({
   parentModuleId,
   passMarkPercent = 70,
   onTestPassed,
+  onClose,
   returnUrl,
 }: StudentAssessmentRunnerProps) {
   const navigate = useNavigate();
   const notify = useNotify();
   const finalReturnUrl = returnUrl || `/courses/${courseId}/learn`;
+
+  const handleExit = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      navigate(finalReturnUrl);
+    }
+  };
 
   const [prepareAttempt, { isLoading: isPreparingAttempt }] = usePrepareAttemptMutation();
   const [startAttempt, { isLoading: isStartingAttempt }] = useStartAttemptMutation();
@@ -333,11 +343,11 @@ export function StudentAssessmentRunner({
       <div className="max-w-4xl mx-auto space-y-6 pb-12 pt-4">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-xs text-slate-500 font-medium pb-3 border-b border-slate-200">
-          <Link to="/courses/my" className="hover:text-[#00663C] transition-colors">
+          <Link to="/courses/my" className="hover:text-[#6366F1] transition-colors">
             Courses
           </Link>
           <span>/</span>
-          <Link to={finalReturnUrl} className="hover:text-[#00663C] transition-colors">
+          <Link to={finalReturnUrl} className="hover:text-[#6366F1] transition-colors">
             {courseTitle}
           </Link>
           <span>/</span>
@@ -359,13 +369,13 @@ export function StudentAssessmentRunner({
               type="button"
               disabled={isFetchingResult}
               onClick={() => loadAttemptResult(attemptId)}
-              className="px-5 py-2.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs transition-colors disabled:opacity-60"
+              className="px-5 py-2.5 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs transition-colors disabled:opacity-60"
             >
               {isFetchingResult ? "Checking..." : "Retry Result"}
             </button>
             <button
               type="button"
-              onClick={() => navigate(finalReturnUrl)}
+              onClick={handleExit}
               className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors"
             >
               Back to course
@@ -382,11 +392,11 @@ export function StudentAssessmentRunner({
       <div className="max-w-4xl mx-auto space-y-6 pb-12 pt-4">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-xs text-slate-500 font-medium pb-3 border-b border-slate-200">
-          <Link to="/courses/my" className="hover:text-[#00663C] transition-colors">
+          <Link to="/courses/my" className="hover:text-[#6366F1] transition-colors">
             Courses
           </Link>
           <span>/</span>
-          <Link to={finalReturnUrl} className="hover:text-[#00663C] transition-colors">
+          <Link to={finalReturnUrl} className="hover:text-[#6366F1] transition-colors">
             {courseTitle}
           </Link>
           <span>/</span>
@@ -414,8 +424,8 @@ export function StudentAssessmentRunner({
             </button>
             <button
               type="button"
-              onClick={() => navigate(finalReturnUrl)}
-              className="px-5 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs transition-colors"
+              onClick={handleExit}
+              className="px-5 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs transition-colors"
             >
               Back to course
             </button>
@@ -431,11 +441,11 @@ export function StudentAssessmentRunner({
       <div className="max-w-4xl mx-auto space-y-6 pb-12 pt-4">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-xs text-slate-500 font-medium pb-3 border-b border-slate-200">
-          <Link to="/courses/my" className="hover:text-[#00663C] transition-colors">
+          <Link to="/courses/my" className="hover:text-[#6366F1] transition-colors">
             Courses
           </Link>
           <span>/</span>
-          <Link to={finalReturnUrl} className="hover:text-[#00663C] transition-colors">
+          <Link to={finalReturnUrl} className="hover:text-[#6366F1] transition-colors">
             {courseTitle}
           </Link>
           <span>/</span>
@@ -455,8 +465,8 @@ export function StudentAssessmentRunner({
           </div>
           <button
             type="button"
-            onClick={() => navigate(finalReturnUrl)}
-            className="px-5 py-2.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs transition-colors"
+            onClick={handleExit}
+            className="px-5 py-2.5 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs transition-colors"
           >
             Back to course
           </button>
@@ -489,11 +499,11 @@ export function StudentAssessmentRunner({
         <div className="space-y-1">
           {/* Breadcrumb: Courses / Course Name / Context Name */}
           <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-            <Link to="/courses/my" className="hover:text-[#00663C] transition-colors">
+            <Link to="/courses/my" className="hover:text-[#6366F1] transition-colors">
               Courses
             </Link>
             <span>/</span>
-            <Link to={finalReturnUrl} className="hover:text-[#00663C] transition-colors truncate max-w-xs">
+            <Link to={finalReturnUrl} className="hover:text-[#6366F1] transition-colors truncate max-w-xs">
               {courseTitle}
             </Link>
             <span>/</span>
@@ -527,7 +537,7 @@ export function StudentAssessmentRunner({
               "inline-flex items-center gap-2 font-mono font-bold text-sm px-4 py-1.5 rounded-full border shadow-2xs transition-colors",
               isTimeCritical
                 ? "bg-rose-50 text-rose-700 border-rose-300 animate-pulse"
-                : "bg-emerald-50 text-[#00663C] border-emerald-200"
+                : "bg-emerald-50 text-[#6366F1] border-emerald-200"
             )}
           >
             <Icon name="clock" size={16} />
@@ -543,7 +553,7 @@ export function StudentAssessmentRunner({
         </b>
         <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
           <div
-            className="h-full bg-[#00663C] rounded-full transition-all duration-300"
+            className="h-full bg-[#6366F1] rounded-full transition-all duration-300"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -556,7 +566,7 @@ export function StudentAssessmentRunner({
           <div
             className={cn(
               "w-16 h-16 rounded-2xl flex items-center justify-center mx-auto shadow-xs",
-              testResult.passed ? "bg-emerald-50 text-[#00663C]" : "bg-rose-50 text-rose-600"
+              testResult.passed ? "bg-emerald-50 text-[#6366F1]" : "bg-rose-50 text-rose-600"
             )}
           >
             <Icon name={testResult.passed ? "award" : "alertTriangle"} size={32} />
@@ -565,7 +575,7 @@ export function StudentAssessmentRunner({
           <div>
             <h3 className="text-xl font-bold text-[#0A1530]">
               {testResult.passed
-                ? `${contextType === "chapter" ? "Chapter" : "Module"} Test Passed!`
+                ? `${contextType === "chapter" ? "Chapter" : contextType === "final" ? "Final Certification Exam" : "Module"} Test Passed!`
                 : "Assessment Not Passed"}
             </h3>
             <p className="text-xs text-slate-500 mt-1.5">
@@ -576,8 +586,8 @@ export function StudentAssessmentRunner({
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => navigate(finalReturnUrl)}
-              className="flex-1 py-2.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs"
+              onClick={handleExit}
+              className="flex-1 py-2.5 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs"
             >
               Back to course
             </button>
@@ -627,14 +637,14 @@ export function StudentAssessmentRunner({
                       className={cn(
                         "flex items-center gap-3.5 p-3.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all",
                         isSelected
-                          ? "border-[#00663C] bg-[#E7F3EC] text-[#0A1530] shadow-2xs font-bold"
+                          ? "border-[#6366F1] bg-[#EEF2FF] text-[#0A1530] shadow-2xs font-bold"
                           : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50/70"
                       )}
                     >
                       <span
                         className={cn(
                           "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
-                          isSelected ? "border-[#00663C] bg-[#00663C]" : "border-slate-300"
+                          isSelected ? "border-[#6366F1] bg-[#6366F1]" : "border-slate-300"
                         )}
                       >
                         {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -675,7 +685,7 @@ export function StudentAssessmentRunner({
                   <button
                     type="button"
                     onClick={handleNext}
-                    className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs transition-colors"
+                    className="px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs transition-colors"
                   >
                     Next
                   </button>
@@ -683,7 +693,7 @@ export function StudentAssessmentRunner({
                   <button
                     type="button"
                     onClick={() => setIsConfirmSubmitOpen(true)}
-                    className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs transition-colors"
+                    className="px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs transition-colors"
                   >
                     Submit test
                   </button>
@@ -710,11 +720,11 @@ export function StudentAssessmentRunner({
                     onClick={() => setCurrentIndex(idx)}
                     className={cn(
                       "aspect-square rounded-xl text-xs font-bold flex items-center justify-center transition-all cursor-pointer relative",
-                      isCurrent && "ring-2 ring-[#00663C] ring-offset-2",
+                      isCurrent && "ring-2 ring-[#6366F1] ring-offset-2",
                       isFlagged
                         ? "bg-[#FEF1D6] text-[#9A5B00] border border-[#9A5B00]"
                         : isAnswered
-                        ? "bg-[#A5D5BC] text-[#00522F] border border-[#A5D5BC]"
+                        ? "bg-[#C7D2FE] text-[#4F46E5] border border-[#C7D2FE]"
                         : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
                     )}
                   >
@@ -730,11 +740,11 @@ export function StudentAssessmentRunner({
             {/* Design Legend */}
             <div className="flex flex-wrap items-center gap-3 pt-2 text-[11px] text-slate-500 border-t border-slate-100">
               <span className="inline-flex items-center gap-1.5">
-                <i className="w-2.5 h-2.5 rounded-xs bg-[#00663C]" />
+                <i className="w-2.5 h-2.5 rounded-xs bg-[#6366F1]" />
                 Current
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <i className="w-2.5 h-2.5 rounded-xs bg-[#A5D5BC]" />
+                <i className="w-2.5 h-2.5 rounded-xs bg-[#C7D2FE]" />
                 Answered
               </span>
               <span className="inline-flex items-center gap-1.5">
@@ -749,7 +759,7 @@ export function StudentAssessmentRunner({
               type="button"
               onClick={() => setIsConfirmSubmitOpen(true)}
               disabled={isSubmittingAttempt}
-              className="w-full py-2.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] disabled:opacity-50 cursor-pointer shadow-xs transition-colors"
+              className="w-full py-2.5 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] disabled:opacity-50 cursor-pointer shadow-xs transition-colors"
             >
               {isSubmittingAttempt ? "Submitting..." : "Submit test"}
             </button>
@@ -763,7 +773,7 @@ export function StudentAssessmentRunner({
         onClose={() => setIsExitModalOpen(false)}
         onConfirm={() => {
           setIsExitModalOpen(false);
-          navigate(finalReturnUrl);
+          handleExit();
         }}
         title="Leave this test?"
         description="Leave this test? Your answers are saved and you can resume while the timer is running."

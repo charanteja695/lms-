@@ -73,3 +73,38 @@ class CatalogCleanupSummaryResponse(SuccessResponse):
     draft_courses_count: int
     total_modules_count: int
     total_chapters_count: int
+
+
+class BrowsePlanPreviewOut(ResponseSchema):
+    plan_id: str
+    code: str
+    name: str
+    price_paise: int
+    billing_duration_days: int
+    billing_label: str
+    max_courses: int | None = None
+    is_recommended: bool = False
+
+
+class CourseBrowseOut(ResponseSchema):
+    course_id: PublicIdOut = Field(validation_alias="public_id")
+    title: str
+    slug: str
+    summary: str
+    thumbnail_media_id: PublicIdOut | None = None
+    instructor_name: str | None = None
+    modules_count: int = 0
+    chapters_count: int = 0
+    duration_seconds: int = 0
+    duration_label: str = "Self-paced"
+    latest_published_version_id: PublicIdOut | None = None
+    access_status: str = "available"  # enrolled | active_plan | eligible_under_plan | available | payments_disabled
+    active_plan_name: str | None = None
+    min_price_paise: int | None = None
+    payments_enabled: bool = True
+    plans_preview: list[BrowsePlanPreviewOut] = Field(default_factory=list)
+
+
+class CourseBrowseListResponse(SuccessResponse):
+    courses: list[CourseBrowseOut]
+    page_context: PageContext

@@ -6,6 +6,10 @@ export interface ParsedCourseSummary {
   duration: string;
   passPercentage: string;
   cleanDescription: string;
+  category: string;
+  instructor: string;
+  learningOutcomes: string[];
+  prerequisites: string[];
 }
 
 export function parseCourseSummary(summary?: string | null): ParsedCourseSummary {
@@ -15,6 +19,10 @@ export function parseCourseSummary(summary?: string | null): ParsedCourseSummary
       duration: "0h",
       passPercentage: "70%",
       cleanDescription: "",
+      category: "Technology",
+      instructor: "Staff Instructor",
+      learningOutcomes: [],
+      prerequisites: [],
     };
   }
 
@@ -31,13 +39,38 @@ export function parseCourseSummary(summary?: string | null): ParsedCourseSummary
   const passMatch = summary.match(/\[Pass:\s*([0-9]+%?)\]/i);
   const passPercentage = passMatch && passMatch[1] ? passMatch[1] : "70%";
 
+  const catMatch = summary.match(/\[Category:\s*([^\]]+)\]/i);
+  const category = catMatch && catMatch[1] ? catMatch[1].trim() : "Technology";
+
+  const instMatch = summary.match(/\[Instructor:\s*([^\]]+)\]/i);
+  const instructor = instMatch && instMatch[1] ? instMatch[1].trim() : "Staff Instructor";
+
   const cleanDescription = summary
     .replace(/\[(?:Beginner|Intermediate|Advanced)\]/gi, "")
     .replace(/\[[0-9]+\s*(?:hours|hour|h|min|minutes)\]/gi, "")
     .replace(/\[Pass:\s*[0-9]+%?\]/gi, "")
+    .replace(/\[Category:\s*[^\]]+\]/gi, "")
+    .replace(/\[Instructor:\s*[^\]]+\]/gi, "")
     .trim();
 
-  return { level, duration, passPercentage, cleanDescription };
+  return {
+    level,
+    duration,
+    passPercentage,
+    cleanDescription,
+    category,
+    instructor,
+    learningOutcomes: [
+      "Master the core fundamental and advanced concepts",
+      "Hands-on exercises and real-world project assignments",
+      "Pass chapter checkpoints and end-of-module tests",
+      "Qualify for verified graduation certificate",
+    ],
+    prerequisites: [
+      "Basic computer literacy and internet access",
+      "Curiosity and willingness to complete hands-on labs",
+    ],
+  };
 }
 
 export interface CourseMetrics {
@@ -102,13 +135,8 @@ export function computeCourseStepsStatus(
     const topics = m.topics ?? [];
     totalChapters += topics.length;
   }
-  // At least 1 chapter exists
   const step3Done = totalChapters >= 1;
-
-  // Step 4: Questions approved
   const step4Done = Boolean(hasApprovedQuestions);
-
-  // Step 5: Final exam configured
   const step5Done = Boolean(versionDetail?.rule?.final_test_id);
 
   const missingStepsText: string[] = [];

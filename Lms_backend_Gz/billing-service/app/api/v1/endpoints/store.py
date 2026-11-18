@@ -71,3 +71,14 @@ async def confirm(purchase_id: PurchaseIdPath, body: ConfirmPaymentRequest, auth
     )
     message = "Payment received: your course is open." if purchase.status == "paid" else "Payment is being confirmed."
     return CoursePurchaseResponse(message=message, purchase=_purchase(purchase, invoice))
+
+
+@router.post(
+    "/courses/{course_id}/test-buy-and-confirm", response_model=CoursePurchaseResponse, summary="Test purchase and immediate activation",
+    responses=errors(*AUTHENTICATED, 400, 404), dependencies=[WriteRateLimit],
+)
+async def test_buy_and_confirm(course_id: CourseIdPath, body: BuyRequest, auth: RequireLearner, db: DbSession, settings: SettingsDep, gateway: PaymentGatewayDep) -> CoursePurchaseResponse:  # type: ignore[valid-type]
+    service = StoreService(db, settings, gateway)
+    purchase, invoice = await service.test_buy_and_confirm(auth, course_id, name=body.name, email=body.email)
+    return CoursePurchaseResponse(message="Payment verified: course is open.", purchase=_purchase(purchase, invoice))
+

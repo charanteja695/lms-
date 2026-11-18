@@ -45,7 +45,7 @@ export function WorkspaceGrid() {
             </h2>
             <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {entries.map((item) => (
-                <li key={item.to} className="relative group">
+                <li key={`${item.to}-${item.label}`} className="relative group">
                   {/* Kokonut / Backlit UI ambient radiant glow on hover */}
                   <div
                     className={cn(

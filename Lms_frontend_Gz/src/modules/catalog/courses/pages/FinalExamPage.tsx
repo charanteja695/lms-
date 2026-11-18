@@ -694,7 +694,7 @@ export function FinalExamPage() {
               <button
                 type="button"
                 onClick={() => navigate("/courses/my")}
-                className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer"
               >
                 My Courses
               </button>
@@ -728,7 +728,7 @@ export function FinalExamPage() {
               <button
                 type="button"
                 onClick={() => navigate("/courses/my")}
-                className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer"
               >
                 My Courses
               </button>
@@ -765,7 +765,7 @@ export function FinalExamPage() {
               <button
                 type="button"
                 onClick={() => navigate("/courses/my")}
-                className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer"
               >
                 My Courses
               </button>
@@ -814,7 +814,7 @@ export function FinalExamPage() {
               <button
                 type="button"
                 onClick={() => navigate(`/courses/${courseId}/learn`)}
-                className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer"
               >
                 Back to Course
               </button>
@@ -873,7 +873,7 @@ export function FinalExamPage() {
                 {courseTitle} · Comprehensive Proctored Assessment
               </p>
             </div>
-            <span className="px-3 py-1 rounded-full bg-[#E7F3EC] text-[#00663C] text-xs font-bold flex items-center gap-1.5 border border-[#A5D5BC]">
+            <span className="px-3 py-1 rounded-full bg-[#EEF2FF] text-[#6366F1] text-xs font-bold flex items-center gap-1.5 border border-[#C7D2FE]">
               <Shield className="w-3.5 h-3.5" />
               Proctor Guard Active · {maxWarnings} Allowed Warnings
             </span>
@@ -882,19 +882,19 @@ export function FinalExamPage() {
           <div className="p-6 rounded-2xl border border-[#E4EAE7] bg-white space-y-6 shadow-2xs">
             {/* 3 Step Progress Bar */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-b border-[#E4EAE7] pb-6">
-              <div className="p-3 rounded-xl bg-[#E7F3EC] text-[#00663C] flex items-center gap-2 text-xs">
+              <div className="p-3 rounded-xl bg-[#EEF2FF] text-[#6366F1] flex items-center gap-2 text-xs">
                 <Check className="w-4 h-4 stroke-[3]" />
                 <div>
                   <b className="block text-[#0A1530]">1. Rules & Malpractice</b>
-                  <span className="text-[11px] text-[#00663C]">Configured ({maxWarnings} warnings)</span>
+                  <span className="text-[11px] text-[#6366F1]">Configured ({maxWarnings} warnings)</span>
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-[#E7F3EC] text-[#00663C] flex items-center gap-2 text-xs">
+              <div className="p-3 rounded-xl bg-[#EEF2FF] text-[#6366F1] flex items-center gap-2 text-xs">
                 <Check className="w-4 h-4 stroke-[3]" />
                 <div>
                   <b className="block text-[#0A1530]">2. Device check</b>
-                  <span className="text-[11px] text-[#00663C]">Camera & mic verified</span>
+                  <span className="text-[11px] text-[#6366F1]">Camera & mic verified</span>
                 </div>
               </div>
 
@@ -936,16 +936,16 @@ export function FinalExamPage() {
 
                 {/* Device Status checklist */}
                 <div className="p-4 rounded-xl bg-[#F8FAF9] border border-[#E4EAE7] space-y-2.5 text-xs">
-                  <div className="flex items-center gap-2 text-[#00663C] font-semibold">
-                    <CheckCircle className="w-4 h-4 text-[#00663C]" />
+                  <div className="flex items-center gap-2 text-[#6366F1] font-semibold">
+                    <CheckCircle className="w-4 h-4 text-[#6366F1]" />
                     <span>Camera ready — continuous webcam monitoring will be active</span>
                   </div>
-                  <div className="flex items-center gap-2 text-[#00663C] font-semibold">
-                    <CheckCircle className="w-4 h-4 text-[#00663C]" />
+                  <div className="flex items-center gap-2 text-[#6366F1] font-semibold">
+                    <CheckCircle className="w-4 h-4 text-[#6366F1]" />
                     <span>Microphone calibrated — environmental audio monitoring enabled</span>
                   </div>
-                  <div className="flex items-center gap-2 text-[#00663C] font-semibold">
-                    <CheckCircle className="w-4 h-4 text-[#00663C]" />
+                  <div className="flex items-center gap-2 text-[#6366F1] font-semibold">
+                    <CheckCircle className="w-4 h-4 text-[#6366F1]" />
                     <span>Browser fullscreen lockdown initialized</span>
                   </div>
                   <div className="flex items-center gap-2 text-[#9A5B00] font-semibold">
@@ -968,7 +968,7 @@ export function FinalExamPage() {
                     type="checkbox"
                     checked={hasAgreedConsent}
                     onChange={(e) => setHasAgreedConsent(e.target.checked)}
-                    className="w-4 h-4 mt-0.5 accent-[#00663C] rounded cursor-pointer"
+                    className="w-4 h-4 mt-0.5 accent-[#6366F1] rounded cursor-pointer"
                   />
                   <span className="text-xs text-[#0A1530] font-medium leading-relaxed">
                     I agree to continuous webcam monitoring, acknowledge the {maxWarnings}-warning limit, and agree to enter and stay in full screen during this examination.
@@ -981,7 +981,7 @@ export function FinalExamPage() {
                   id="startexam"
                   disabled={!hasAgreedConsent || isStartingAttempt}
                   onClick={handleStartExam}
-                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#00663C] hover:bg-[#00522F] disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all"
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#6366F1] hover:bg-[#4F46E5] disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all"
                 >
                   <Maximize2 className="w-4 h-4" />
                   <span>{isStartingAttempt ? "Preparing Exam..." : "Start certification exam & Enter Fullscreen"}</span>
@@ -992,7 +992,7 @@ export function FinalExamPage() {
               {/* Right: Live Camera Preview Box */}
               <div className="md:col-span-5 flex flex-col items-center">
                 <span className="text-xs font-bold text-[#0A1530] mb-2 self-start flex items-center gap-1.5">
-                  <Camera className="w-4 h-4 text-[#00663C]" />
+                  <Camera className="w-4 h-4 text-[#6366F1]" />
                   Live Proctor Camera Preview
                 </span>
 
@@ -1077,7 +1077,7 @@ export function FinalExamPage() {
               <button
                 type="button"
                 onClick={() => navigate("/certificates/issued")}
-                className="px-5 py-2.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs"
+                className="px-5 py-2.5 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs"
               >
                 View Certificate
               </button>
@@ -1091,7 +1091,7 @@ export function FinalExamPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl border border-slate-200 bg-white shadow-2xs">
             <div className="flex items-center gap-3">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-              <b className="text-xs font-bold text-[#00663C]">PROCTORING ACTIVE</b>
+              <b className="text-xs font-bold text-[#6366F1]">PROCTORING ACTIVE</b>
               <span className="text-xs text-slate-400">|</span>
               <span className="text-xs text-slate-600 font-semibold">{courseTitle}</span>
             </div>
@@ -1175,14 +1175,14 @@ export function FinalExamPage() {
                             className={cn(
                               "w-full text-left p-3.5 rounded-xl border text-xs font-medium transition-all flex items-center gap-3 cursor-pointer",
                               isSelected
-                                ? "border-[#00663C] bg-[#E7F3EC] text-[#00663C] font-semibold shadow-2xs"
+                                ? "border-[#6366F1] bg-[#EEF2FF] text-[#6366F1] font-semibold shadow-2xs"
                                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                             )}
                           >
                             <span
                               className={cn(
                                 "w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-bold shrink-0",
-                                isSelected ? "border-[#00663C] bg-[#00663C] text-white" : "border-slate-300 text-slate-500"
+                                isSelected ? "border-[#6366F1] bg-[#6366F1] text-white" : "border-slate-300 text-slate-500"
                               )}
                             >
                               {String.fromCharCode(65 + oIdx)}
@@ -1198,7 +1198,7 @@ export function FinalExamPage() {
                           value={answers[currentQ.question_id] || ""}
                           onChange={(e) => handleSelectOption(e.target.value)}
                           placeholder="Type your response here. Answers are autosaved to the server."
-                          className="w-full rounded-xl border border-slate-300 p-3 text-xs text-slate-800 focus:outline-none focus:border-[#00663C]"
+                          className="w-full rounded-xl border border-slate-300 p-3 text-xs text-slate-800 focus:outline-none focus:border-[#6366F1]"
                         />
                       </div>
                     )}
@@ -1221,7 +1221,7 @@ export function FinalExamPage() {
                         <button
                           type="button"
                           onClick={() => setIsConfirmSubmitOpen(true)}
-                          className="px-5 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs"
+                          className="px-5 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs"
                         >
                           Submit Examination
                         </button>
@@ -1229,7 +1229,7 @@ export function FinalExamPage() {
                         <button
                           type="button"
                           onClick={() => setCurrentIndex((prev) => Math.min(questions.length - 1, prev + 1))}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer"
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer"
                         >
                           Next
                           <ArrowRight className="w-3.5 h-3.5" />
@@ -1246,7 +1246,7 @@ export function FinalExamPage() {
               {/* Docked Live Camera Stream with AI Scanner */}
               <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs space-y-2">
                 <span className="text-xs font-bold text-[#0A1530] flex items-center gap-1.5">
-                  <Camera className="w-3.5 h-3.5 text-[#00663C]" />
+                  <Camera className="w-3.5 h-3.5 text-[#6366F1]" />
                   Active Proctor Feed
                 </span>
                 <div className="flex justify-center">
@@ -1284,11 +1284,11 @@ export function FinalExamPage() {
                         onClick={() => setCurrentIndex(idx)}
                         className={cn(
                           "w-8 h-8 rounded-lg text-xs font-bold flex items-center justify-center transition-all cursor-pointer border",
-                          isCurrent && "ring-2 ring-[#00663C] ring-offset-1",
+                          isCurrent && "ring-2 ring-[#6366F1] ring-offset-1",
                           isMarked
                             ? "bg-amber-100 border-amber-300 text-amber-800"
                             : isAnswered
-                            ? "bg-[#00663C] border-[#00663C] text-white"
+                            ? "bg-[#6366F1] border-[#6366F1] text-white"
                             : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
                         )}
                       >

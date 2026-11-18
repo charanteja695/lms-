@@ -43,7 +43,7 @@ export function CourseCreationStepper({
     <div className={cn("rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs", className)}>
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#00663C]" />
+          <span className="w-2 h-2 rounded-full bg-[#6366F1]" />
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Course Creation Flow</h3>
         </div>
         <span className="text-xs text-slate-500 font-semibold">
@@ -66,7 +66,7 @@ export function CourseCreationStepper({
               className={cn(
                 "flex flex-col text-left p-2.5 rounded-xl transition-all border text-xs cursor-pointer",
                 isCurrent
-                  ? "bg-emerald-50/80 border-[#00663C] ring-2 ring-[#00663C]/10 shadow-2xs"
+                  ? "bg-indigo-50/80 border-[#6366F1] ring-2 ring-indigo-100 shadow-2xs"
                   : isDone
                   ? "bg-slate-50/70 border-slate-200 hover:bg-slate-100/70"
                   : "bg-white border-dashed border-slate-200 text-slate-400 hover:border-slate-300",
@@ -78,9 +78,9 @@ export function CourseCreationStepper({
                   className={cn(
                     "w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 transition-colors",
                     isDone
-                      ? "bg-[#00663C] text-white"
+                      ? "bg-emerald-600 text-white"
                       : isCurrent
-                      ? "bg-white border-2 border-[#00663C] text-[#00663C]"
+                      ? "bg-white border-2 border-[#6366F1] text-[#6366F1]"
                       : "bg-slate-100 text-slate-400 border border-slate-200"
                   )}
                 >
@@ -94,7 +94,7 @@ export function CourseCreationStepper({
                   className={cn(
                     "font-bold truncate text-xs",
                     isCurrent
-                      ? "text-[#00663C]"
+                      ? "text-[#6366F1]"
                       : isDone
                       ? "text-slate-800"
                       : "text-slate-500"

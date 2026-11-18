@@ -83,7 +83,7 @@ export function AdminVideoPreviewModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#00663C] border border-emerald-200 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-[#6366F1] border border-indigo-200 flex items-center justify-center shrink-0">
               <Play size={17} className="fill-current ml-0.5" />
             </div>
             <div className="min-w-0">
@@ -91,7 +91,7 @@ export function AdminVideoPreviewModal({
                 <h3 className="text-sm font-bold text-slate-900 truncate">
                   {chapterTitle || "Chapter Video Preview"}
                 </h3>
-                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-[#00663C] shrink-0">
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 text-[#6366F1] shrink-0">
                   Video Preview
                 </span>
               </div>
@@ -131,7 +131,7 @@ export function AdminVideoPreviewModal({
                 <button
                   type="button"
                   onClick={handleRetry}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs transition-colors"
                 >
                   <RefreshCw size={13} />
                   <span>Retry Stream</span>

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 
 import { formatDate } from "@/core/lib/format";
 import { BatchStatusBadge } from "@/modules/learning/common/components/BatchStatusBadge";
@@ -27,6 +28,19 @@ export function useBatchColumns() {
         : []),
       { key: "status", header: "Status", render: (item) => <BatchStatusBadge status={item.status} /> },
       { key: "created", header: "Created", hideOnMobile: true, render: (item) => formatDate(item.created_at.slice(0, 10)) },
+      {
+        key: "actions",
+        header: "Actions",
+        render: (item) => (
+          <Link
+            to={`/batches/${item.batch_id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-800"
+          >
+            Manage Roster →
+          </Link>
+        ),
+      },
     ],
     [showInstitution],
   );

@@ -20,7 +20,7 @@ from app.api.deps import (
 from app.api.responses import errors
 from app.core.exceptions import BadRequestError, PermissionDeniedError
 from app.core.security import AccessTokenClaims
-from app.schemas.batch import BatchCreate, BatchListResponse, BatchOut, BatchResponse
+from app.schemas.batch import BatchCreate, BatchListResponse, BatchOut, BatchResponse, BatchUpdate
 from app.schemas.common import ListQuery
 from app.services.batch_service import BatchService
 from app.services.enrollment_service import EnrollmentService
@@ -71,3 +71,20 @@ async def get_batch(batch_id: BatchIdParam, auth: CurrentAuth, db: DbSession, se
     if not (auth.has_scope(STUDY) and await EnrollmentService(db, settings).is_enrolled(batch, auth.user_id)):
         ensure_organization_visible(auth, batch.organization_id)
     return BatchResponse(message="Batch retrieved successfully.", batch=BatchOut.model_validate(batch))
+
+
+@router.patch("/{batch_id}", response_model=BatchResponse, summary="Update a batch", responses=errors(400, 401, 403, 404))
+async def update_batch(batch_id: BatchIdParam, data: BatchUpdate, auth: RequireBatchCreate, db: DbSession, settings: SettingsDep, redis: RedisDep) -> BatchResponse:
+    batch = await BatchService(db, settings, redis).get(batch_id)
+    ensure_organization_visible(auth, batch.organization_id)
+    updated = await BatchService(db, settings, redis).update(batch_id, data)
+    return BatchResponse(message="Batch updated successfully.", batch=BatchOut.model_validate(updated))
+
+
+@router.delete("/{batch_id}", response_model=BatchResponse, summary="Archive or delete a batch", responses=errors(401, 403, 404))
+async def delete_batch(batch_id: BatchIdParam, auth: RequireBatchCreate, db: DbSession, settings: SettingsDep, redis: RedisDep) -> BatchResponse:
+    batch = await BatchService(db, settings, redis).get(batch_id)
+    ensure_organization_visible(auth, batch.organization_id)
+    archived = await BatchService(db, settings, redis).delete(batch_id)
+    return BatchResponse(message="Batch archived successfully.", batch=BatchOut.model_validate(archived))
+

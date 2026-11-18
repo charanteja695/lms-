@@ -252,7 +252,7 @@ export function AdminPdfPreviewModal({
               type="button"
               onClick={handleDownload}
               disabled={!blobUrl || isLoading || Boolean(error)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs transition-colors"
               title="Download PDF"
             >
               <Download size={14} />
@@ -295,7 +295,7 @@ export function AdminPdfPreviewModal({
                 <button
                   type="button"
                   onClick={loadPdf}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#6366F1] text-xs font-bold text-white hover:bg-[#4F46E5] cursor-pointer shadow-xs transition-colors"
                 >
                   <RefreshCw size={13} />
                   <span>Retry Loading</span>

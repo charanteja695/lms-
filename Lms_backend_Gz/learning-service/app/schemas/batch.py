@@ -16,6 +16,11 @@ class BatchCreate(RequestSchema):
     )
 
 
+class BatchUpdate(RequestSchema):
+    name: str | None = Field(default=None, min_length=3, max_length=200)
+    status: str | None = Field(default=None, description="active, archived, completed")
+
+
 class BatchOut(ResponseSchema):
     batch_id: PublicIdOut = Field(validation_alias="public_id")
     organization_id: PublicIdOut

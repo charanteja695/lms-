@@ -45,7 +45,12 @@ export function LoginPage() {
   const [login, { isLoading }] = useLoginMutation();
   const [formError, setFormError] = useState<string | null>(null);
   const [selectedDemoIndex, setSelectedDemoIndex] = useState(0);
-  const form = useForm<LoginValues>({ defaultValues: { identifier: "", password: "" } });
+  const form = useForm<LoginValues>({
+    defaultValues: {
+      identifier: DEMO_PRESETS[0]?.email ?? "admin@example.com",
+      password: DEMO_PRESETS[0]?.password ?? "Password123!",
+    },
+  });
 
   const activeDemo = DEMO_PRESETS[selectedDemoIndex] ?? (DEMO_PRESETS[0] as (typeof DEMO_PRESETS)[number]);
 
@@ -53,8 +58,9 @@ export function LoginPage() {
     setSelectedDemoIndex(index);
     const demo = DEMO_PRESETS[index];
     if (demo) {
-      form.setValue("identifier", demo.email);
-      form.setValue("password", demo.password);
+      form.setValue("identifier", demo.email, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+      form.setValue("password", demo.password, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+      form.clearErrors();
       setFormError(null);
     }
   };
@@ -69,6 +75,25 @@ export function LoginPage() {
       } else if (response.user.mfa_setup_required) {
         navigate("/account/setup/mfa", { replace: true });
       } else {
+        // Safe role-based redirect: if a student signs in, never send them to an admin path
+        if (response.user.role === "student") {
+          const isAdminPath =
+            redirectTo.startsWith("/admin") ||
+            redirectTo.startsWith("/billing") ||
+            redirectTo.startsWith("/institution") ||
+            redirectTo.startsWith("/grading") ||
+            redirectTo.startsWith("/tests") ||
+            redirectTo.startsWith("/attempts") ||
+            redirectTo.startsWith("/questions") ||
+            redirectTo === "/courses" ||
+            redirectTo.startsWith("/courses/new") ||
+            redirectTo.includes("/edit");
+
+          if (isAdminPath) {
+            navigate("/", { replace: true });
+            return;
+          }
+        }
         navigate(redirectTo, { replace: true });
       }
     }

@@ -96,13 +96,21 @@ class SessionService:
                 expires_at=refresh_expires_at,
             )
         )
+        is_individual = (
+            user.role == "student"
+            and (institution is None or getattr(institution, "institution_type", None) == "individual")
+        )
+        effective_org_id = None if is_individual else (institution.public_id if institution else None)
+        effective_org_type = None if is_individual else (institution.org_type if institution else None)
+        effective_inst_ref = None if is_individual else InstitutionRef.of(institution)
+
         access_token, expires_in = create_access_token(
             user_id=user.public_id,
             session_id=session.public_id,
             role=user.role,
-            organization_id=institution.public_id if institution else None,
+            organization_id=effective_org_id,
             token_version=user.token_version,
-            organization_type=institution.org_type if institution else None,
+            organization_type=effective_org_type,
             scopes=permissions,
             admin_organization_ids=admin_orgs,
         )
@@ -119,7 +127,7 @@ class SessionService:
                 email=user.email,
                 username=user.username,
                 role=user.role,
-                institution=InstitutionRef.of(institution),
+                institution=effective_inst_ref,
                 scopes=permissions,
                 must_change_password=user.must_change_password,
                 mfa_enabled=mfa_enabled,

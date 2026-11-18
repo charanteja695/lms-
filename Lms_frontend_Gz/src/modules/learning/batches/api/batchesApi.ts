@@ -22,7 +22,23 @@ export const batchesApi = baseApi.injectEndpoints({
       transformResponse: (response: { batch: Batch }) => response.batch,
       invalidatesTags: ["BatchList"],
     }),
+    updateBatch: build.mutation<Batch, { id: string; name?: string; status?: string }>({
+      query: ({ id, ...body }) => ({ url: `/batches/${id}`, method: "PATCH", body }),
+      transformResponse: (response: { batch: Batch }) => response.batch,
+      invalidatesTags: (_result, _error, { id }) => [{ type: "Batch", id }, "BatchList"],
+    }),
+    deleteBatch: build.mutation<Batch, string>({
+      query: (id) => ({ url: `/batches/${id}`, method: "DELETE" }),
+      transformResponse: (response: { batch: Batch }) => response.batch,
+      invalidatesTags: (_result, _error, id) => [{ type: "Batch", id }, "BatchList"],
+    }),
   }),
 });
 
-export const { useListBatchesQuery, useGetBatchQuery, useCreateBatchMutation } = batchesApi;
+export const {
+  useListBatchesQuery,
+  useGetBatchQuery,
+  useCreateBatchMutation,
+  useUpdateBatchMutation,
+  useDeleteBatchMutation,
+} = batchesApi;

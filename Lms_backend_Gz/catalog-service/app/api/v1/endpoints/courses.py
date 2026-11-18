@@ -21,7 +21,9 @@ from app.schemas.course import (
     BulkDeleteRequest,
     BulkDeleteResponse,
     CatalogCleanupSummaryResponse,
+    CourseBrowseListResponse,
 )
+from app.services.course_browse import enrich_browse_courses
 from app.services.course_service import CourseService
 from app.services.outbox import write_event
 
@@ -53,7 +55,7 @@ async def list_courses(query: Annotated[CourseListQuery, Query()], auth: Current
     
     allowed_ids = None
     if is_student:
-        allowed_ids = await get_student_accessible_course_ids(auth.organization_id)
+        allowed_ids = await get_student_accessible_course_ids(auth.organization_id, user_id=auth.user_id)
         published_only = True
     else:
         published_only = query.published_only or not is_admin
@@ -136,6 +138,35 @@ async def bulk_delete_courses(data: BulkDeleteRequest, auth: CurrentAuth, db: Db
         message=f"Successfully deleted {count} course{'s' if count != 1 else ''}.",
         deleted_count=count,
         affected_courses=titles,
+    )
+
+
+@router.get(
+    "/browse",
+    response_model=CourseBrowseListResponse,
+    summary="Browse available courses with plan pricing and access status",
+    responses=errors(401, 422),
+)
+async def browse_courses(query: Annotated[CourseListQuery, Query()], auth: CurrentAuth, db: DbSession) -> CourseBrowseListResponse:
+    is_student = auth.role == "student"
+    allowed_ids = await get_student_accessible_course_ids(auth.organization_id) if is_student else None
+    courses, total, is_exact = await CourseService(db).list_courses(
+        query,
+        published_only=True,
+        allowed_course_ids=allowed_ids,
+    )
+    enriched = await enrich_browse_courses(db, courses, user_id=auth.user_id, role=auth.role)
+    return CourseBrowseListResponse(
+        message="Browse courses retrieved successfully.",
+        courses=enriched,
+        page_context=PageContext.build(
+            page=query.page,
+            per_page=query.per_page,
+            total=total,
+            is_exact=is_exact,
+            sort_column="created_time",
+            sort_order=SortOrder(query.sort_order),
+        ),
     )
 
 

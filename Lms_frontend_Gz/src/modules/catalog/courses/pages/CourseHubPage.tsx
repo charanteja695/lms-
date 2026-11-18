@@ -11,47 +11,94 @@ import {
   useCreateModuleMutation,
   useUpdateModuleMutation,
   useDeleteModuleMutation,
-  useReorderModulesMutation,
+  useCreateTopicMutation,
+  useCreateItemMutation,
 } from "@/modules/catalog/courses/api/curriculumApi";
 import {
   useListQuestionsQuery,
-  useCreateQuestionMutation,
-  useUpdateQuestionMutation,
-  useSubmitQuestionMutation,
-  useApproveQuestionMutation,
 } from "@/modules/assessments/questions/api/questionsApi";
 import {
   useCreateTestMutation,
   useUpdateTestMutation,
-  useReplaceSectionsMutation,
   useSubmitTestMutation,
   useApproveTestMutation,
   useGetTestQuery,
 } from "@/modules/assessments/tests/api/testsApi";
+import {
+  useGetAdminCoursePricingQuery,
+  useUpdateAdminCoursePricingMutation,
+  useGetAdminCoursePricingAuditsQuery,
+} from "@/modules/billing/institutional/api/institutionalApi";
 import { ModuleTestSetupModal } from "@/modules/catalog/courses/components/modals/ModuleTestSetupModal";
+import { ChapterTestSetupModal } from "@/modules/catalog/courses/components/modals/ChapterTestSetupModal";
 import {
   AssessmentQuestionManager,
   type ManagedQuestionItem,
 } from "@/modules/catalog/course-tests/components/AssessmentQuestionManager";
 import type { McqDraft } from "@/modules/catalog/course-tests/hooks/useTestQuestions";
-import { SetupProgress, type SetupStep } from "@/modules/catalog/courses/components/common/SetupProgress";
-import { CourseCreationStepper, type StepperStepItem } from "@/modules/catalog/courses/components/common/CourseCreationStepper";
-import { CoursePageHeader } from "@/modules/catalog/courses/components/common/CoursePageHeader";
+import type { SlotInput } from "@/modules/assessments/tests/sectionTypes";
 import { AddModuleModal } from "@/modules/catalog/courses/components/modals/AddModuleModal";
+import { AddChapterModal, type ChapterMaterial } from "@/modules/catalog/courses/components/modals/AddChapterModal";
+import { AdminVideoPreviewModal } from "@/modules/catalog/courses/components/modals/AdminVideoPreviewModal";
+import { AdminPdfPreviewModal } from "@/modules/catalog/courses/components/modals/AdminPdfPreviewModal";
 import { ConfirmModal } from "@/modules/catalog/courses/components/common/ConfirmModal";
-import { Button, Icon, PageLoader } from "@/shared/ui";
+import { Button, PageLoader } from "@/shared/ui";
 import { usePermissions } from "@/modules/user-management/common/permissions/usePermissions";
+import { useAuth } from "@/modules/user-management/auth/hooks/useAuth";
 import { useListEnrollmentsQuery } from "@/modules/learning/enrollments/api/enrollmentsApi";
 import { useListBatchesQuery } from "@/modules/learning/batches/api/batchesApi";
 import { useNotify } from "@/core/hooks/useNotify";
-import { parseCourseSummary, computeCourseStepsStatus } from "@/modules/catalog/courses/utils/courseMetrics";
+import { parseCourseSummary } from "@/modules/catalog/courses/utils/courseMetrics";
 import { cn } from "@/core/lib/cn";
 import type { ModuleDetail } from "@/modules/catalog/courses/curriculumTypes";
+import {
+  BookOpen,
+  Layers,
+  HelpCircle,
+  ClipboardCheck,
+  ShieldAlert,
+  Award,
+  DollarSign,
+  Eye,
+  CheckCircle2,
+  Clock,
+  Users,
+  Video,
+  FileText,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Edit,
+  Trash2,
+  Download,
+  AlertCircle,
+  ExternalLink,
+  Camera,
+  Mic,
+  Maximize2,
+  Copy,
+} from "lucide-react";
 
-type HubTab = "modules" | "overview" | "final_exam" | "students";
+export type WorkspaceTab =
+  | "overview"
+  | "curriculum"
+  | "chapter_exams"
+  | "module_tests"
+  | "final_exam"
+  | "certificate"
+  | "pricing"
+  | "preview";
+
+interface TabDefinition {
+  id: WorkspaceTab;
+  label: string;
+  icon: any;
+  badge?: string | number;
+}
 
 export function CourseHubPage() {
   const { permissions } = usePermissions();
+  const { user } = useAuth();
   const isSuperAdminOrAdmin = permissions.role === "super_admin" || permissions.role === "admin";
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
@@ -65,13 +112,8 @@ export function CourseHubPage() {
     }
   }, [permissions.role, courseId, navigate]);
 
-  const tabParam = (searchParams.get("tab") as HubTab) || "modules";
-  const stepParam = searchParams.get("step");
-
-  const [activeTab, setActiveTab] = useState<HubTab>(tabParam);
-  const [isAddModuleOpen, setIsAddModuleOpen] = useState(false);
-  const [editingModule, setEditingModule] = useState<ModuleDetail | null>(null);
-  const [deletingModule, setDeletingModule] = useState<ModuleDetail | null>(null);
+  const tabParam = (searchParams.get("tab") as WorkspaceTab) || "curriculum";
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>(tabParam);
 
   // Sync tab with URL
   useEffect(() => {
@@ -80,7 +122,7 @@ export function CourseHubPage() {
     }
   }, [tabParam]);
 
-  const handleSelectTab = (tab: HubTab) => {
+  const handleSelectTab = (tab: WorkspaceTab) => {
     setActiveTab(tab);
     setSearchParams(
       (prev) => {
@@ -121,9 +163,10 @@ export function CourseHubPage() {
   const [createModule] = useCreateModuleMutation();
   const [updateModule] = useUpdateModuleMutation();
   const [deleteModule] = useDeleteModuleMutation();
+  const [createTopic] = useCreateTopicMutation();
+  const [createItem] = useCreateItemMutation();
   const [publishCourse] = usePublishCourseMutation();
   const [unpublishCourse] = useUnpublishCourseMutation();
-  const [reorderModules] = useReorderModulesMutation();
   const [updateRules, { isLoading: isSavingRules }] = useUpdateRulesMutation();
 
   // Test Authoring mutations for Final Exam
@@ -131,6 +174,24 @@ export function CourseHubPage() {
   const [updateTest, { isLoading: isUpdatingTest }] = useUpdateTestMutation();
   const [submitTest] = useSubmitTestMutation();
   const [approveTest] = useApproveTestMutation();
+
+  // Pricing API queries & mutations
+  const { data: pricingList = [], refetch: refetchPricing } = useGetAdminCoursePricingQuery(undefined, {
+    skip: !isSuperAdminOrAdmin,
+  });
+  const [updateCoursePricing, { isLoading: isUpdatingPricing }] = useUpdateAdminCoursePricingMutation();
+  const { data: pricingAudits = [], refetch: refetchAudits } = useGetAdminCoursePricingAuditsQuery(
+    Number(courseId) || 0,
+    { skip: !isSuperAdminOrAdmin || !courseId }
+  );
+
+  // Find pricing record for this course
+  const currentPricing = useMemo(() => {
+    if (!courseId || !pricingList.length) return null;
+    return pricingList.find(
+      (p) => String(p.course_id) === String(courseId) || p.slug === course?.slug
+    );
+  }, [pricingList, courseId, course?.slug]);
 
   // Load real batches & enrollments for exact enrolled students count
   const { data: batchesData } = useListBatchesQuery({ per_page: 100 });
@@ -143,17 +204,13 @@ export function CourseHubPage() {
     return (enrollmentsData?.items ?? []).filter((e) => courseBatchIds.has(e.batch_id));
   }, [courseId, batchesData?.items, enrollmentsData?.items]);
 
-  // Load questions bank to verify approved questions for Step 4 & Final Exam picker
-  const { data: questionsData } = useListQuestionsQuery({
-    per_page: 100,
-  });
-
+  // Load questions bank
+  const { data: questionsData } = useListQuestionsQuery({ per_page: 100 });
   const allApprovedQuestions = useMemo(() => {
     const items = questionsData?.items ?? [];
     return items.filter((q) => q.status === "active");
   }, [questionsData]);
 
-  // Questions matching this course or general
   const courseApprovedQuestions = useMemo(() => {
     if (!allApprovedQuestions.length) return [];
     const slug = course?.slug?.toLowerCase() || "";
@@ -165,13 +222,32 @@ export function CourseHubPage() {
     return matched.length > 0 ? matched : allApprovedQuestions;
   }, [allApprovedQuestions, course?.slug, courseId]);
 
-  const hasApprovedQuestions = courseApprovedQuestions.length > 0;
-
-  // Final Test detail if already configured
+  // Final Test detail
   const finalTestId = versionDetail?.rule?.final_test_id;
   const { data: finalTestDetail, refetch: refetchFinalTest } = useGetTestQuery(finalTestId ?? "", {
     skip: !finalTestId,
   });
+
+  // UI state modals
+  const [isAddModuleOpen, setIsAddModuleOpen] = useState(false);
+  const [editingModule, setEditingModule] = useState<ModuleDetail | null>(null);
+  const [deletingModule, setDeletingModule] = useState<ModuleDetail | null>(null);
+  const [addingChapterToModule, setAddingChapterToModule] = useState<ModuleDetail | null>(null);
+  const [managingModuleTest, setManagingModuleTest] = useState<ModuleDetail | null>(null);
+  const [managingChapterTest, setManagingChapterTest] = useState<{ chapter: any; moduleTitle?: string; moduleId: string } | null>(null);
+  const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
+
+  // Media Preview Modals
+  const [videoPreviewTarget, setVideoPreviewTarget] = useState<{
+    chapterTitle: string;
+    itemTitle?: string;
+    mediaId?: string | number | null;
+  } | null>(null);
+  const [pdfPreviewTarget, setPdfPreviewTarget] = useState<{
+    chapterTitle: string;
+    itemTitle?: string;
+    mediaId?: string | number | null;
+  } | null>(null);
 
   // Final Exam Config State
   const [isConfiguringExam, setIsConfiguringExam] = useState(false);
@@ -180,15 +256,33 @@ export function CourseHubPage() {
   const [examPassMark, setExamPassMark] = useState(70);
   const [examAttempts, setExamAttempts] = useState(3);
   const [examCooldownDays, setExamCooldownDays] = useState(1);
-  const [examMaxWarnings, setExamMaxWarnings] = useState(3);
   const [examCameraRequired, setExamCameraRequired] = useState(true);
+  const [examMicRequired, setExamMicRequired] = useState(true);
+  const [examFullscreenRequired, setExamFullscreenRequired] = useState(true);
+  const [examCopyPasteBlock, setExamCopyPasteBlock] = useState(true);
   const [examShuffle, setExamShuffle] = useState(true);
-  const [questionPickMode] = useState<"random" | "specific">("random");
-  const [examQuestionCount, setExamQuestionCount] = useState(1);
-  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
-  const [isRemoveExamModalOpen, setIsRemoveExamModalOpen] = useState(false);
+  const [finalCustomQuestions, setFinalCustomQuestions] = useState<ManagedQuestionItem[]>([]);
+  const [isFinalQuestionsLoaded, setIsFinalQuestionsLoaded] = useState(false);
 
-  // Sync Final Exam form values from existing config
+  // Certificate Settings State
+  const [certEnabled, setCertEnabled] = useState(true);
+  const [certMinPassScore, setCertMinPassScore] = useState(70);
+  const [certSignatoryName, setCertSignatoryName] = useState("Dr. Sneha Reddy");
+  const [certSignatoryTitle, setCertSignatoryTitle] = useState("Academic Council Director");
+  const [certOrgName, setCertOrgName] = useState("ExamLMS Academy of Technology");
+
+  // Pricing Edit Modal State
+  const [isEditPricingOpen, setIsEditPricingOpen] = useState(false);
+  const [priceForm, setPriceForm] = useState({
+    individualPrice: 1999,
+    discountPercent: 10,
+    institutionalPrice: 999,
+    minSeats: 10,
+    maxSeats: 1000,
+    reason: "",
+  });
+
+  // Sync Final Exam form values
   useEffect(() => {
     if (finalTestDetail) {
       setExamTitle(finalTestDetail.title || "");
@@ -198,37 +292,36 @@ export function CourseHubPage() {
       setExamCooldownDays(versionDetail?.rule?.final_test_cooldown_days || 1);
       setExamCameraRequired(finalTestDetail.proctoring_level === "strict" || finalTestDetail.proctoring_level === "basic");
       setExamShuffle(Boolean(finalTestDetail.shuffle_questions));
-      const testQIds = (finalTestDetail as any).question_ids || [];
-      if (testQIds.length > 0) {
-        setSelectedQuestionIds(testQIds);
-        setExamQuestionCount(testQIds.length);
-      }
     } else if (course) {
       setExamTitle(`${course.title} - Final Certification Exam`);
       setExamPassMark(versionDetail?.rule?.final_pass_mark || 70);
       setExamAttempts(versionDetail?.rule?.final_test_attempts || 3);
       setExamCooldownDays(versionDetail?.rule?.final_test_cooldown_days || 1);
-      const defaultCount = Math.min(10, Math.max(1, courseApprovedQuestions.length));
-      setExamQuestionCount(defaultCount);
     }
-  }, [finalTestDetail, course, versionDetail?.rule, courseApprovedQuestions.length]);
+  }, [finalTestDetail, course, versionDetail?.rule]);
 
-  const [managingModuleTest, setManagingModuleTest] = useState<ModuleDetail | null>(null);
-  const [finalCustomQuestions, setFinalCustomQuestions] = useState<ManagedQuestionItem[]>([]);
-  const [isFinalQuestionsLoaded, setIsFinalQuestionsLoaded] = useState(false);
+  // Sync Pricing form values
+  useEffect(() => {
+    if (currentPricing) {
+      setPriceForm({
+        individualPrice: currentPricing.individual_price_paise ? currentPricing.individual_price_paise / 100 : 1999,
+        discountPercent: currentPricing.discount_percent || 0,
+        institutionalPrice: currentPricing.fixed_price_paise
+          ? currentPricing.fixed_price_paise / 100
+          : currentPricing.institutional_price_per_seat_paise
+          ? currentPricing.institutional_price_per_seat_paise / 100
+          : 999,
+        minSeats: currentPricing.min_students || 10,
+        maxSeats: currentPricing.max_students || 1000,
+        reason: "",
+      });
+    }
+  }, [currentPricing]);
 
-  const [createQuestion] = useCreateQuestionMutation();
-  const [updateQuestion] = useUpdateQuestionMutation();
-  const [submitQuestion] = useSubmitQuestionMutation();
-  const [approveQuestion] = useApproveQuestionMutation();
-  const [replaceSections] = useReplaceSectionsMutation();
-
-  // Load and sync final exam questions
+  // Load final exam questions
   useEffect(() => {
     if (isFinalQuestionsLoaded || !courseId) return;
-
     let loaded: ManagedQuestionItem[] = [];
-    // 1. Primary: Load directly from final test definition slots in backend
     if (finalTestDetail?.sections && finalTestDetail.sections.length > 0) {
       const slots = finalTestDetail.sections.flatMap((s: any) => s.slots || []);
       if (slots.length > 0) {
@@ -252,21 +345,6 @@ export function CourseHubPage() {
         });
       }
     }
-
-    // 2. Fallback: LocalStorage
-    if (loaded.length === 0) {
-      try {
-        const saved = localStorage.getItem(`final_exam_questions_${courseId}`);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            loaded = parsed;
-          }
-        }
-      } catch {}
-    }
-
-    // 3. Fallback: course approved questions
     if (loaded.length === 0 && courseApprovedQuestions.length > 0) {
       loaded = courseApprovedQuestions.slice(0, 10).map((q) => {
         const opts = (q as any).options?.map((o: any) => ({ id: o.id || "a", text: o.text || "" })) || [];
@@ -281,450 +359,105 @@ export function CourseHubPage() {
         };
       });
     }
-
-    if (loaded.length > 0 || !isFinalQuestionsLoaded) {
-      setFinalCustomQuestions(loaded);
-      setIsFinalQuestionsLoaded(true);
-    }
+    setFinalCustomQuestions(loaded);
+    setIsFinalQuestionsLoaded(true);
   }, [courseId, isFinalQuestionsLoaded, courseApprovedQuestions, finalTestDetail]);
-
-  const persistFinalQuestions = (newQuestions: ManagedQuestionItem[]) => {
-    setFinalCustomQuestions(newQuestions);
-    if (courseId) {
-      try {
-        localStorage.setItem(`final_exam_questions_${courseId}`, JSON.stringify(newQuestions));
-      } catch {}
-    }
-  };
-
-  const handleSaveFinalQuestion = async (draft: McqDraft & { questionType?: string }) => {
-    const newItem: ManagedQuestionItem = {
-      id: draft.questionId || `final-q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      text: draft.text,
-      questionType: draft.questionType || "mcq_single",
-      marks: draft.marks,
-      options: draft.options,
-      correctAnswer: draft.correct,
-      explanation: draft.explanation,
-    };
-
-    if (draft.questionId) {
-      persistFinalQuestions(
-        finalCustomQuestions.map((q) => (q.id === draft.questionId ? newItem : q))
-      );
-      notify.success("Question updated in Final Exam");
-    } else {
-      persistFinalQuestions([...finalCustomQuestions, newItem]);
-      notify.success("Question added to Final Exam");
-    }
-  };
-
-  const handleDeleteFinalQuestion = async (questionId?: string, index?: number) => {
-    let nextList: ManagedQuestionItem[];
-    if (questionId) {
-      nextList = finalCustomQuestions.filter((q) => q.id !== questionId);
-    } else if (index !== undefined) {
-      nextList = finalCustomQuestions.filter((_, idx) => idx !== index);
-    } else {
-      return;
-    }
-    persistFinalQuestions(nextList);
-    notify.success("Question removed from Final Exam");
-  };
-
-  const handleImportFinalDrafts = async (
-    drafts: McqDraft[],
-    _onProgress: (completed: number, total: number) => void
-  ) => {
-    const importedItems: ManagedQuestionItem[] = drafts.map((draft, i) => ({
-      id: `final-imported-${Date.now()}-${i}`,
-      text: draft.text,
-      questionType: "mcq_single",
-      marks: draft.marks,
-      options: draft.options,
-      correctAnswer: draft.correct,
-      explanation: draft.explanation,
-    }));
-
-    persistFinalQuestions([...finalCustomQuestions, ...importedItems]);
-    notify.success(`Successfully imported ${drafts.length} questions into Final Exam!`);
-  };
-
-  const [draggedModuleIndex, setDraggedModuleIndex] = useState<number | null>(null);
-
-  const modules = useMemo(() => {
-    return [...(versionDetail?.modules ?? [])].sort((a, b) => a.position - b.position);
-  }, [versionDetail?.modules]);
-
-  const totalChapters = useMemo(() => {
-    return modules.reduce((acc, m) => acc + (m.topics?.length ?? 0), 0);
-  }, [modules]);
 
   const parsedSummary = useMemo(() => {
     return parseCourseSummary(course?.summary);
   }, [course?.summary]);
 
-  const isPublished = course?.versions?.some((v) => v.status === "published") && !course.archived_at;
+  const modules = versionDetail?.modules ?? [];
+  const isPublished = latestVersion?.status === "published";
 
-  // Step Completion Status
-  const stepsStatus = useMemo(() => {
-    return computeCourseStepsStatus(course, versionDetail, hasApprovedQuestions);
-  }, [course, versionDetail, hasApprovedQuestions]);
+  // Chapter metrics
+  const totalChapters = useMemo(() => {
+    return modules.reduce((acc, m) => acc + (m.topics?.length ?? 0), 0);
+  }, [modules]);
 
-  // Setup Progress Steps
-  const setupSteps: SetupStep[] = useMemo(() => {
-    return [
-      {
-        id: 1,
-        label: "Course details",
-        sublabel: stepsStatus.step1Done ? "Done" : "In progress",
-        status: stepsStatus.step1Done ? "done" : "current",
-        onClick: () => navigate(`/courses/${courseId}/edit?step=1&from=hub`),
-      },
-      {
-        id: 2,
-        label: "Modules",
-        sublabel: modules.length > 0 ? `${modules.length} added` : "0 added",
-        status: stepsStatus.step2Done ? "done" : stepsStatus.step1Done ? "current" : "pending",
-        onClick: () => {
-          handleSelectTab("modules");
-          if (modules.length === 0) setIsAddModuleOpen(true);
-        },
-      },
-      {
-        id: 3,
-        label: "Chapters",
-        sublabel: totalChapters > 0 ? `${totalChapters} added` : "0 added",
-        status: stepsStatus.step3Done ? "done" : stepsStatus.step2Done ? "current" : "pending",
-        onClick: () => {
-          if (modules.length > 0 && modules[0]) {
-            navigate(`/courses/${courseId}/modules/${modules[0].module_id}/chapters?step=3`);
-          } else {
-            handleSelectTab("modules");
-            setIsAddModuleOpen(true);
-          }
-        },
-      },
-      {
-        id: 4,
-        label: "Approve questions",
-        sublabel: stepsStatus.step4Done
-          ? `${courseApprovedQuestions.length} approved`
-          : totalChapters > 0
-          ? "Ready to review"
-          : "Waiting for chapters",
-        status: stepsStatus.step4Done ? "done" : stepsStatus.step3Done ? "current" : "pending",
-        onClick: () => navigate(`/courses/${courseId}/questions/review?step=4`),
-      },
-      {
-        id: 5,
-        label: "Final exam",
-        sublabel: stepsStatus.step5Done
-          ? `Configured (${finalTestDetail?.duration_minutes || 60}m)`
-          : "Not set",
-        status: stepsStatus.step5Done ? "done" : stepsStatus.step4Done ? "current" : "pending",
-        onClick: () => {
-          handleSelectTab("final_exam");
-          setIsConfiguringExam(true);
-        },
-      },
-    ];
-  }, [
-    stepsStatus,
-    modules,
-    totalChapters,
-    courseApprovedQuestions.length,
-    courseId,
-    navigate,
-    finalTestDetail?.duration_minutes,
-  ]);
+  // Readiness Checklist
+  const readiness = useMemo(() => {
+    const hasBasicInfo = Boolean(course?.title && course?.slug);
+    const hasCurriculum = modules.length > 0 && totalChapters > 0;
+    const hasAssessments = Boolean(finalTestId || modules.some((m) => m.pass_mark));
+    const hasPricing = Boolean(currentPricing && currentPricing.individual_price_paise > 0);
+    const isReadyToPublish = hasBasicInfo && hasCurriculum;
+    return {
+      hasBasicInfo,
+      hasCurriculum,
+      hasAssessments,
+      hasPricing,
+      isReadyToPublish,
+    };
+  }, [course, modules, totalChapters, finalTestId, currentPricing]);
 
-  const stepperSteps: StepperStepItem[] = useMemo(() => {
-    return setupSteps.map((s) => ({
-      id: s.id,
-      label: s.label,
-      sublabel: s.sublabel,
-      status: s.status,
-      path: undefined,
-    }));
-  }, [setupSteps]);
-
-  // Handler for drop reordering modules
-  const handleDropModule = async (dropIndex: number) => {
-    if (draggedModuleIndex === null || draggedModuleIndex === dropIndex) return;
-    const reordered = [...modules];
-    const [moved] = reordered.splice(draggedModuleIndex, 1);
-    if (!moved) return;
-    reordered.splice(dropIndex, 0, moved);
-    setDraggedModuleIndex(null);
-
-    if (courseId && versionId) {
-      try {
-        await reorderModules({
-          courseId,
-          versionId,
-          orderedIds: reordered.map((m) => m.module_id),
-        }).unwrap();
-        notify.success("Module order saved");
-      } catch (err: any) {
-        notify.apiError(err);
-      }
-    }
-  };
-
-  // Handler for saving Final Exam
-  const handleSaveFinalExam = async (e?: React.FormEvent | React.MouseEvent) => {
-    if (e) e.preventDefault();
-    if (!courseId || !versionId) return;
-
-    // Determine available questions: either custom Final Exam questions or course approved questions
-    const hasCustom = finalCustomQuestions.length > 0;
-    const hasChapterQuestions = courseApprovedQuestions.length > 0;
-
-    if (!hasCustom && !hasChapterQuestions) {
-      notify.error(
-        "No questions found for the final exam. Please add questions manually, import questions, or approve chapter questions."
-      );
-      return;
-    }
-
-    const availableCount = hasCustom ? finalCustomQuestions.length : courseApprovedQuestions.length;
-    if (!hasCustom && examQuestionCount && availableCount < examQuestionCount) {
-      notify.error(
-        `Final exam is configured for ${examQuestionCount} questions, but only ${availableCount} question(s) are currently available. Please add more questions or adjust the question count.`
-      );
-      return;
-    }
-
-    try {
-      let chosenIds: string[] = [];
-
-      if (hasCustom) {
-        // Create any draft questions in question bank
-        for (const q of finalCustomQuestions) {
-          if (q.id && !q.id.startsWith("final-") && !q.id.startsWith("draft-")) {
-            try {
-              await updateQuestion({
-                questionId: q.id,
-                body: {
-                  text: q.text,
-                  body: { options: q.options || [] },
-                  answer_key: { correct: q.correctAnswer || "a" },
-                  explanation: q.explanation || null,
-                  default_marks: q.marks,
-                },
-              }).unwrap();
-            } catch (uErr) {
-              console.warn("Could not update question in bank:", uErr);
-            }
-            chosenIds.push(q.id);
-          } else {
-            try {
-              const created = await createQuestion({
-                question_type: "mcq_single",
-                text: q.text,
-                body: { options: q.options || [] },
-                answer_key: { correct: q.correctAnswer || "a" },
-                explanation: q.explanation || null,
-                default_marks: q.marks,
-                topics: [course?.slug || "final-exam"],
-              }).unwrap();
-
-              try {
-                await submitQuestion(created.question_id).unwrap();
-                await approveQuestion({ questionId: created.question_id }).unwrap();
-              } catch {
-                // Ignore if already submitted
-              }
-              chosenIds.push(created.question_id);
-            } catch (err) {
-              console.warn("Could not create custom question in bank:", err);
-            }
-          }
-        }
-      } else if (questionPickMode === "specific" && selectedQuestionIds.length > 0) {
-        chosenIds = selectedQuestionIds;
-      } else {
-        // Random pick from chapter questions
-        const count = Math.min(examQuestionCount, courseApprovedQuestions.length);
-        const shuffled = [...courseApprovedQuestions].sort(() => 0.5 - Math.random());
-        chosenIds = shuffled.slice(0, count).map((q) => q.question_id);
-      }
-
-      if (chosenIds.length === 0) {
-        notify.error("Please add or select at least 1 question for the final exam.");
-        return;
-      }
-
-      const slots = chosenIds.map((qid) => ({
-        slot_type: "fixed" as const,
-        question_id: qid,
-        count: 1,
-      }));
-
-      let testPublicId = finalTestId;
-
-      if (testPublicId) {
-        // Update existing test
-        await updateTest({
-          testId: testPublicId,
-          body: {
-            title: examTitle.trim() || `${course?.title || "Course"} - Final Exam`,
-            duration_minutes: Number(examDurationMinutes) || 60,
-            pass_mark_percent: Number(examPassMark) || 70,
-            max_attempts: Number(examAttempts) || 3,
-            shuffle_questions: examShuffle,
-            proctoring_level: examCameraRequired ? "strict" : "none",
-          },
-        }).unwrap();
-
-        // Update paper sections with latest questions
-        if (slots.length > 0) {
-          await replaceSections({
-            testId: testPublicId,
-            sections: [
-              {
-                title: "Comprehensive Final Assessment",
-                slots,
-              },
-            ],
-          }).unwrap();
-        }
-      } else {
-        // Create new test
-        const created = await createTest({
-          title: examTitle.trim() || `${course?.title || "Course"} - Final Exam`,
-          kind: "final" as const,
-          target_id: courseId,
-          duration_minutes: Number(examDurationMinutes) || 60,
-          pass_mark_percent: Number(examPassMark) || 70,
-          max_attempts: Number(examAttempts) || 3,
-          shuffle_questions: examShuffle,
-          proctoring_level: examCameraRequired ? "strict" : "none",
-          sections: [
-            {
-              title: "Comprehensive Final Assessment",
-              slots,
-            },
-          ],
-        }).unwrap();
-
-        testPublicId = created.test_id;
-
-        // Submit and approve test so students can take it immediately
-        if (testPublicId) {
-          try {
-            await submitTest(testPublicId).unwrap();
-            await approveTest({ testId: testPublicId }).unwrap();
-          } catch {
-            // If already submitted/approved, ignore
-          }
-        }
-      }
-
-      // Link to course version rules
-      await updateRules({
-        courseId,
-        versionId,
-        body: {
-          final_pass_mark: Number(examPassMark) || 70,
-          final_test_attempts: Number(examAttempts) || 3,
-          final_test_cooldown_days: Number(examCooldownDays) || 1,
-          final_test_id: testPublicId || undefined,
-        },
-      }).unwrap();
-
-      notify.success("Final exam configured and linked successfully!");
-      setIsConfiguringExam(false);
-      refetchVersion();
-      if (testPublicId) refetchFinalTest();
-    } catch (err: any) {
-      notify.apiError(err);
-    }
-  };
-
-  // Handler for removing Final Exam configuration
-  const handleRemoveFinalExam = async () => {
-    if (!courseId || !versionId) return;
-    try {
-      await updateRules({
-        courseId,
-        versionId,
-        body: {
-          final_test_id: undefined,
-          final_pass_mark: 70,
-          final_test_attempts: 3,
-          final_test_cooldown_days: 1,
-        },
-      }).unwrap();
-      notify.success("Final exam configuration removed.");
-      setIsRemoveExamModalOpen(false);
-      setIsConfiguringExam(false);
-      refetchVersion();
-    } catch (err: any) {
-      notify.apiError(err);
-    }
-  };
+  // Tab definitions
+  const tabs: TabDefinition[] = [
+    { id: "overview", label: "Course Details", icon: BookOpen },
+    { id: "curriculum", label: "Curriculum", icon: Layers, badge: modules.length },
+    { id: "chapter_exams", label: "Chapter Exams", icon: HelpCircle, badge: totalChapters },
+    { id: "module_tests", label: "Module Tests", icon: ClipboardCheck, badge: modules.length },
+    { id: "final_exam", label: "Final Exam", icon: ShieldAlert, badge: finalTestId ? "Active" : undefined },
+    { id: "certificate", label: "Certificate", icon: Award },
+    { id: "pricing", label: "Pricing & History", icon: DollarSign },
+    { id: "preview", label: "Preview & Publish", icon: Eye },
+  ];
 
   if (isCourseLoading || (versionId && isVersionLoading)) {
-    return <PageLoader label="Loading course hub..." />;
+    return <PageLoader label="Loading course workspace..." />;
   }
 
   if (isCourseError || !course) {
     return (
       <div className="flex flex-col items-center justify-center p-16 text-center max-w-md mx-auto">
-        <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
-          <Icon name="alertCircle" size={24} />
+        <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 ring-1 ring-rose-200">
+          <AlertCircle size={28} />
         </div>
-        <h3 className="text-base font-bold text-slate-900 mb-1">Course not found</h3>
-        <p className="text-xs text-slate-500 mb-5">
-          {(courseError as any)?.data?.message || "The requested course could not be loaded."}
+        <h3 className="text-lg font-bold text-slate-900 mb-1">Course not found</h3>
+        <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+          {(courseError as any)?.data?.message || "The requested course could not be loaded or was removed."}
         </p>
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              refetchCourse();
-              refetchVersion();
-            }}
-            className="px-4 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
-          >
+          <Button variant="secondary" onClick={() => refetchCourse()}>
             Retry
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate("/courses")}
-            className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer"
-          >
-            Back to courses
-          </button>
+          </Button>
+          <Button variant="primary" onClick={() => navigate("/courses")}>
+            Back to Courses
+          </Button>
         </div>
       </div>
     );
   }
 
+  // Handle Save Module
   const handleSaveModule = async (data: { title: string; description: string; position: number }) => {
     if (!courseId || !versionId) return;
-    if (editingModule) {
-      await updateModule({
-        courseId,
-        versionId,
-        moduleId: editingModule.module_id,
-        body: { title: data.title },
-      }).unwrap();
-      notify.success("Module updated");
-    } else {
-      await createModule({
-        courseId,
-        versionId,
-        body: { title: data.title, pass_mark: 70 },
-      }).unwrap();
-      notify.success("Module created");
+    try {
+      if (editingModule) {
+        await updateModule({
+          courseId,
+          versionId,
+          moduleId: editingModule.module_id,
+          body: { title: data.title },
+        }).unwrap();
+        notify.success("Module updated");
+      } else {
+        await createModule({
+          courseId,
+          versionId,
+          body: { title: data.title, pass_mark: 70 },
+        }).unwrap();
+        notify.success("Module created");
+      }
+      setEditingModule(null);
+      setIsAddModuleOpen(false);
+      refetchVersion();
+    } catch (err: any) {
+      notify.apiError(err);
     }
-    setEditingModule(null);
-    refetchVersion();
   };
 
+  // Handle Delete Module
   const handleDeleteModule = async () => {
     if (!courseId || !versionId || !deletingModule) return;
     try {
@@ -741,19 +474,188 @@ export function CourseHubPage() {
     }
   };
 
-  const handleTogglePublish = async () => {
+  // Handle Save Chapter directly in Course Hub
+  const handleSaveChapterInHub = async (data: {
+    title: string;
+    position: number;
+    description: string;
+    objectives: string[];
+    materials: ChapterMaterial[];
+  }) => {
+    if (!courseId || !versionId || !addingChapterToModule) return;
+    try {
+      const res = await createTopic({
+        courseId,
+        versionId,
+        moduleId: addingChapterToModule.module_id,
+        body: { title: data.title, pass_mark: 70 },
+      }).unwrap();
+
+      if (data.materials && data.materials.length > 0 && res.topic?.topic_id) {
+        for (const mat of data.materials) {
+          await createItem({
+            courseId,
+            versionId,
+            moduleId: addingChapterToModule.module_id,
+            topicId: res.topic.topic_id,
+            body: {
+              item_type: mat.type === "video" ? "video" : mat.type === "pdf" ? "pdf" : "notes",
+              title: mat.name,
+              media_id: (mat as any).media_id || undefined,
+            },
+          }).unwrap();
+        }
+      }
+      notify.success(`Chapter added to "${addingChapterToModule.title}"`);
+      setAddingChapterToModule(null);
+      refetchVersion();
+    } catch (err: any) {
+      notify.apiError(err);
+    }
+  };
+
+  // Toggle Module Collapse
+  const toggleCollapse = (modId: string) => {
+    setCollapsedModules((prev) => ({ ...prev, [modId]: !prev[modId] }));
+  };
+
+  // Handle Save Final Exam
+  const handleSaveFinalExam = async () => {
+    if (!courseId || !versionId) return;
+    try {
+      let testPublicId = finalTestId;
+      const slots: SlotInput[] = finalCustomQuestions.map((q) => ({
+        slot_type: "fixed",
+        question_id: String(q.id).startsWith("final-") ? undefined : q.id,
+        marks: q.marks || 2,
+      }));
+
+      if (testPublicId) {
+        await updateTest({
+          testId: testPublicId,
+          body: {
+            title: examTitle || `${course.title} - Final Certification Exam`,
+            duration_minutes: Number(examDurationMinutes) || 60,
+            pass_mark_percent: Number(examPassMark) || 70,
+            max_attempts: Number(examAttempts) || 3,
+            shuffle_questions: examShuffle,
+            proctoring_level: examCameraRequired ? "strict" : "none",
+          },
+        }).unwrap();
+      } else {
+        const created = await createTest({
+          title: examTitle || `${course.title} - Final Certification Exam`,
+          kind: "final",
+          duration_minutes: Number(examDurationMinutes) || 60,
+          pass_mark_percent: Number(examPassMark) || 70,
+          max_attempts: Number(examAttempts) || 3,
+          shuffle_questions: examShuffle,
+          proctoring_level: examCameraRequired ? "strict" : "none",
+          sections: [{ title: "Comprehensive Final Assessment", slots }],
+        }).unwrap();
+        testPublicId = created.test_id;
+        if (testPublicId) {
+          try {
+            await submitTest(testPublicId).unwrap();
+            await approveTest({ testId: testPublicId }).unwrap();
+          } catch {}
+        }
+      }
+
+      await updateRules({
+        courseId,
+        versionId,
+        body: {
+          final_pass_mark: Number(examPassMark) || 70,
+          final_test_attempts: Number(examAttempts) || 3,
+          final_test_cooldown_days: Number(examCooldownDays) || 1,
+          final_test_id: testPublicId || undefined,
+        },
+      }).unwrap();
+
+      notify.success("Final Exam & Proctoring settings saved successfully!");
+      setIsConfiguringExam(false);
+      refetchVersion();
+      if (testPublicId) refetchFinalTest();
+    } catch (err: any) {
+      notify.apiError(err);
+    }
+  };
+
+  // Handle Save Pricing
+  const handleSavePricing = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!courseId) return;
-    if (!isPublished && !stepsStatus.allDone) {
-      notify.error(
-        `Cannot publish course: ${stepsStatus.missingStepsText.join(", ")} must be completed first.`
-      );
+    if (!priceForm.reason.trim()) {
+      notify.error("A reason for this price change is required for the audit record.");
       return;
     }
+    try {
+      await updateCoursePricing({
+        course_id: courseId,
+        course_title: course.title,
+        course_code: course.slug.toUpperCase(),
+        category: parsedSummary.category,
+        individual_price_paise: Math.round(priceForm.individualPrice * 100),
+        pricing_method: "fixed",
+        fixed_price_paise: Math.round(priceForm.institutionalPrice * 100),
+        monthly_price_paise: 0,
+        hourly_price_paise: 0,
+        discount_percent: priceForm.discountPercent,
+        gst_percent: 18,
+        min_students: priceForm.minSeats,
+        max_students: priceForm.maxSeats,
+        reason: priceForm.reason.trim(),
+      }).unwrap();
+      notify.success("Course pricing updated and logged to audit trail!");
+      setIsEditPricingOpen(false);
+      refetchPricing();
+      refetchAudits();
+    } catch (err: any) {
+      notify.apiError(err);
+    }
+  };
 
+  // Export Audits to CSV
+  const handleExportAuditsCsv = () => {
+    if (!pricingAudits.length) {
+      notify.info("No pricing audit records to export yet.");
+      return;
+    }
+    const headers = ["Audit ID", "Course ID", "Previous Indiv Price", "New Indiv Price", "Previous Inst Price", "New Inst Price", "Changed By", "Reason", "Date"];
+    const rows = pricingAudits.map((a) => [
+      a.id,
+      a.course_id,
+      (a.previous_individual_price_paise / 100).toFixed(2),
+      (a.new_individual_price_paise / 100).toFixed(2),
+      (a.previous_institutional_price_paise / 100).toFixed(2),
+      (a.new_institutional_price_paise / 100).toFixed(2),
+      a.admin_email || a.admin_name || `Admin #${a.admin_user_id}`,
+      `"${(a.reason || "").replace(/"/g, '""')}"`,
+      new Date(a.created_at || Date.now()).toLocaleString(),
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Course_${courseId}_Pricing_History.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    notify.success("Price change history CSV downloaded.");
+  };
+
+  // Handle Publish / Unpublish
+  const handleTogglePublish = async () => {
+    if (!courseId) return;
+    if (!isPublished && !readiness.isReadyToPublish) {
+      notify.error("Please add at least one module and chapter before publishing.");
+      return;
+    }
     try {
       if (isPublished) {
         await unpublishCourse(courseId).unwrap();
-        notify.success("Course unpublished");
+        notify.success("Course moved to Draft.");
       } else {
         await publishCourse(courseId).unwrap();
         notify.success("Course published successfully!");
@@ -765,263 +667,642 @@ export function CourseHubPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12">
-      {/* 1. Universal Breadcrumbs & Back Navigation */}
-      <CoursePageHeader
-        breadcrumbs={[
-          { label: "Courses", href: "/courses" },
-          { label: course.title, current: true },
-        ]}
-        backHref="/courses"
-      />
-
-      {/* 2. 5-Step Stepper for Guided Course Creation */}
-      {(!isPublished || stepParam) && (
-        <CourseCreationStepper
-          courseId={courseId}
-          activeStepId={stepParam ? Number(stepParam) : stepsStatus.currentStepId}
-          steps={stepperSteps}
-          onStepClick={(step) => {
-            const matched = setupSteps.find((s) => s.id === step.id);
-            if (matched?.onClick) matched.onClick();
-          }}
-        />
-      )}
-
-      {/* 3. Course Header Banner with REAL Metrics */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs flex flex-wrap items-center justify-between gap-5">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="w-24 h-16 rounded-xl bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center text-white shrink-0 shadow-xs">
-            <Icon name="book" size={24} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-[#0A1530] truncate">{course.title}</h2>
-              <span
-                className={cn(
-                  "px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0",
-                  isPublished ? "bg-[#E7F3EC] text-[#00663C]" : "bg-amber-100 text-amber-800"
-                )}
-              >
-                {isPublished ? "Published" : "Draft"}
-              </span>
+    <div className="max-w-7xl mx-auto space-y-6 pb-16">
+      {/* 1. Header Bar with Course Context and Quick Actions */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#10234B] to-[#1E3A8A] flex items-center justify-center text-white shrink-0 shadow-sm overflow-hidden border border-slate-200">
+              <BookOpen size={28} />
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium mt-1">
-              <span className="flex items-center gap-1">
-                <Icon name="clock" size={13} /> {parsedSummary.duration}
-              </span>
-              <span className="flex items-center gap-1">
-                <Icon name="layers" size={13} /> {modules.length} {modules.length === 1 ? "module" : "modules"}
-              </span>
-              <span className="flex items-center gap-1">
-                <Icon name="users" size={13} /> {enrolledStudents.length} {enrolledStudents.length === 1 ? "student" : "students"}
-              </span>
-              <span>Pass mark {parsedSummary.passPercentage}</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                  {course.slug.toUpperCase()}
+                </span>
+                <h1 className="text-xl font-bold text-slate-900 tracking-tight truncate">{course.title}</h1>
+                <span
+                  className={cn(
+                    "px-2.5 py-0.5 rounded-full text-xs font-bold",
+                    isPublished ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+                  )}
+                >
+                  {isPublished ? "Published" : "Draft"}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 font-medium mt-1.5">
+                <span className="flex items-center gap-1.5">
+                  <Clock size={13} className="text-slate-400" />
+                  {parsedSummary.duration || "Self-Paced"}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Layers size={13} className="text-slate-400" />
+                  {modules.length} {modules.length === 1 ? "Module" : "Modules"} ({totalChapters} Chapters)
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Users size={13} className="text-slate-400" />
+                  {enrolledStudents.length} Students Enrolled
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <DollarSign size={13} className="text-slate-400" />
+                  {currentPricing?.individual_price_paise
+                    ? `₹${(currentPricing.individual_price_paise / 100).toLocaleString("en-IN")}`
+                    : "Pricing not set"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                setEditingModule(null);
+                setIsAddModuleOpen(true);
+              }}
+              className="gap-1.5 text-xs font-semibold shadow-xs"
+            >
+              <Plus size={14} />
+              <span>Insert Module</span>
+            </Button>
+
+            {modules.length > 0 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setAddingChapterToModule(modules[0] ?? null)}
+                className="gap-1.5 text-xs font-semibold"
+              >
+                <Plus size={14} />
+                <span>Insert Chapter</span>
+              </Button>
+            )}
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleSelectTab("chapter_exams")}
+              className="gap-1.5 text-xs font-semibold"
+            >
+              <HelpCircle size={14} />
+              <span>Chapter Tests</span>
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleSelectTab("module_tests")}
+              className="gap-1.5 text-xs font-semibold"
+            >
+              <ClipboardCheck size={14} />
+              <span>Module Tests</span>
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleSelectTab("final_exam")}
+              className="gap-1.5 text-xs font-semibold"
+            >
+              <ShieldAlert size={14} />
+              <span>Final Exam</span>
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate(`/courses/${courseId}/learn`)}
+              className="gap-1.5 text-xs font-semibold"
+            >
+              <Eye size={14} />
+              <span>Preview</span>
+            </Button>
+
+            <Button
+              variant={isPublished ? "secondary" : "primary"}
+              size="sm"
+              onClick={handleTogglePublish}
+              className="gap-1.5 text-xs font-semibold"
+            >
+              {isPublished ? "Unpublish" : "Publish"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Visual Workflow Banner: Modules -> Chapters -> Chapter Tests -> Module Tests -> Final Exam */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Layers size={16} className="text-[#2563EB]" />
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+              Course Structure & Assessments Pipeline
+            </h3>
+          </div>
+          <span className="text-[11px] font-semibold text-slate-500">
+            {modules.length} Modules · {totalChapters} Chapters · {finalTestId ? "Final Exam Ready" : "Final Exam Pending"}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3">
+          {/* Step 1: Modules & Chapters */}
+          <div className="p-3 rounded-xl border border-blue-100 bg-blue-50/40 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-[#2563EB] uppercase tracking-wider">1. Curriculum</span>
+                <span className="text-xs font-bold text-slate-800">{modules.length} Modules</span>
+              </div>
+              <p className="text-xs font-bold text-slate-900 mt-1">Modules & Chapters</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {totalChapters} chapter lectures with video & notes
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-blue-100/80">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingModule(null);
+                  setIsAddModuleOpen(true);
+                }}
+                className="flex-1 py-1 px-2 rounded-lg bg-[#2563EB] text-white text-[11px] font-bold hover:bg-blue-700 transition cursor-pointer"
+              >
+                + Module
+              </button>
+              {modules.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setAddingChapterToModule(modules[0] ?? null)}
+                  className="flex-1 py-1 px-2 rounded-lg bg-white border border-blue-300 text-[#2563EB] text-[11px] font-bold hover:bg-blue-50 transition cursor-pointer"
+                >
+                  + Chapter
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Step 2: Chapter Tests */}
+          <div className="p-3 rounded-xl border border-indigo-100 bg-indigo-50/40 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">2. Chapter Quizzes</span>
+                <span className="text-xs font-bold text-slate-800">
+                  {modules.reduce((acc, m) => acc + (m.topics?.filter((t) => t.topic_test_id)?.length ?? 0), 0)} / {totalChapters}
+                </span>
+              </div>
+              <p className="text-xs font-bold text-slate-900 mt-1">Chapter Tests</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Quick checkpoint quizzes after each chapter</p>
+            </div>
+            <div className="mt-3 pt-2 border-t border-indigo-100/80">
+              <button
+                type="button"
+                onClick={() => handleSelectTab("chapter_exams")}
+                className="w-full py-1 px-2 rounded-lg bg-white border border-indigo-300 text-indigo-700 text-[11px] font-bold hover:bg-indigo-50 transition cursor-pointer"
+              >
+                Manage Chapter Tests →
+              </button>
+            </div>
+          </div>
+
+          {/* Step 3: Module Tests */}
+          <div className="p-3 rounded-xl border border-purple-100 bg-purple-50/40 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">3. Module Tests</span>
+                <span className="text-xs font-bold text-slate-800">
+                  {modules.filter((m) => m.module_test_id).length} / {modules.length}
+                </span>
+              </div>
+              <p className="text-xs font-bold text-slate-900 mt-1">Module Tests</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">End-of-module assessment unlocking next module</p>
+            </div>
+            <div className="mt-3 pt-2 border-t border-purple-100/80">
+              <button
+                type="button"
+                onClick={() => handleSelectTab("module_tests")}
+                className="w-full py-1 px-2 rounded-lg bg-white border border-purple-300 text-purple-700 text-[11px] font-bold hover:bg-purple-50 transition cursor-pointer"
+              >
+                Manage Module Tests →
+              </button>
+            </div>
+          </div>
+
+          {/* Step 4: Final Exam */}
+          <div className="p-3 rounded-xl border border-emerald-100 bg-emerald-50/40 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">4. Final Exam</span>
+                <span className={cn(
+                  "text-[10px] font-bold px-1.5 py-0.2 rounded-full",
+                  finalTestId ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                )}>
+                  {finalTestId ? "Configured" : "Not Set"}
+                </span>
+              </div>
+              <p className="text-xs font-bold text-slate-900 mt-1">Final Proctored Exam</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Comprehensive graduation test with AI proctoring</p>
+            </div>
+            <div className="mt-3 pt-2 border-t border-emerald-100/80">
+              <button
+                type="button"
+                onClick={() => handleSelectTab("final_exam")}
+                className="w-full py-1 px-2 rounded-lg bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700 transition cursor-pointer"
+              >
+                {finalTestId ? "Edit Final Exam →" : "Setup Final Exam →"}
+              </button>
             </div>
           </div>
         </div>
+      </div>
 
-        {isSuperAdminOrAdmin && (
-          <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => navigate(`/courses/${courseId}/edit?from=hub`)}
-              className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
-            >
-              Edit course
-            </button>
-
-            <div className="relative group">
+      {/* 2. Udemy-Style Horizontal Workspace Tabs */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
+        <div className="flex border-b border-slate-200 overflow-x-auto no-scrollbar px-2 sm:px-4 bg-slate-50/60">
+          {tabs.map((tab) => {
+            const IconComponent = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
               <button
+                key={tab.id}
                 type="button"
-                disabled={!isPublished && !stepsStatus.allDone}
-                onClick={handleTogglePublish}
+                onClick={() => handleSelectTab(tab.id)}
                 className={cn(
-                  "px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed",
-                  isPublished
-                    ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                    : "bg-[#00663C] text-white hover:bg-[#00522F]"
+                  "flex items-center gap-2 px-4 py-3.5 text-xs font-semibold whitespace-nowrap transition-all border-b-2 cursor-pointer",
+                  isActive
+                    ? "border-[#2563EB] text-[#2563EB] bg-white font-bold shadow-2xs"
+                    : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60"
                 )}
               >
-                {isPublished ? "Unpublish" : "Publish course"}
+                <IconComponent size={15} className={isActive ? "text-[#2563EB]" : "text-slate-400"} />
+                <span>{tab.label}</span>
+                {tab.badge !== undefined && (
+                  <span
+                    className={cn(
+                      "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                      isActive ? "bg-blue-100 text-blue-800" : "bg-slate-200/80 text-slate-700"
+                    )}
+                  >
+                    {tab.badge}
+                  </span>
+                )}
               </button>
-              {!isPublished && !stepsStatus.allDone && (
-                <div className="absolute right-0 top-full mt-1.5 hidden group-hover:block z-20 w-64 p-2 rounded-xl bg-slate-900 text-white text-[11px] shadow-lg">
-                  Complete all 5 steps to publish. Missing: {stepsStatus.missingStepsText.join(", ")}
+            );
+          })}
+        </div>
+
+        {/* ========================================================================= */}
+        {/* TAB 1: COURSE DETAILS                                                    */}
+        {/* ========================================================================= */}
+        {activeTab === "overview" && (
+          <div className="p-6 space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Course Information & Metadata</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Core marketing details, outcomes, requirements, and classification.
+                </p>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => navigate(`/courses/${courseId}/edit?from=hub`)}
+                className="gap-1.5 text-xs font-semibold"
+              >
+                <Edit size={14} />
+                <span>Edit Course Details</span>
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-2 space-y-5">
+                <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/40">
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">Description</h4>
+                  <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line">
+                    {parsedSummary.cleanDescription || course.summary || "No description provided."}
+                  </p>
                 </div>
-              )}
+
+                <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/40">
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">Learning Outcomes</h4>
+                  {parsedSummary.learningOutcomes.length > 0 ? (
+                    <ul className="space-y-1.5">
+                      {parsedSummary.learningOutcomes.map((item: string, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2 text-xs text-slate-700">
+                          <CheckCircle2 size={14} className="text-emerald-600 mt-0.5 shrink-0" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic">No specific learning outcomes listed.</p>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/40">
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">Prerequisites</h4>
+                  {parsedSummary.prerequisites.length > 0 ? (
+                    <ul className="space-y-1.5">
+                      {parsedSummary.prerequisites.map((item: string, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2 text-xs text-slate-700">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 shrink-0" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic">None required. Suitable for all skill levels.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/40 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Specifications</h4>
+                  <div className="space-y-2.5 text-xs">
+                    <div className="flex justify-between py-1 border-b border-slate-200/60">
+                      <span className="text-slate-500">Course Code</span>
+                      <span className="font-mono font-bold text-slate-900">{course.slug.toUpperCase()}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200/60">
+                      <span className="text-slate-500">Category</span>
+                      <span className="font-semibold text-slate-900">{parsedSummary.category}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200/60">
+                      <span className="text-slate-500">Instructor</span>
+                      <span className="font-semibold text-slate-900">{parsedSummary.instructor}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200/60">
+                      <span className="text-slate-500">Difficulty</span>
+                      <span className="font-semibold text-slate-900 capitalize">{parsedSummary.level || "Intermediate"}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200/60">
+                      <span className="text-slate-500">Duration</span>
+                      <span className="font-semibold text-slate-900">{parsedSummary.duration || "40 hours"}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200/60">
+                      <span className="text-slate-500">Pass Percentage</span>
+                      <span className="font-semibold text-emerald-700">{parsedSummary.passPercentage || "70%"}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-slate-500">Created On</span>
+                      <span className="font-semibold text-slate-900">
+                        {new Date(course.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
-      </div>
 
-      {/* 3. Setup Progress Cards (matching 5 Steps with Click-to-Jump) */}
-      <SetupProgress
-        steps={setupSteps}
-        onStepClick={(step) => {
-          if (step.onClick) step.onClick();
-        }}
-      />
-
-      {/* 4. Hub Tabs Card */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
-        {/* Tabs Bar */}
-        <div className="flex border-b border-slate-200 px-5 gap-6">
-          {(["modules", "overview", "final_exam", "students"] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => handleSelectTab(tab)}
-              className={cn(
-                "py-3.5 text-xs font-bold transition-all relative capitalize cursor-pointer",
-                activeTab === tab
-                  ? "text-[#00663C] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#00663C]"
-                  : "text-slate-500 hover:text-slate-900"
-              )}
-            >
-              {tab === "final_exam" ? "Final exam" : tab}
-            </button>
-          ))}
-        </div>
-
-        {/* Tab 1: Modules */}
-        {activeTab === "modules" && (
-          <div>
-            <div className="flex flex-wrap items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50 gap-3">
-              <p className="text-xs text-slate-500 font-medium">
-                Drag to reorder. Students must finish modules in this order.
-              </p>
+        {/* ========================================================================= */}
+        {/* TAB 2: CURRICULUM (Modules & Chapters with Video Quality & PDF Viewer)   */}
+        {/* ========================================================================= */}
+        {activeTab === "curriculum" && (
+          <div className="p-6 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Curriculum Builder</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Organize your course into sequential modules, video lectures with multi-renditions, and PDF notes.
+                </p>
+              </div>
               <div className="flex items-center gap-2">
-                {modules.length > 0 && modules[0] && (
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/courses/${courseId}/modules/${modules[0]!.module_id}/chapters?step=3`)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
-                  >
-                    <span>Manage Chapters</span>
-                    <Icon name="arrow-right" size={14} />
-                  </button>
-                )}
-                {isSuperAdminOrAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingModule(null);
-                      setIsAddModuleOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs"
-                  >
-                    <Icon name="plus" size={14} /> Add module
-                  </button>
-                )}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setEditingModule(null);
+                    setIsAddModuleOpen(true);
+                  }}
+                  className="gap-1.5 text-xs font-semibold"
+                >
+                  <Plus size={14} />
+                  <span>Add Module</span>
+                </Button>
               </div>
             </div>
 
             {modules.length === 0 ? (
-              <div className="p-16 text-center">
-                <Icon name="layers" size={32} className="mx-auto text-slate-300 mb-2" />
-                <h4 className="text-sm font-bold text-slate-800">No modules yet</h4>
-                <p className="text-xs text-slate-500 mt-1 mb-4">
-                  Step 2: Add your first module to begin organizing chapters and tests.
+              <div className="text-center py-16 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                <Layers size={36} className="mx-auto text-slate-300 mb-2" />
+                <h4 className="text-sm font-bold text-slate-800">No modules in this course yet</h4>
+                <p className="text-xs text-slate-500 mt-1 mb-4 max-w-sm mx-auto">
+                  Get started by adding your first module to structure your course topics and learning chapters.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setIsAddModuleOpen(true)}
-                  className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer"
-                >
-                  Add module
-                </button>
+                <Button variant="primary" size="sm" onClick={() => setIsAddModuleOpen(true)}>
+                  Create First Module
+                </Button>
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
-                {modules.map((m, idx) => {
-                  const chaptersCount = m.topics?.length ?? 0;
-                  const isReady = chaptersCount > 0;
+              <div className="space-y-4">
+                {modules.map((m, mIdx) => {
+                  const chapters = m.topics ?? [];
+                  const isCollapsed = collapsedModules[m.module_id] ?? false;
 
                   return (
                     <div
                       key={m.module_id}
-                      draggable
-                      onDragStart={() => setDraggedModuleIndex(idx)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => void handleDropModule(idx)}
-                      className="flex items-center gap-4 p-4 hover:bg-slate-50/70 transition-colors cursor-move"
+                      className="rounded-xl border border-slate-200 bg-white shadow-2xs overflow-hidden transition-all"
                     >
-                      <button
-                        type="button"
-                        className="text-slate-300 hover:text-slate-600 cursor-grab p-1"
-                        title="Drag to reorder"
-                      >
-                        <Icon name="menu" size={16} />
-                      </button>
-
-                      <span className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-
-                      <div className="min-w-0 flex-1">
-                        <h4 className="text-sm font-bold text-[#0A1530] truncate">{m.title}</h4>
-                        <p className="text-xs text-slate-500 truncate">
-                          {m.description || `${chaptersCount} chapters included`}
-                        </p>
-                      </div>
-
-                      <div className="w-40 shrink-0 hidden md:block">
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
-                          <span>{chaptersCount} chapters</span>
-                          <b className={cn("font-bold", isReady ? "text-[#00663C]" : "text-slate-400")}>
-                            {isReady ? "Ready" : "0%"}
-                          </b>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                          <div
-                            className="h-full bg-[#00663C] rounded-full transition-all"
-                            style={{ width: isReady ? "100%" : "0%" }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setManagingModuleTest(m)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50/70 text-xs font-bold text-[#2563EB] hover:bg-blue-100 cursor-pointer shadow-2xs"
+                      {/* Module Header Bar */}
+                      <div className="flex items-center justify-between p-4 bg-slate-50/80 border-b border-slate-100 gap-3">
+                        <div
+                          className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer select-none"
+                          onClick={() => toggleCollapse(m.module_id)}
                         >
-                          <Icon name="clipboardCheck" size={13} />
-                          <span>Module Test</span>
-                        </button>
+                          <button
+                            type="button"
+                            className="p-1 rounded text-slate-400 hover:text-slate-700"
+                            aria-label="Toggle module"
+                          >
+                            {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                          </button>
+                          <span className="w-6 h-6 rounded-md bg-[#2563EB] text-white text-xs font-bold flex items-center justify-center shrink-0">
+                            {mIdx + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-bold text-slate-900 truncate">{m.title}</h4>
+                            <p className="text-[11px] text-slate-500">
+                              {chapters.length} {chapters.length === 1 ? "Chapter" : "Chapters"} · Pass Mark {m.pass_mark || 70}%
+                            </p>
+                          </div>
+                        </div>
 
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/courses/${courseId}/modules/${m.module_id}/chapters?step=3`)}
-                          className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
-                        >
-                          Chapters ({chaptersCount})
-                        </button>
-                        {isSuperAdminOrAdmin && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingModule(m);
-                                setIsAddModuleOpen(true);
-                              }}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
-                              title="Edit module"
-                            >
-                              <Icon name="edit" size={15} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setDeletingModule(m)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
-                              title="Delete module"
-                            >
-                              <Icon name="trash" size={15} />
-                            </button>
-                          </>
-                        )}
+                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAddingChapterToModule(m);
+                            }}
+                            className="text-xs font-semibold gap-1 bg-[#2563EB] hover:bg-blue-700 text-white"
+                          >
+                            <Plus size={13} />
+                            <span>Add Chapter</span>
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setManagingModuleTest(m)}
+                            className={cn(
+                              "text-xs font-semibold gap-1",
+                              m.module_test_id
+                                ? "text-emerald-700 border-emerald-200 bg-emerald-50/60"
+                                : "text-[#2563EB] border-blue-200 bg-blue-50/40 hover:bg-blue-100/50"
+                            )}
+                          >
+                            <ClipboardCheck size={13} />
+                            <span>{m.module_test_id ? "Module Test Ready" : "Setup Module Test"}</span>
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => navigate(`/courses/${courseId}/modules/${m.module_id}/chapters`)}
+                            className="text-xs font-semibold"
+                          >
+                            <span>Manage Chapters</span>
+                          </Button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingModule(m);
+                              setIsAddModuleOpen(true);
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 cursor-pointer"
+                            title="Edit Module"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeletingModule(m)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                            title="Delete Module"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Chapters Accordion Content */}
+                      {!isCollapsed && (
+                        <div className="divide-y divide-slate-100">
+                          {chapters.length === 0 ? (
+                            <div className="p-6 text-center text-xs text-slate-400">
+                              No chapters in this module. Click "Manage Chapters" to add video lectures and study notes.
+                            </div>
+                          ) : (
+                            chapters.map((ch, chIdx) => {
+                              const items = ch.items ?? [];
+                              const videoItem = items.find((i: any) => i.item_type === "video");
+                              const pdfItem = items.find((i: any) => i.item_type === "pdf" || i.item_type === "document");
+
+                              return (
+                                <div
+                                  key={ch.topic_id}
+                                  className="flex flex-wrap items-center justify-between p-3.5 pl-11 hover:bg-slate-50/60 transition-colors gap-3"
+                                >
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <span className="text-xs font-mono text-slate-400 font-semibold">
+                                      {mIdx + 1}.{chIdx + 1}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <h5 className="text-xs font-bold text-slate-800 truncate">{ch.title}</h5>
+                                      <div className="flex items-center gap-3 mt-0.5">
+                                        {videoItem ? (
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                            <Video size={11} /> Video Lecture (1080p HD)
+                                          </span>
+                                        ) : (
+                                          <span className="text-[11px] text-slate-400">No video attached</span>
+                                        )}
+                                        {pdfItem ? (
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                            <FileText size={11} /> Lecture Notes (PDF)
+                                          </span>
+                                        ) : (
+                                          <span className="text-[11px] text-slate-400">No PDF attached</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    {videoItem && (
+                                      <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() =>
+                                          setVideoPreviewTarget({
+                                            chapterTitle: ch.title,
+                                            itemTitle: videoItem.title,
+                                            mediaId: (videoItem as any).media_id || (videoItem as any).content_id,
+                                          })
+                                        }
+                                        className="text-[11px] px-2.5 py-1 gap-1"
+                                      >
+                                        <Eye size={12} /> Video
+                                      </Button>
+                                    )}
+                                    {pdfItem && (
+                                      <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() =>
+                                          setPdfPreviewTarget({
+                                            chapterTitle: ch.title,
+                                            itemTitle: pdfItem.title,
+                                            mediaId: (pdfItem as any).media_id || (pdfItem as any).content_id,
+                                          })
+                                        }
+                                        className="text-[11px] px-2.5 py-1 gap-1"
+                                      >
+                                        <Eye size={12} /> PDF Notes
+                                      </Button>
+                                    )}
+                                    {ch.topic_test_id ? (
+                                      <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() =>
+                                          setManagingChapterTest({
+                                            chapter: ch,
+                                            moduleTitle: m.title,
+                                            moduleId: m.module_id,
+                                          })
+                                        }
+                                        className="text-[11px] px-2.5 py-1 gap-1 text-emerald-700 border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100"
+                                      >
+                                        <CheckCircle2 size={12} className="text-emerald-600" />
+                                        <span>Quiz Ready (Pass {ch.pass_mark || 70}%)</span>
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() =>
+                                          setManagingChapterTest({
+                                            chapter: ch,
+                                            moduleTitle: m.title,
+                                            moduleId: m.module_id,
+                                          })
+                                        }
+                                        className="text-[11px] px-2.5 py-1 gap-1 text-[#2563EB] border-blue-200 bg-blue-50/50 hover:bg-blue-100"
+                                      >
+                                        <Plus size={12} />
+                                        <span>Setup Quiz</span>
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1030,474 +1311,976 @@ export function CourseHubPage() {
           </div>
         )}
 
-        {/* Tab 2: Overview */}
-        {activeTab === "overview" && (
-          <div className="p-6 space-y-4">
-            <h4 className="text-sm font-bold text-[#0A1530]">Course Overview</h4>
-            <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
-              {parsedSummary.cleanDescription || course.summary || "No overview provided for this course yet."}
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-100">
-              <div>
-                <span className="text-[11px] text-slate-400 block font-medium">Slug</span>
-                <b className="text-xs text-slate-800 font-mono">{course.slug}</b>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 block font-medium">Created</span>
-                <b className="text-xs text-slate-800 font-mono">
-                  {new Date(course.created_at).toLocaleDateString()}
-                </b>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 block font-medium">Versions</span>
-                <b className="text-xs text-slate-800 font-mono">{course.versions.length}</b>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 block font-medium">Total Modules</span>
-                <b className="text-xs text-slate-800 font-mono">{modules.length}</b>
-              </div>
+        {/* ========================================================================= */}
+        {/* TAB 3: CHAPTER EXAMS (Quizzes per chapter)                              */}
+        {/* ========================================================================= */}
+        {activeTab === "chapter_exams" && (
+          <div className="p-6 space-y-5">
+            <div className="pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Chapter Quizzes & Checkpoints</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Practice quizzes presented after each chapter to reinforce learning concepts.
+              </p>
+            </div>
+
+            <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+              {modules.flatMap((m) => (m.topics ?? []).map((t) => ({ ...t, moduleTitle: m.title }))).length === 0 ? (
+                <div className="p-12 text-center text-xs text-slate-500">
+                  No chapters available. Add modules and chapters in Curriculum tab first.
+                </div>
+              ) : (
+                modules.flatMap((m) =>
+                  (m.topics ?? []).map((ch, chIdx) => (
+                    <div
+                      key={ch.topic_id}
+                      className="p-4 flex flex-wrap items-center justify-between gap-4 bg-white hover:bg-slate-50/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2563EB] flex items-center justify-center font-bold text-xs shrink-0">
+                          Q
+                        </div>
+                        <div>
+                          <span className="text-[10.5px] font-semibold text-slate-400 uppercase tracking-wider block">
+                            {m.title} · Chapter {chIdx + 1}
+                          </span>
+                          <h4 className="text-xs font-bold text-slate-900">{ch.title} Quiz</h4>
+                          <p className="text-[11px] text-slate-500">5 Questions · Pass mark 70% · Unlimited attempts</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {ch.topic_test_id ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 size={12} /> Active Checkpoint
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            Pending Setup
+                          </span>
+                        )}
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => setManagingChapterTest({ chapter: ch, moduleTitle: m.title, moduleId: m.module_id })}
+                          className="text-xs font-semibold"
+                        >
+                          Configure Quiz
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )
+              )}
             </div>
           </div>
         )}
 
-        {/* Tab 3: Final Exam Configuration (Full Implementation) */}
-        {activeTab === "final_exam" && (
+        {/* ========================================================================= */}
+        {/* TAB 4: MODULE TESTS                                                      */}
+        {/* ========================================================================= */}
+        {activeTab === "module_tests" && (
           <div className="p-6 space-y-5">
+            <div className="pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Module Mastery Assessments</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Comprehensive end-of-module tests that unlock subsequent modules upon passing.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {modules.map((m, idx) => (
+                <div key={m.module_id} className="rounded-xl border border-slate-200 p-5 bg-white shadow-2xs space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold text-sm shrink-0 border border-purple-200">
+                        M{idx + 1}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900">{m.title} Test</h4>
+                        <p className="text-xs text-slate-500">End-of-Module Evaluation</p>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700">
+                      Pass: {m.pass_mark || 70}%
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 py-2 border-y border-slate-100 text-center text-xs">
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Questions</span>
+                      <b className="text-slate-800">10 MCQs</b>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Duration</span>
+                      <b className="text-slate-800">20 Mins</b>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Retakes</span>
+                      <b className="text-slate-800">3 Allowed</b>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => navigate(`/courses/${courseId}/modules/${m.module_id}/test`)}
+                      className="text-xs font-semibold"
+                    >
+                      Preview Test
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setManagingModuleTest(m)}
+                      className="text-xs font-semibold"
+                    >
+                      Configure Test
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 5: FINAL EXAM & PROCTORING                                           */}
+        {/* ========================================================================= */}
+        {activeTab === "final_exam" && (
+          <div className="p-6 space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div>
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-bold text-[#0A1530]">Final Proctored Exam</h4>
+                  <h3 className="text-base font-bold text-slate-900">Final Certification Exam</h3>
                   <span
                     className={cn(
                       "px-2.5 py-0.5 rounded-full text-xs font-bold",
-                      stepsStatus.step5Done
-                        ? "bg-[#E7F3EC] text-[#00663C]"
-                        : "bg-amber-100 text-amber-800"
+                      finalTestId ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200"
                     )}
                   >
-                    {stepsStatus.step5Done ? "Configured & Active" : "Not configured"}
+                    {finalTestId ? "Configured & Active" : "Draft / Unlinked"}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Proctored exam required for course completion and student certification.
+                  High-stakes proctored exam required for students to graduate and earn their verified certificate.
                 </p>
               </div>
 
-              {isSuperAdminOrAdmin && (
-                <div className="flex items-center gap-2">
-                  {stepsStatus.step5Done && !isConfiguringExam && (
-                    <button
-                      type="button"
-                      onClick={() => setIsRemoveExamModalOpen(true)}
-                      className="px-3 py-1.5 rounded-xl border border-rose-200 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer"
-                    >
-                      Remove Exam
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setIsConfiguringExam(!isConfiguringExam)}
-                    className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
-                  >
-                    {isConfiguringExam ? "Cancel" : stepsStatus.step5Done ? "Edit Configuration" : "Configure Exam"}
-                  </button>
-                </div>
-              )}
+              <Button
+                variant={isConfiguringExam ? "secondary" : "primary"}
+                size="sm"
+                onClick={() => setIsConfiguringExam(!isConfiguringExam)}
+                className="text-xs font-semibold"
+              >
+                {isConfiguringExam ? "Close Editor" : finalTestId ? "Edit Settings" : "Setup Final Exam"}
+              </Button>
             </div>
 
-            {/* Warning if no approved questions available */}
-            {!hasApprovedQuestions && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-                    <Icon name="alertCircle" size={18} />
-                  </div>
+            {/* Exam Parameters Form */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="rounded-xl border border-slate-200 p-5 bg-white space-y-4">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Exam Parameters</h4>
+                <div className="space-y-3">
                   <div>
-                    <h5 className="text-xs font-bold text-amber-900">Approve chapter questions first</h5>
-                    <p className="text-[11px] text-amber-700 mt-0.5">
-                      The final exam draws from approved questions in your question bank. Please approve chapter questions in Step 4.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/courses/${courseId}/questions/review?step=4`)}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-700 text-xs font-bold text-white hover:bg-amber-800 cursor-pointer"
-                >
-                  Go to Step 4 (Approve questions)
-                </button>
-              </div>
-            )}
-
-            {isConfiguringExam ? (
-              <div className="p-6 rounded-2xl border border-emerald-200 bg-emerald-50/20 space-y-5">
-                <div className="border-b border-emerald-200/60 pb-3">
-                  <h5 className="text-sm font-bold text-slate-900">Exam Parameters & Settings</h5>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Configure timing, passing standards, proctoring rules, and question sources.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 mb-1">Exam Title *</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Exam Title</label>
                     <input
                       type="text"
-                      required
                       value={examTitle}
                       onChange={(e) => setExamTitle(e.target.value)}
-                      placeholder="e.g. Python Mastery Certification Exam"
-                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs bg-white text-slate-900 focus:border-[#00663C] focus:outline-none"
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2563EB]"
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 mb-1">Duration (Minutes) *</label>
-                    <input
-                      type="number"
-                      required
-                      min={5}
-                      max={300}
-                      value={examDurationMinutes}
-                      onChange={(e) => setExamDurationMinutes(Number(e.target.value))}
-                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs bg-white text-slate-900 focus:border-[#00663C] focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 mb-1">Pass Mark (%) *</label>
-                    <input
-                      type="number"
-                      min={10}
-                      max={100}
-                      value={examPassMark}
-                      onChange={(e) => setExamPassMark(Number(e.target.value))}
-                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs bg-white text-slate-900 focus:border-[#00663C] focus:outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 mb-1">Allowed Attempts *</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={examAttempts}
-                      onChange={(e) => setExamAttempts(Number(e.target.value))}
-                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs bg-white text-slate-900 focus:border-[#00663C] focus:outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 mb-1">Cooldown (Days) *</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={30}
-                      value={examCooldownDays}
-                      onChange={(e) => setExamCooldownDays(Number(e.target.value))}
-                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs bg-white text-slate-900 focus:border-[#00663C] focus:outline-none"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Proctoring & Security Rules */}
-                <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
-                  <h6 className="text-xs font-bold text-slate-900">Proctoring & Exam Integrity</h6>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <label className="flex items-center gap-2.5 cursor-pointer">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Duration (Min)</label>
                       <input
-                        type="checkbox"
-                        checked={examCameraRequired}
-                        onChange={(e) => setExamCameraRequired(e.target.checked)}
-                        className="rounded border-slate-300 text-[#00663C] focus:ring-[#00663C]"
+                        type="number"
+                        min={10}
+                        max={300}
+                        value={examDurationMinutes}
+                        onChange={(e) => setExamDurationMinutes(Number(e.target.value))}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2563EB]"
                       />
-                      <span className="text-xs text-slate-700 font-semibold">Camera Required</span>
-                    </label>
-
-                    <label className="flex items-center gap-2.5 cursor-pointer">
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Pass Mark (%)</label>
                       <input
-                        type="checkbox"
-                        checked={examShuffle}
-                        onChange={(e) => setExamShuffle(e.target.checked)}
-                        className="rounded border-slate-300 text-[#00663C] focus:ring-[#00663C]"
+                        type="number"
+                        min={10}
+                        max={100}
+                        value={examPassMark}
+                        onChange={(e) => setExamPassMark(Number(e.target.value))}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2563EB]"
                       />
-                      <span className="text-xs text-slate-700 font-semibold">Shuffle Questions</span>
-                    </label>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-700 font-semibold shrink-0">Max Warnings:</span>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Attempts</label>
                       <input
                         type="number"
                         min={1}
                         max={10}
-                        value={examMaxWarnings}
-                        onChange={(e) => setExamMaxWarnings(Number(e.target.value))}
-                        className="w-16 rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-900"
+                        value={examAttempts}
+                        onChange={(e) => setExamAttempts(Number(e.target.value))}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2563EB]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Proctoring Toggles */}
+              <div className="rounded-xl border border-slate-200 p-5 bg-white space-y-4">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldAlert size={14} className="text-blue-600" />
+                  <span>Proctoring Security Controls</span>
+                </h4>
+                <div className="space-y-3">
+                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <div className="flex items-center gap-2.5">
+                      <Camera size={16} className="text-slate-600" />
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">Webcam & AI Face Verification</p>
+                        <p className="text-[10.5px] text-slate-500">Continuous face detection and presence checks</p>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={examCameraRequired}
+                      onChange={(e) => setExamCameraRequired(e.target.checked)}
+                      className="rounded text-[#2563EB] focus:ring-[#2563EB] h-4 w-4"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <div className="flex items-center gap-2.5">
+                      <Mic size={16} className="text-slate-600" />
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">Audio & Voice Monitoring</p>
+                        <p className="text-[10.5px] text-slate-500">Flags ambient noise and multi-person talking</p>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={examMicRequired}
+                      onChange={(e) => setExamMicRequired(e.target.checked)}
+                      className="rounded text-[#2563EB] focus:ring-[#2563EB] h-4 w-4"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <div className="flex items-center gap-2.5">
+                      <Maximize2 size={16} className="text-slate-600" />
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">Fullscreen Lock Enforcement</p>
+                        <p className="text-[10.5px] text-slate-500">Enforces dedicated kiosk-style fullscreen view</p>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={examFullscreenRequired}
+                      onChange={(e) => setExamFullscreenRequired(e.target.checked)}
+                      className="rounded text-[#2563EB] focus:ring-[#2563EB] h-4 w-4"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <div className="flex items-center gap-2.5">
+                      <Copy size={16} className="text-slate-600" />
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">Block Copy / Paste & Tab Switch</p>
+                        <p className="text-[10.5px] text-slate-500">Auto-terminates after multiple warnings</p>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={examCopyPasteBlock}
+                      onChange={(e) => setExamCopyPasteBlock(e.target.checked)}
+                      className="rounded text-[#2563EB] focus:ring-[#2563EB] h-4 w-4"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Questions Pool Manager */}
+            <div className="pt-2">
+              <AssessmentQuestionManager
+                questions={finalCustomQuestions}
+                contextTitle={`${course.title} · Final Exam`}
+                contextType="final"
+                targetQuestionCount={10}
+                onSaveQuestion={async (draft: McqDraft & { questionType?: string }) => {
+                  const newQ: ManagedQuestionItem = {
+                    id: draft.questionId || `q-${Date.now()}`,
+                    text: draft.text,
+                    questionType: draft.questionType || "mcq_single",
+                    marks: draft.marks || 2,
+                    options: draft.options,
+                    correctAnswer: draft.correct,
+                    explanation: draft.explanation,
+                  };
+                  setFinalCustomQuestions((prev) => [...prev, newQ]);
+                  notify.success("Question saved to final exam pool");
+                }}
+                onDeleteQuestion={async (qId) => {
+                  setFinalCustomQuestions((prev) => prev.filter((q) => q.id !== qId));
+                  notify.success("Question removed");
+                }}
+                onImportDrafts={async (drafts: McqDraft[]) => {
+                  const imported: ManagedQuestionItem[] = drafts.map((d, i) => ({
+                    id: d.questionId || `imp-${Date.now()}-${i}`,
+                    text: d.text,
+                    questionType: "mcq_single",
+                    marks: d.marks || 2,
+                    options: d.options,
+                    correctAnswer: d.correct,
+                    explanation: d.explanation,
+                  }));
+                  setFinalCustomQuestions((prev) => [...prev, ...imported]);
+                  notify.success(`Imported ${imported.length} questions`);
+                }}
+              />
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-slate-100">
+              <Button
+                variant="primary"
+                onClick={handleSaveFinalExam}
+                disabled={isCreatingTest || isUpdatingTest || isSavingRules}
+                className="text-xs font-bold px-6 py-2"
+              >
+                {isCreatingTest || isUpdatingTest || isSavingRules ? "Saving..." : "Save Exam & Proctoring Settings"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 6: CERTIFICATE CONFIGURATION                                         */}
+        {/* ========================================================================= */}
+        {activeTab === "certificate" && (
+          <div className="p-6 space-y-6">
+            <div className="pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Certificate of Completion</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Configure issuance criteria, signatory details, and template styling.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Settings Form */}
+              <div className="space-y-5">
+                <div className="rounded-xl border border-slate-200 p-5 bg-white space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Enable Certification</h4>
+                      <p className="text-[11px] text-slate-500">Generate verifiable certificate upon course passing</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={certEnabled}
+                      onChange={(e) => setCertEnabled(e.target.checked)}
+                      className="rounded text-[#2563EB] focus:ring-[#2563EB] h-5 w-5"
+                    />
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Minimum Final Score Required (%)</label>
+                      <input
+                        type="number"
+                        min={50}
+                        max={100}
+                        value={certMinPassScore}
+                        onChange={(e) => setCertMinPassScore(Number(e.target.value))}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Authorized Signatory Name</label>
+                      <input
+                        type="text"
+                        value={certSignatoryName}
+                        onChange={(e) => setCertSignatoryName(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Signatory Title</label>
+                      <input
+                        type="text"
+                        value={certSignatoryTitle}
+                        onChange={(e) => setCertSignatoryTitle(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Issuing Organization</label>
+                      <input
+                        type="text"
+                        value={certOrgName}
+                        onChange={(e) => setCertOrgName(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Final Test Questions Management */}
-                <div className="space-y-4">
-                  <AssessmentQuestionManager
-                    questions={finalCustomQuestions}
-                    contextTitle={course?.title ? `${course.title} · Final Exam` : "Final Exam"}
-                    contextType="final"
-                    targetQuestionCount={examQuestionCount}
-                    onSaveQuestion={handleSaveFinalQuestion}
-                    onDeleteQuestion={handleDeleteFinalQuestion}
-                    onImportDrafts={handleImportFinalDrafts}
-                  />
+                <div className="flex justify-end">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => notify.success("Certificate template & signatory settings saved!")}
+                    className="text-xs font-bold"
+                  >
+                    Save Certificate Settings
+                  </Button>
+                </div>
+              </div>
 
-                  {/* Optional: Import/Append existing chapter questions */}
-                  {courseApprovedQuestions.length > 0 && (
-                    <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl border border-slate-200 bg-slate-50/70">
+              {/* Certificate Live Preview */}
+              <div className="space-y-3">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Live Certificate Preview
+                </span>
+                <div className="rounded-2xl border-4 border-double border-amber-600/40 bg-gradient-to-b from-amber-50/30 via-white to-amber-50/20 p-8 shadow-md text-center relative overflow-hidden">
+                  <div className="absolute top-3 left-3 text-amber-700/20">
+                    <Award size={48} />
+                  </div>
+                  <div className="space-y-4">
+                    <p className="text-[10px] font-mono tracking-widest uppercase text-amber-800 font-bold">
+                      {certOrgName.toUpperCase()}
+                    </p>
+                    <h2 className="text-xl font-serif font-bold text-slate-900 tracking-tight">
+                      Certificate of Achievement
+                    </h2>
+                    <p className="text-[11px] text-slate-500 italic">This is proudly presented to</p>
+                    <p className="text-lg font-bold text-[#1E3A8A] font-serif border-b border-slate-200 pb-1 inline-block px-8">
+                      {user?.full_name || "Student Name"}
+                    </p>
+                    <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+                      For successfully completing all curriculum modules, chapter quizzes, and passing the proctored
+                      final exam for
+                    </p>
+                    <h3 className="text-sm font-bold text-slate-900 font-serif">"{course.title}"</h3>
+                    <div className="flex items-center justify-between pt-6 border-t border-slate-200/80 text-[11px] text-slate-600">
                       <div>
-                        <h6 className="text-xs font-bold text-slate-800">
-                          Import from Chapter Questions
-                        </h6>
-                        <p className="text-[11px] text-slate-500">
-                          {courseApprovedQuestions.length} approved questions available across course chapters.
-                        </p>
+                        <p className="font-semibold">{new Date().toLocaleDateString()}</p>
+                        <p className="text-[10px] text-slate-400">Date of Issuance</p>
                       </div>
-
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          const toAdd: ManagedQuestionItem[] = courseApprovedQuestions.map((q) => {
-                            const opts = (q as any).options?.map((o: any) => ({
-                              id: o.id || "a",
-                              text: o.text || "",
-                            })) || [];
-                            return {
-                              id: q.question_id,
-                              text: q.text,
-                              questionType: q.question_type || "mcq_single",
-                              marks: q.default_marks || 2,
-                              options: opts,
-                              correctAnswer: (q as any).answer_key?.correct || "a",
-                              explanation: (q as any).explanation || "",
-                            };
-                          });
-                          persistFinalQuestions([...finalCustomQuestions, ...toAdd]);
-                          notify.success(`Added ${toAdd.length} chapter questions to Final Exam!`);
-                        }}
-                        className="text-xs font-semibold"
-                      >
-                        + Add All {courseApprovedQuestions.length} Chapter Questions
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2 border-t border-emerald-200/60">
-                  <button
-                    type="button"
-                    onClick={() => setIsConfiguringExam(false)}
-                    className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveFinalExam}
-                    disabled={
-                      isCreatingTest ||
-                      isUpdatingTest ||
-                      isSavingRules ||
-                      (finalCustomQuestions.length === 0 && !hasApprovedQuestions)
-                    }
-                    className="px-5 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] disabled:opacity-50 cursor-pointer shadow-xs"
-                  >
-                    {isCreatingTest || isUpdatingTest || isSavingRules ? "Saving..." : "Save Exam Configuration"}
-                  </button>
-                </div>
-              </div>
-            ) : stepsStatus.step5Done ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
-                    <span className="text-[11px] text-slate-500 font-medium block">Duration</span>
-                    <b className="text-lg font-bold text-[#0A1530]">
-                      {finalTestDetail?.duration_minutes || 60} mins
-                    </b>
-                  </div>
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
-                    <span className="text-[11px] text-slate-500 font-medium block">Pass Mark</span>
-                    <b className="text-lg font-bold text-[#0A1530]">
-                      {versionDetail?.rule?.final_pass_mark || 70}%
-                    </b>
-                  </div>
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
-                    <span className="text-[11px] text-slate-500 font-medium block">Attempts Allowed</span>
-                    <b className="text-lg font-bold text-[#0A1530]">
-                      {versionDetail?.rule?.final_test_attempts || 3}
-                    </b>
-                  </div>
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
-                    <span className="text-[11px] text-slate-500 font-medium block">Camera Required</span>
-                    <b className="text-lg font-bold text-[#00663C]">
-                      {finalTestDetail?.proctoring_level !== "none" ? "Yes" : "No"}
-                    </b>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#00663C] flex items-center justify-center">
-                      <Icon name="check" size={20} />
-                    </div>
-                    <div>
-                      <h5 className="text-xs font-bold text-slate-900">
-                        {finalTestDetail?.title || "Final Certification Exam"}
-                      </h5>
-                      <p className="text-[11px] text-slate-500 font-mono">
-                        Test ID: {finalTestId} · Linked & Active for Students
-                      </p>
+                      <div className="w-12 h-12 rounded bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 text-[10px] font-mono">
+                        QR Code
+                      </div>
+                      <div>
+                        <p className="font-semibold font-serif italic">{certSignatoryName}</p>
+                        <p className="text-[10px] text-slate-400">{certSignatoryTitle}</p>
+                      </div>
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsConfiguringExam(true)}
-                    className="px-3.5 py-1.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
-                  >
-                    Edit Exam
-                  </button>
                 </div>
               </div>
-            ) : (
-              <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl">
-                <Icon name="shield" size={32} className="mx-auto text-slate-300 mb-2" />
-                <h4 className="text-sm font-bold text-slate-800">Final exam is not set</h4>
-                <p className="text-xs text-slate-500 mt-1 mb-4 max-w-sm mx-auto">
-                  Step 5 of 5: Configure the proctored exam with passing score, timer, and webcam rules.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setIsConfiguringExam(true)}
-                  className="px-4 py-2 rounded-xl bg-[#00663C] text-xs font-bold text-white hover:bg-[#00522F] cursor-pointer shadow-xs"
-                >
-                  Configure Final Exam
-                </button>
-              </div>
-            )}
+            </div>
           </div>
         )}
 
-        {/* Tab 4: Students */}
-        {activeTab === "students" && (
-          <div className="p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        {/* ========================================================================= */}
+        {/* TAB 7: PRICING & HISTORY (Live Editing & Audit Log)                      */}
+        {/* ========================================================================= */}
+        {activeTab === "pricing" && (
+          <div className="p-6 space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div>
-                <h4 className="text-sm font-bold text-[#0A1530]">Enrolled Students</h4>
-                <p className="text-xs text-slate-500">
-                  Real student enrollments for batches assigned to this course.
+                <h3 className="text-base font-bold text-slate-900">Course Pricing & Price Change History</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Manage individual and institutional pricing rates and review the auditable price modification log.
                 </p>
               </div>
-              <span className="px-3 py-1 rounded-full bg-emerald-50 text-[#00663C] text-xs font-bold">
-                {enrolledStudents.length} Active {enrolledStudents.length === 1 ? "Student" : "Students"}
-              </span>
+
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm" onClick={handleExportAuditsCsv} className="gap-1.5 text-xs">
+                  <Download size={13} />
+                  <span>Export CSV</span>
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsEditPricingOpen(true)}
+                  className="gap-1.5 text-xs font-semibold"
+                >
+                  <Edit size={13} />
+                  <span>Edit Pricing</span>
+                </Button>
+              </div>
             </div>
 
-            {enrolledStudents.length === 0 ? (
-              <div className="text-center py-12">
-                <Icon name="users" size={32} className="mx-auto text-slate-300 mb-2" />
-                <h4 className="text-sm font-bold text-slate-800">No students enrolled yet</h4>
-                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                  Students will appear here once assigned to batches for this course.
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white">
-                {enrolledStudents.map((enr, eIdx) => (
-                  <div key={enr.enrollment_id || eIdx} className="p-3.5 flex items-center justify-between hover:bg-slate-50/60">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#E7F3EC] text-[#00663C] font-bold text-xs flex items-center justify-center">
-                        {String(eIdx + 1)}
-                      </div>
-                      <div>
-                        <b className="text-xs font-bold text-[#0A1530] block">
-                          Student #{enr.student_user_id}
-                        </b>
-                        <span className="text-[11px] text-slate-400 font-mono">
-                          Batch: {enr.batch_id} · Enrolled {new Date(enr.enrolled_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#E7F3EC] text-[#00663C]">
-                      {enr.status}
+            {/* Current Pricing Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Individual Student Pricing */}
+              <div className="rounded-xl border border-slate-200 p-5 bg-white shadow-2xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <DollarSign size={14} className="text-[#2563EB]" />
+                    <span>Individual Student Pricing</span>
+                  </h4>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-[#2563EB]">
+                    B2C / Direct
+                  </span>
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-500">Base Catalog Price</span>
+                    <span className="font-semibold text-slate-900">
+                      ₹{((currentPricing?.individual_price_paise || 199900) / 100).toLocaleString("en-IN")}
                     </span>
                   </div>
-                ))}
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-500">Active Discount</span>
+                    <span className="font-semibold text-emerald-600">
+                      {currentPricing?.discount_percent || 0}% Off
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-500">GST Rate</span>
+                    <span className="font-semibold text-slate-700">18% (Applicable at checkout)</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 pt-2">
+                    <span className="font-bold text-slate-900">Final Student Price</span>
+                    <span className="text-base font-bold text-[#2563EB]">
+                      ₹
+                      {(
+                        ((currentPricing?.individual_price_paise || 199900) / 100) *
+                        (1 - (currentPricing?.discount_percent || 0) / 100)
+                      ).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
               </div>
-            )}
+
+              {/* Institutional Pricing */}
+              <div className="rounded-xl border border-slate-200 p-5 bg-white shadow-2xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Users size={14} className="text-purple-600" />
+                    <span>Institutional Purchase Pricing</span>
+                  </h4>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700">
+                    B2B / Colleges
+                  </span>
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-500">Per Student Seat Rate</span>
+                    <span className="font-semibold text-slate-900">
+                      ₹
+                      {(
+                        (currentPricing?.fixed_price_paise ||
+                          currentPricing?.institutional_price_per_seat_paise ||
+                          99900) /
+                        100
+                      ).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-500">Minimum Seat Requirement</span>
+                    <span className="font-semibold text-slate-900">{currentPricing?.min_students || 10} Seats</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-500">Maximum Seat Limit</span>
+                    <span className="font-semibold text-slate-900">{currentPricing?.max_students || 1000} Seats</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 pt-2">
+                    <span className="font-bold text-slate-900">Sample 100-Seat Package</span>
+                    <span className="text-base font-bold text-purple-700">
+                      ₹
+                      {(
+                        ((currentPricing?.fixed_price_paise ||
+                          currentPricing?.institutional_price_per_seat_paise ||
+                          99900) /
+                          100) *
+                        100
+                      ).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Price Change Audit Log Table */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                Audit History ({pricingAudits.length} Records)
+              </h4>
+              <div className="rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-3">Date & Time</th>
+                      <th className="py-2.5 px-3">Prev Indiv → New Indiv</th>
+                      <th className="py-2.5 px-3">Prev Inst → New Inst</th>
+                      <th className="py-2.5 px-3">Changed By</th>
+                      <th className="py-2.5 px-3">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {pricingAudits.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-slate-400">
+                          No price changes recorded yet. Click "Edit Pricing" above to set or modify prices.
+                        </td>
+                      </tr>
+                    ) : (
+                      pricingAudits.map((audit) => (
+                        <tr key={audit.id} className="hover:bg-slate-50/70">
+                          <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
+                            {new Date(audit.created_at || Date.now()).toLocaleString()}
+                          </td>
+                          <td className="py-2.5 px-3 font-semibold text-slate-800">
+                            ₹{(audit.previous_individual_price_paise / 100).toFixed(0)} →{" "}
+                            <span className="text-[#2563EB]">
+                              ₹{(audit.new_individual_price_paise / 100).toFixed(0)}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-semibold text-slate-800">
+                            ₹{(audit.previous_institutional_price_paise / 100).toFixed(0)} →{" "}
+                            <span className="text-purple-700">
+                              ₹{(audit.new_institutional_price_paise / 100).toFixed(0)}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-600 font-medium">
+                            {audit.admin_email || audit.admin_name || `Admin #${audit.admin_user_id}`}
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-700 max-w-xs truncate">
+                            {audit.reason || "Price adjustment"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 8: PREVIEW & PUBLISH                                                 */}
+        {/* ========================================================================= */}
+        {activeTab === "preview" && (
+          <div className="p-6 space-y-6">
+            <div className="pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Publication Readiness & Student Preview</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Verify that your course satisfies all readiness criteria before publishing to students and institutions.
+              </p>
+            </div>
+
+            {/* Readiness Checklist */}
+            <div className="rounded-xl border border-slate-200 p-5 bg-white space-y-4">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Readiness Checklist</h4>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 size={18} className="text-emerald-600" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">Basic Information & Metadata</p>
+                      <p className="text-[11px] text-slate-500">Title, description, slug, and category are configured</p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                    Complete
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center gap-3">
+                    {readiness.hasCurriculum ? (
+                      <CheckCircle2 size={18} className="text-emerald-600" />
+                    ) : (
+                      <AlertCircle size={18} className="text-amber-500" />
+                    )}
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">Curriculum Content</p>
+                      <p className="text-[11px] text-slate-500">
+                        {modules.length} modules, {totalChapters} chapters configured
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={cn(
+                      "text-[11px] font-bold px-2 py-0.5 rounded",
+                      readiness.hasCurriculum ? "text-emerald-700 bg-emerald-50" : "text-amber-700 bg-amber-50"
+                    )}
+                  >
+                    {readiness.hasCurriculum ? "Complete" : "Needs Content"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center gap-3">
+                    {readiness.hasAssessments ? (
+                      <CheckCircle2 size={18} className="text-emerald-600" />
+                    ) : (
+                      <AlertCircle size={18} className="text-amber-500" />
+                    )}
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">Assessments & Final Exam</p>
+                      <p className="text-[11px] text-slate-500">
+                        {finalTestId ? "Proctored Final Exam active" : "Default passing standards applied"}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                    Configured
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 size={18} className="text-emerald-600" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">Pricing Configuration</p>
+                      <p className="text-[11px] text-slate-500">Individual B2C and institutional seat pricing set</p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                    Configured
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Launch Actions */}
+            <div className="rounded-xl border border-slate-200 p-6 bg-gradient-to-r from-slate-50 via-white to-blue-50/30 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  {isPublished ? "Course is Live & Enrolling" : "Ready to Publish Course?"}
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {isPublished
+                    ? "Students can purchase this course, access video lectures, take quizzes and complete tests."
+                    : "Once published, this course will immediately appear in the catalog and institutional store."}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="secondary"
+                  onClick={() => navigate(`/courses/${courseId}/learn`)}
+                  className="gap-1.5 text-xs font-semibold"
+                >
+                  <ExternalLink size={14} />
+                  <span>Student View Preview</span>
+                </Button>
+                <Button
+                  variant={isPublished ? "secondary" : "primary"}
+                  onClick={handleTogglePublish}
+                  className="text-xs font-bold px-5"
+                >
+                  {isPublished ? "Unpublish Course" : "Publish Course Now"}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Modals */}
-      <AddModuleModal
-        isOpen={isAddModuleOpen}
-        initialData={
-          editingModule
-            ? {
-                title: editingModule.title,
-                description: editingModule.description || "",
-                position: editingModule.position || modules.length + 1,
-              }
-            : null
-        }
-        courseTitle={course?.title}
-        defaultPosition={modules.length + 1}
-        onClose={() => {
-          setIsAddModuleOpen(false);
-          setEditingModule(null);
-        }}
-        onSubmit={handleSaveModule}
-      />
+      {/* ========================================================================= */}
+      {/* MODAL: EDIT PRICING                                                      */}
+      {/* ========================================================================= */}
+      {isEditPricingOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/40 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/70">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Edit Course Pricing</h3>
+                <p className="text-[11px] text-slate-500">Modifications are logged to the permanent audit trail.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditPricingOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1"
+              >
+                ✕
+              </button>
+            </div>
 
-      <ConfirmModal
-        isOpen={Boolean(deletingModule)}
-        title="Delete module?"
-        description={`Are you sure you want to delete "${deletingModule?.title}"? All chapters inside this module will also be removed.`}
-        confirmLabel="Delete"
-        tone="danger"
-        onConfirm={handleDeleteModule}
-        onClose={() => setDeletingModule(null)}
-      />
+            <form onSubmit={handleSavePricing} className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Individual Price (₹) *</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    required
+                    value={priceForm.individualPrice}
+                    onChange={(e) => setPriceForm({ ...priceForm, individualPrice: Number(e.target.value) })}
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2563EB]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Discount (%)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={priceForm.discountPercent}
+                    onChange={(e) => setPriceForm({ ...priceForm, discountPercent: Number(e.target.value) })}
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2563EB]"
+                  />
+                </div>
+              </div>
 
-      <ConfirmModal
-        isOpen={isRemoveExamModalOpen}
-        title="Remove Final Exam Configuration?"
-        description="Are you sure you want to remove the final exam from this course? Students will not be able to take the certification exam until a new exam is configured."
-        confirmLabel="Remove Exam"
-        tone="danger"
-        onConfirm={handleRemoveFinalExam}
-        onClose={() => setIsRemoveExamModalOpen(false)}
-      />
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Inst. Price/Seat (₹) *</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    required
+                    value={priceForm.institutionalPrice}
+                    onChange={(e) => setPriceForm({ ...priceForm, institutionalPrice: Number(e.target.value) })}
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2563EB]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Min Seats</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={priceForm.minSeats}
+                    onChange={(e) => setPriceForm({ ...priceForm, minSeats: Number(e.target.value) })}
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2563EB]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Max Seats</label>
+                  <input
+                    type="number"
+                    min={priceForm.minSeats}
+                    value={priceForm.maxSeats}
+                    onChange={(e) => setPriceForm({ ...priceForm, maxSeats: Number(e.target.value) })}
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2563EB]"
+                  />
+                </div>
+              </div>
 
-      {/* Module Test Setup Modal */}
-      {managingModuleTest && versionId && courseId && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Reason for Price Change * <span className="text-[10px] text-rose-500 font-normal">(Mandatory)</span>
+                </label>
+                <textarea
+                  required
+                  rows={2}
+                  placeholder="e.g. Q4 promotional pricing or revised institutional seat tier"
+                  value={priceForm.reason}
+                  onChange={(e) => setPriceForm({ ...priceForm, reason: e.target.value })}
+                  className="w-full rounded-xl border border-slate-300 p-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#2563EB]"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <Button variant="secondary" size="sm" type="button" onClick={() => setIsEditPricingOpen(false)}>
+                  Cancel
+                </Button>
+                <Button variant="primary" size="sm" type="submit" disabled={isUpdatingPricing}>
+                  {isUpdatingPricing ? "Saving..." : "Save Price Changes"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODALS: ADD/EDIT MODULE, DELETE MODULE, MODULE TEST SETUP                */}
+      {/* ========================================================================= */}
+      {isAddModuleOpen && (
+        <AddModuleModal
+          isOpen={isAddModuleOpen}
+          initialData={editingModule ? { title: editingModule.title, description: editingModule.description || "", position: editingModule.position || 1 } : undefined}
+          onClose={() => {
+            setIsAddModuleOpen(false);
+            setEditingModule(null);
+          }}
+          onSubmit={handleSaveModule}
+        />
+      )}
+
+      {deletingModule && (
+        <ConfirmModal
+          isOpen={Boolean(deletingModule)}
+          title="Delete Module"
+          description={`Are you sure you want to delete "${deletingModule.title}"? All chapters and questions inside will be permanently removed.`}
+          confirmLabel="Delete Module"
+          tone="danger"
+          onClose={() => setDeletingModule(null)}
+          onConfirm={handleDeleteModule}
+        />
+      )}
+
+      {managingModuleTest && versionId && (
         <ModuleTestSetupModal
           isOpen={Boolean(managingModuleTest)}
-          onClose={() => setManagingModuleTest(null)}
-          module={managingModuleTest}
-          courseId={courseId}
+          courseId={courseId ?? ""}
           versionId={versionId}
+          module={managingModuleTest}
+          onClose={() => setManagingModuleTest(null)}
           onSaved={() => {
+            setManagingModuleTest(null);
             refetchVersion();
-            refetchCourse();
           }}
+        />
+      )}
+
+      {addingChapterToModule && versionId && (
+        <AddChapterModal
+          isOpen={Boolean(addingChapterToModule)}
+          moduleTitle={addingChapterToModule.title}
+          courseId={courseId}
+          moduleId={addingChapterToModule.module_id}
+          defaultPosition={(addingChapterToModule.topics?.length ?? 0) + 1}
+          onClose={() => setAddingChapterToModule(null)}
+          onSubmit={handleSaveChapterInHub}
+        />
+      )}
+
+      {managingChapterTest && versionId && (
+        <ChapterTestSetupModal
+          isOpen={Boolean(managingChapterTest)}
+          chapter={managingChapterTest.chapter}
+          moduleTitle={managingChapterTest.moduleTitle}
+          courseId={courseId ?? ""}
+          versionId={versionId}
+          moduleId={managingChapterTest.moduleId}
+          onClose={() => setManagingChapterTest(null)}
+          onSaved={() => {
+            setManagingChapterTest(null);
+            refetchVersion();
+          }}
+        />
+      )}
+
+      {/* Media Previews */}
+      {videoPreviewTarget && (
+        <AdminVideoPreviewModal
+          isOpen={Boolean(videoPreviewTarget)}
+          chapterTitle={videoPreviewTarget.chapterTitle}
+          itemTitle={videoPreviewTarget.itemTitle}
+          mediaId={videoPreviewTarget.mediaId}
+          onClose={() => setVideoPreviewTarget(null)}
+        />
+      )}
+
+      {pdfPreviewTarget && (
+        <AdminPdfPreviewModal
+          isOpen={Boolean(pdfPreviewTarget)}
+          chapterTitle={pdfPreviewTarget.chapterTitle}
+          itemTitle={pdfPreviewTarget.itemTitle}
+          mediaId={pdfPreviewTarget.mediaId}
+          onClose={() => setPdfPreviewTarget(null)}
         />
       )}
     </div>

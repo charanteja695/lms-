@@ -79,9 +79,9 @@ class Settings(BaseSettings):
     # --- Hashing ---
     # Server-side pepper used to HMAC refresh tokens, OTPs and reset links at rest.
     TOKEN_HASH_SECRET: SecretStr = SecretStr(f"{DEV_SECRET_MARKER}-token-hash-secret-change-me-0")
-    ARGON2_TIME_COST: int = Field(default=3, ge=1)
-    ARGON2_MEMORY_COST_KIB: int = Field(default=65536, ge=8)
-    ARGON2_PARALLELISM: int = Field(default=4, ge=1)
+    ARGON2_TIME_COST: int = Field(default=1, ge=1)
+    ARGON2_MEMORY_COST_KIB: int = Field(default=32768, ge=8)
+    ARGON2_PARALLELISM: int = Field(default=2, ge=1)
     # Password hashes computed at once per instance. Each uses ARGON2_MEMORY_COST_KIB of RAM, so this bounds
     # memory during login bursts (e.g. 8 x 64 MB = 512 MB). Scale out instances for more throughput.
     PASSWORD_HASH_CONCURRENCY: int = Field(default_factory=lambda: max(2, os.cpu_count() or 2), ge=1, le=256)
